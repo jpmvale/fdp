@@ -548,6 +548,29 @@ describe('CA-296/CA-297: retirada', () => {
     expect(result.state.deckCount).toBe(1);
   });
 
+  it('partida encerrada não deixa jogador da vez apontando para quem saiu', () => {
+    // Regressão: a retirada que encerra a partida mantinha `activePlayerId`
+    // no jogador retirado, violando INV-08 e fazendo a UI pedir jogada a um
+    // fantasma. Encontrado pelo teste de propriedade da sala (CA-311).
+    let state = createMatch({ matchId: 'm', seed: 'fantasma', playerIds: players(3) });
+    state = settle({ ...state, cardsThisRound: 3 }).state;
+    while (state.round.phase === 'APOSTAS') {
+      state = must(applyMove(state, legalMoves(state)[0]!, ctx));
+    }
+    const daVez = state.round.activePlayerId!;
+    expect(daVez).not.toBeNull();
+
+    // Retira todos menos um: a partida encerra na hora.
+    const outros = state.playerOrder.filter((id) => id !== state.playerOrder[0]!);
+    const result = withdrawPlayers(state, outros, ctx);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.state.endReason).toBe('VITORIA_POR_ABANDONO');
+    expect(result.state.round.activePlayerId).toBeNull();
+    expect(checkInvariants(result.state)).toEqual([]);
+  });
+
   it('CA-297/CA-055: sobrando 1, encerra com VITORIA_POR_ABANDONO', () => {
     let state = createMatch({ matchId: 'm', seed: 'aband', playerIds: players(3) });
     state = settle(state).state;

@@ -19,7 +19,8 @@
       "@fdp/rules": ["./packages/rules/src/index.ts"],
       "@fdp/store": ["./packages/store/src/index.ts"],
       "@fdp/protocol": ["./packages/protocol/src/index.ts"],
-      "@fdp/protocol/validate": ["./packages/protocol/src/validate.ts"]
+      "@fdp/protocol/validate": ["./packages/protocol/src/validate.ts"],
+      "@fdp/room": ["./packages/room/src/index.ts"]
     }
   }
 }

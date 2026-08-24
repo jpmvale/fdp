@@ -1,8 +1,17 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/rules" },
-    { "path": "./packages/store" },
-    { "path": "./packages/protocol" }
+    {
+      "path": "./packages/rules"
+    },
+    {
+      "path": "./packages/store"
+    },
+    {
+      "path": "./packages/protocol"
+    },
+    {
+      "path": "./packages/room"
+    }
   ]
 }

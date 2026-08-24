@@ -672,7 +672,11 @@ function finish(
 ): MoveResult {
   return {
     ok: true,
-    state: { ...state, winnerIds, endReason },
+    // Partida encerrada não tem jogador da vez. Sem esta limpeza, um
+    // encerramento por retirada deixa `activePlayerId` apontando para quem
+    // acabou de sair — estado inconsistente que viola INV-08 e faria a UI
+    // pedir jogada a um fantasma.
+    state: { ...state, round: { ...state.round, activePlayerId: null }, winnerIds, endReason },
     events: [...events, { type: 'match:ended', winnerIds, endReason: endReason! }],
   };
 }
@@ -762,5 +766,10 @@ export function endMatch(
   endReason: NonNullable<MatchState['endReason']>,
 ): MatchState {
   if (state.endReason !== null) return state;
-  return { ...state, endReason, winnerIds: state.winnerIds ?? [] };
+  return {
+    ...state,
+    round: { ...state.round, activePlayerId: null },
+    endReason,
+    winnerIds: state.winnerIds ?? [],
+  };
 }

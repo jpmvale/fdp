@@ -26,7 +26,7 @@ Em desenvolvimento. O jogo ainda não é jogável.
 packages/rules/      ✅  motor de regras — puro e determinístico
 packages/store/      ✅  RoomStore: interface + memória (Redis pendente)
 packages/protocol/   ✅  contrato cliente ↔ servidor + validação
-packages/room/       ⬜  máquina de sala, timers, pausa, auto-play
+packages/room/       ✅  máquina de sala, timers, pausa, auto-play
 server/              ⬜  Hono + WebSocket
 app/                 ⬜  cliente Vite + React
 ```
@@ -56,7 +56,7 @@ Requer Node 24+.
 
 ```bash
 npm install
-npm test          # 98 testes
+npm test          # 137 testes
 npm run typecheck
 ```
 
@@ -65,8 +65,15 @@ de propriedade que simula **1.000 partidas** — 2 a 8 jogadores, ambos os modos
 verifica os 18 invariantes a cada jogada, além de checar vazamento de informação oculta em toda
 projeção gerada.
 
-Esse teste já encontrou bugs reais: na rodada de testa, a carta estava sendo contada duas vezes
-— na mão e na mesa — quebrando a conservação de cartas sem sintoma visível.
+Há um segundo teste de propriedade que simula 300 partidas **com quedas de conexão e decisões
+de ausência aleatórias**, verificando que nenhuma sala fica presa em pausa.
+
+Os dois já encontraram bugs reais que nenhuma revisão de código teria pego:
+
+- Na rodada de testa, a carta era contada duas vezes — na mão e na mesa — quebrando a
+  conservação de cartas sem sintoma visível.
+- Uma partida encerrada por retirada mantinha o "jogador da vez" apontando para quem acabou de
+  sair, fazendo a interface pedir jogada a um fantasma.
 
 ## Arquitetura
 
