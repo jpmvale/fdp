@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Tipagem estrita: sem `any` na fronteira de dados (RNF-103).
+      - name: Typecheck
+        run: npx tsc -b --pretty
+
+      # Inclui CA-310/CA-311: 1.000 partidas simuladas sem violar invariante.
+      - name: Testes
+        run: npm test
+
+      # RJ-143: o motor de regras não pode alcançar UI, rede nem store.
+      - name: Fronteira de imports do motor de regras
+        run: |
+          if grep -rnE "from '(@fdp/(store|protocol|room)|\.\./\.\./(app|server))" packages/rules/src; then
+            echo "::error::packages/rules importou fora da própria fronteira (RJ-143)"
+            exit 1
+          fi
+          echo "fronteira preservada"
+
+      # RJ-140: tempo e aleatoriedade entram por parâmetro, nunca do ambiente.
+      - name: Pureza do motor de regras
+        run: |
+          if grep -rn "Date\.now\|Math\.random" packages/rules/src --include=*.ts | grep -v '^\S*: *\*'; then
+            echo "::error::packages/rules usa Date.now ou Math.random (RJ-140)"
+            exit 1
+          fi
+          echo "motor puro"

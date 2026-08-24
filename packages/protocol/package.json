@@ -1,0 +1,14 @@
+{
+  "name": "@fdp/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./validate": "./src/validate.ts"
+  },
+  "dependencies": {
+    "@fdp/rules": "*",
+    "zod": "^4.4.3"
+  }
+}

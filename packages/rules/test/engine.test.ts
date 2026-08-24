@@ -1,0 +1,614 @@
+/**
+ * Testes do motor: partidas completas, projeção, auto-play e propriedade.
+ * Cita os critérios de docs/10-criterios-de-aceite.md §4.
+ */
+
+import { describe, expect, it } from 'vitest';
+import {
+  advance,
+  applyMove,
+  autoMove,
+  checkInvariants,
+  checkNoLeak,
+  createMatch,
+  isActive,
+  project,
+  ranking,
+  withdrawPlayers,
+  type EngineEvent,
+  type MatchOptions,
+  type MatchState,
+  type Move,
+  type PlayerId,
+} from '../src/index.js';
+
+const ctx = { now: 0 };
+
+function players(n: number): PlayerId[] {
+  return Array.from({ length: n }, (_, i) => `p${i + 1}`);
+}
+
+function must(result: ReturnType<typeof applyMove>): MatchState {
+  if (!result.ok) throw new Error(`jogada rejeitada: ${result.code}/${result.motivo}`);
+  return result.state;
+}
+
+/** Roda todas as fases automáticas pendentes. */
+function settle(state: MatchState): { state: MatchState; events: EngineEvent[] } {
+  const events: EngineEvent[] = [];
+  let current = state;
+  while (
+    current.endReason === null &&
+    ['DISTRIBUICAO', 'REVELACAO', 'RESOLUCAO'].includes(current.round.phase)
+  ) {
+    const result = advance(current, ctx);
+    if (!result.ok) throw new Error(`advance falhou: ${result.motivo}`);
+    current = result.state;
+    events.push(...result.events);
+  }
+  return { state: current, events };
+}
+
+/**
+ * Joga uma partida inteira com uma política de escolha, verificando invariantes
+ * a cada passo. Devolve o estado final.
+ */
+function playMatch(
+  seed: string,
+  playerCount: number,
+  options: Partial<MatchOptions>,
+  pick: (state: MatchState, legal: Move[]) => Move,
+  maxSteps = 20_000,
+): { state: MatchState; violations: string[] } {
+  let state = createMatch({
+    matchId: `m-${seed}`,
+    seed,
+    playerIds: players(playerCount),
+    options,
+  });
+  const violations: string[] = [];
+
+  const audit = (s: MatchState): void => {
+    violations.push(...checkInvariants(s));
+    for (const viewer of s.playerOrder) violations.push(...checkNoLeak(s, viewer));
+  };
+
+  let steps = 0;
+  while (state.endReason === null) {
+    if (++steps > maxSteps) throw new Error(`partida não terminou em ${maxSteps} passos`);
+    const settled = settle(state);
+    state = settled.state;
+    audit(state);
+    if (state.endReason !== null) break;
+
+    const legal = legalMoves(state);
+    state = must(applyMove(state, pick(state, legal), ctx));
+    audit(state);
+  }
+
+  return { state, violations };
+}
+
+function legalMoves(state: MatchState): Move[] {
+  const playerId = state.round.activePlayerId;
+  if (playerId === null) return [];
+  const base = {
+    playerId,
+    roundNumber: state.roundNumber,
+    trickNumber: state.round.trickNumber,
+  };
+
+  if (state.round.phase === 'APOSTAS') {
+    const { round, cardsThisRound } = state;
+    const placed = round.bidOrder.filter((id) => round.bets[id] !== undefined);
+    const isLast = placed.length === round.bidOrder.length - 1;
+    const sum = placed.reduce((n, id) => n + round.bets[id]!, 0);
+    const forbidden = isLast ? cardsThisRound - sum : null;
+    const moves: Move[] = [];
+    for (let bet = 0; bet <= cardsThisRound; bet++) {
+      if (bet !== forbidden) moves.push({ ...base, type: 'bet', bet });
+    }
+    return moves;
+  }
+
+  return (state.hidden.hands[playerId] ?? []).map((cardId) => ({
+    ...base,
+    type: 'playCard' as const,
+    cardId,
+  }));
+}
+
+// --- CA-200 / CA-303: determinismo -----------------------------------------
+
+describe('CA-200/CA-303: determinismo', () => {
+  it('o mesmo seed produz setup idêntico', () => {
+    const a = createMatch({ matchId: 'm', seed: 'fixo', playerIds: players(5) });
+    const b = createMatch({ matchId: 'm', seed: 'fixo', playerIds: players(5) });
+    expect(a.playerOrder).toEqual(b.playerOrder);
+    expect(a.firstBidderId).toBe(b.firstBidderId);
+  });
+
+  it('a partida inteira é reproduzível a partir do seed', () => {
+    const pickFirst = (_: MatchState, legal: Move[]): Move => legal[0]!;
+    const a = playMatch('repro', 4, {}, pickFirst);
+    const b = playMatch('repro', 4, {}, pickFirst);
+    expect(a.state.winnerIds).toEqual(b.state.winnerIds);
+    expect(a.state.roundNumber).toBe(b.state.roundNumber);
+    expect(a.state.history).toEqual(b.state.history);
+  });
+
+  it('CA-206: playerOrder é permutação e não muda até o fim', () => {
+    const initial = createMatch({ matchId: 'm', seed: 'ordem', playerIds: players(6) });
+    expect([...initial.playerOrder].sort()).toEqual(players(6).sort());
+    expect(initial.cardsThisRound).toBe(1); // RJ-033
+    expect(initial.playerOrder).toContain(initial.firstBidderId);
+
+    const final = playMatch('ordem', 6, {}, (_, l) => l[0]!).state;
+    expect(final.playerOrder).toEqual(initial.playerOrder);
+  });
+
+  it('CA-208: todos começam com vidasIniciais', () => {
+    const state = createMatch({
+      matchId: 'm',
+      seed: 'vidas',
+      playerIds: players(4),
+      options: { vidasIniciais: 3 },
+    });
+    expect(Object.values(state.lives)).toEqual([3, 3, 3, 3]);
+  });
+
+  it('rejeita contagem de jogadores fora de 2..8', () => {
+    expect(() => createMatch({ matchId: 'm', seed: 's', playerIds: players(1) })).toThrow();
+    expect(() => createMatch({ matchId: 'm', seed: 's', playerIds: players(9) })).toThrow();
+  });
+});
+
+// --- CA-210 / CA-211: distribuição -----------------------------------------
+
+describe('CA-210/CA-211: distribuição', () => {
+  it('CA-210: 8 jogadores × 7 cartas usam 2 baralhos e sobram 48 no monte', () => {
+    let state = createMatch({
+      matchId: 'm',
+      seed: 'oito',
+      playerIds: players(8),
+      options: { maxCartasPorRodada: 7 },
+    });
+    // Salta direto para uma rodada de 7 cartas.
+    state = { ...state, cardsThisRound: 7, deckCount: 0 };
+    state = settle(state).state;
+
+    expect(state.deckCount).toBe(2);
+    expect(state.hidden.stock).toHaveLength(104 - 56);
+    for (const id of state.playerOrder) {
+      expect(state.hidden.hands[id]).toHaveLength(7);
+    }
+    expect(checkInvariants(state)).toEqual([]);
+  });
+
+  it('CA-211: o sabot é regerado a cada rodada', () => {
+    const first = settle(
+      createMatch({ matchId: 'm', seed: 'regen', playerIds: players(3) }),
+    ).state;
+    const idsRound1 = new Set(Object.keys(first.hidden.cards));
+
+    let state = first;
+    while (state.roundNumber === 1 && state.endReason === null) {
+      state = settle(state).state;
+      if (state.endReason !== null || state.roundNumber > 1) break;
+      state = must(applyMove(state, legalMoves(state)[0]!, ctx));
+    }
+    state = settle(state).state;
+
+    const idsRound2 = Object.keys(state.hidden.cards);
+    expect(idsRound2.some((id) => idsRound1.has(id))).toBe(false);
+  });
+});
+
+// --- CA-281 a CA-286: visibilidade -----------------------------------------
+
+describe('CA-281 a CA-286: projeção e vazamento', () => {
+  it('CA-281/CA-282: na rodada de testa vejo todos menos a mim', () => {
+    const state = settle(
+      createMatch({ matchId: 'm', seed: 'testa', playerIds: players(4) }),
+    ).state;
+    expect(state.round.isForeheadRound).toBe(true);
+
+    for (const viewer of state.playerOrder) {
+      const view = project(state, viewer);
+      // CA-282: as cartas dos outros três estão completas.
+      expect(Object.keys(view.foreheadCards).sort()).toEqual(
+        state.playerOrder.filter((id) => id !== viewer).sort(),
+      );
+      for (const card of Object.values(view.foreheadCards)) {
+        expect(card.rank).toBeDefined();
+        expect(card.value).toBeGreaterThanOrEqual(2);
+      }
+      // CA-281: a própria carta não aparece em profundidade alguma.
+      expect(view.foreheadCards[viewer]).toBeUndefined();
+      expect(view.hand).toEqual([]);
+      expect(checkNoLeak(state, viewer)).toEqual([]);
+    }
+  });
+
+  it('CA-281: o CardId próprio não aparece no objeto serializado', () => {
+    const state = settle(
+      createMatch({ matchId: 'm', seed: 'serial', playerIds: players(5) }),
+    ).state;
+    for (const viewer of state.playerOrder) {
+      const serialized = JSON.stringify(project(state, viewer));
+      const ownCardId = state.hidden.hands[viewer]![0]!;
+      expect(serialized).not.toContain(ownCardId);
+    }
+  });
+
+  it('CA-286: em rodada de N>1 vejo só a minha mão e a contagem alheia', () => {
+    let state = createMatch({ matchId: 'm', seed: 'mao', playerIds: players(4) });
+    state = settle({ ...state, cardsThisRound: 4 }).state;
+
+    for (const viewer of state.playerOrder) {
+      const view = project(state, viewer);
+      expect(view.hand).toHaveLength(4);
+      expect(Object.keys(view.foreheadCards)).toEqual([]);
+      for (const id of state.playerOrder) expect(view.handCounts[id]).toBe(4);
+      expect(checkNoLeak(state, viewer)).toEqual([]);
+    }
+  });
+
+  it('o valor proibido só vai para quem está na vez', () => {
+    let state = createMatch({ matchId: 'm', seed: 'proib', playerIds: players(3) });
+    state = settle({ ...state, cardsThisRound: 3 }).state;
+    // Deixa só o último apostador de fora.
+    state = must(applyMove(state, { ...baseMove(state), type: 'bet', bet: 1 }, ctx));
+    state = must(applyMove(state, { ...baseMove(state), type: 'bet', bet: 1 }, ctx));
+
+    const lastBidder = state.round.activePlayerId!;
+    expect(project(state, lastBidder).forbiddenBet).toBe(1); // 3 − 2
+    for (const other of state.playerOrder.filter((id) => id !== lastBidder)) {
+      expect(project(state, other).forbiddenBet).toBeNull();
+    }
+  });
+});
+
+function baseMove(state: MatchState): {
+  playerId: PlayerId;
+  roundNumber: number;
+  trickNumber: number;
+} {
+  return {
+    playerId: state.round.activePlayerId!,
+    roundNumber: state.roundNumber,
+    trickNumber: state.round.trickNumber,
+  };
+}
+
+// --- CA-221 a CA-226: validação de jogada ----------------------------------
+
+describe('CA-221 a CA-226: rejeições', () => {
+  const setup = (): MatchState => {
+    const state = createMatch({ matchId: 'm', seed: 'rej', playerIds: players(3) });
+    return settle({ ...state, cardsThisRound: 2 }).state;
+  };
+
+  it('CA-221: o último apostador não pode fechar a soma', () => {
+    let state = setup();
+    state = must(applyMove(state, { ...baseMove(state), type: 'bet', bet: 1 }, ctx));
+    state = must(applyMove(state, { ...baseMove(state), type: 'bet', bet: 1 }, ctx));
+
+    const before = state;
+    const result = applyMove(state, { ...baseMove(state), type: 'bet', bet: 0 }, ctx);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe('ILLEGAL_MOVE');
+      expect(result.motivo).toBe('SOMA_PROIBIDA');
+    }
+    expect(state).toBe(before); // estado intacto
+  });
+
+  it('CA-225: aposta fora do intervalo é rejeitada', () => {
+    const state = setup();
+    for (const bet of [-1, 3, 1.5]) {
+      const result = applyMove(state, { ...baseMove(state), type: 'bet', bet }, ctx);
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.motivo).toBe('APOSTA_FORA_DO_INTERVALO');
+    }
+  });
+
+  it('CA-226: jogar fora da vez é rejeitado', () => {
+    const state = setup();
+    const outra = state.playerOrder.find((id) => id !== state.round.activePlayerId)!;
+    const result = applyMove(
+      state,
+      { ...baseMove(state), playerId: outra, type: 'bet', bet: 0 },
+      ctx,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('NOT_YOUR_TURN');
+  });
+
+  it('CA-123: jogada de rodada ou vaza antiga é rejeitada como STALE_MOVE', () => {
+    const state = setup();
+    for (const stale of [
+      { ...baseMove(state), roundNumber: 0 },
+      { ...baseMove(state), trickNumber: 99 },
+    ]) {
+      const result = applyMove(state, { ...stale, type: 'bet', bet: 0 }, ctx);
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe('STALE_MOVE');
+    }
+  });
+
+  it('CA-121: carta que não está na mão é FORBIDDEN_CARD', () => {
+    let state = setup();
+    while (state.round.phase === 'APOSTAS') {
+      state = must(applyMove(state, legalMoves(state)[0]!, ctx));
+    }
+    const player = state.round.activePlayerId!;
+    const alheia = state.playerOrder
+      .filter((id) => id !== player)
+      .flatMap((id) => state.hidden.hands[id] ?? [])[0]!;
+
+    const result = applyMove(
+      state,
+      { ...baseMove(state), type: 'playCard', cardId: alheia },
+      ctx,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('FORBIDDEN_CARD');
+  });
+
+  it('CA-250: toda carta da mão é jogável', () => {
+    let state = setup();
+    while (state.round.phase === 'APOSTAS') {
+      state = must(applyMove(state, legalMoves(state)[0]!, ctx));
+    }
+    const player = state.round.activePlayerId!;
+    for (const cardId of state.hidden.hands[player]!) {
+      const result = applyMove(
+        state,
+        { ...baseMove(state), type: 'playCard', cardId },
+        ctx,
+      );
+      expect(result.ok).toBe(true);
+    }
+  });
+});
+
+// --- CA-290 a CA-293: auto-play --------------------------------------------
+
+describe('CA-290 a CA-293: auto-play', () => {
+  it('CA-290: aposta 0 por padrão', () => {
+    const state = settle(
+      createMatch({ matchId: 'm', seed: 'auto', playerIds: players(4) }),
+    ).state;
+    const move = autoMove(state);
+    expect(move.type).toBe('bet');
+    if (move.type === 'bet') expect(move.bet).toBe(0);
+  });
+
+  it('CA-291: aposta 1 quando 0 é o valor proibido', () => {
+    // 3 jogadores, 1 carta. Se os dois primeiros apostam 0, o proibido é 1...
+    // então forçamos soma 1 para tornar 0 proibido.
+    let state = createMatch({ matchId: 'm', seed: 'auto2', playerIds: players(3) });
+    state = settle(state).state;
+    state = must(applyMove(state, { ...baseMove(state), type: 'bet', bet: 1 }, ctx));
+    state = must(applyMove(state, { ...baseMove(state), type: 'bet', bet: 0 }, ctx));
+
+    const move = autoMove(state); // soma 1, cartas 1 → proibido é 0
+    if (move.type === 'bet') expect(move.bet).toBe(1);
+  });
+
+  it('CA-292/CA-293: joga a menor carta, desempatando pelo menor CardId', () => {
+    let state = createMatch({ matchId: 'm', seed: 'auto3', playerIds: players(3) });
+    state = settle({ ...state, cardsThisRound: 3 }).state;
+    while (state.round.phase === 'APOSTAS') {
+      state = must(applyMove(state, legalMoves(state)[0]!, ctx));
+    }
+
+    const player = state.round.activePlayerId!;
+    const hand = state.hidden.hands[player]!.map((id) => state.hidden.cards[id]!);
+    const menorValor = Math.min(...hand.map((c) => c.value));
+    const esperado = hand
+      .filter((c) => c.value === menorValor)
+      .map((c) => c.id)
+      .sort()[0]!;
+
+    const move = autoMove(state);
+    if (move.type === 'playCard') expect(move.cardId).toBe(esperado);
+  });
+});
+
+// --- CA-263 a CA-267: morte, vitória e ranking -----------------------------
+
+describe('CA-263 a CA-267: desempate por morte', () => {
+  it('CA-261: morte é registrada na vaza em que vira inevitável', () => {
+    let state = createMatch({
+      matchId: 'm',
+      seed: 'morte',
+      playerIds: players(3),
+      options: { vidasIniciais: 1, maxCartasPorRodada: 3 },
+    });
+    state = settle({ ...state, cardsThisRound: 3 }).state;
+
+    // Todos apostam alto: quem não alcançar morre cedo.
+    while (state.round.phase === 'APOSTAS') {
+      const legal = legalMoves(state);
+      state = must(applyMove(state, legal[legal.length - 1]!, ctx));
+    }
+    while (state.round.phase === 'VAZAS') {
+      state = must(applyMove(state, legalMoves(state)[0]!, ctx));
+    }
+
+    const mortes = Object.values(state.round.mortoEmVaza).filter((v) => v !== null);
+    expect(mortes.length).toBeGreaterThan(0);
+    for (const vaza of mortes) {
+      expect(vaza).toBeGreaterThanOrEqual(1);
+      expect(vaza).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('CA-266: numa rodada de testa todos morrem na vaza 1 e empatam', () => {
+    // 2 jogadores com 1 vida numa rodada de 1 carta. A vitória compartilhada só
+    // é alcançável quando ambos apostam 1 e a vaza empata: aí os dois erram por
+    // 1, morrem na mesma vaza e RJ-010 dá a vitória aos dois. Apostar sempre o
+    // mínimo nunca chega nesse ramo — daí a política de aposta máxima.
+    let encontrouEmpate = false;
+    for (let i = 0; i < 300 && !encontrouEmpate; i++) {
+      const result = playMatch(`testa-${i}`, 2, { vidasIniciais: 1, maxCartasPorRodada: 1 },
+        (_, legal) => legal[legal.length - 1]!);
+      if ((result.state.winnerIds ?? []).length > 1) {
+        encontrouEmpate = true;
+        for (const winner of result.state.winnerIds!) {
+          const record = result.state.eliminated.find((e) => e.playerId === winner)!;
+          expect(record.mortoEmVaza).toBe(1);
+        }
+      }
+      expect(result.violations).toEqual([]);
+    }
+    expect(encontrouEmpate).toBe(true);
+  });
+
+  it('CA-265/CA-272: toda partida termina com vencedor e mortes registradas', () => {
+    for (let i = 0; i < 30; i++) {
+      const { state, violations } = playMatch(`fim-${i}`, 4, {}, (_, l) => l[0]!);
+      expect(violations).toEqual([]);
+      expect(state.endReason).not.toBeNull();
+      expect(state.winnerIds!.length).toBeGreaterThan(0);
+      for (const record of state.eliminated) {
+        expect(record.mortoEmVaza).toBeGreaterThanOrEqual(1);
+      }
+    }
+  });
+
+  it('CA-267: ranking coloca retirados abaixo de todos os eliminados', () => {
+    let state = createMatch({ matchId: 'm', seed: 'rank', playerIds: players(4) });
+    state = settle(state).state;
+    const vitima = state.playerOrder[0]!;
+    const result = withdrawPlayers(state, [vitima], ctx);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const finalState = playFrom(result.state);
+    const ordem = ranking(finalState);
+    expect(ordem[ordem.length - 1]).toBe(vitima);
+  });
+});
+
+function playFrom(start: MatchState): MatchState {
+  let state = start;
+  let steps = 0;
+  while (state.endReason === null) {
+    if (++steps > 20_000) throw new Error('não terminou');
+    state = settle(state).state;
+    if (state.endReason !== null) break;
+    state = must(applyMove(state, legalMoves(state)[0]!, ctx));
+  }
+  return state;
+}
+
+// --- CA-296 / CA-297: retirada por ausência --------------------------------
+
+describe('CA-296/CA-297: retirada', () => {
+  it('CA-296: aborta a rodada sem debitar vida e sem registrar morte', () => {
+    let state = createMatch({ matchId: 'm', seed: 'ret', playerIds: players(4) });
+    state = settle({ ...state, cardsThisRound: 3 }).state;
+    while (state.round.phase === 'APOSTAS') {
+      state = must(applyMove(state, legalMoves(state)[0]!, ctx));
+    }
+    state = must(applyMove(state, legalMoves(state)[0]!, ctx));
+
+    const vidasAntes = { ...state.lives };
+    const vitima = state.playerOrder[1]!;
+    const result = withdrawPlayers(state, [vitima], ctx);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const after = result.state;
+    expect(after.roundNumber).toBe(state.roundNumber); // mesmo roundNumber
+    expect(after.round.phase).toBe('DISTRIBUICAO'); // redistribuída
+    expect(after.withdrawn.map((w) => w.playerId)).toContain(vitima);
+    expect(after.eliminated.map((e) => e.playerId)).not.toContain(vitima); // INV-17
+    expect(after.history.at(-1)!.aborted).toBe(true);
+    for (const id of state.playerOrder) expect(after.lives[id]).toBe(vidasAntes[id]);
+    expect(isActive(after, vitima)).toBe(false);
+  });
+
+  it('CA-053: deckCount é recalculado para o novo número de jogadores', () => {
+    let state = createMatch({
+      matchId: 'm',
+      seed: 'decks',
+      playerIds: players(8),
+      options: { maxCartasPorRodada: 7 },
+    });
+    state = settle({ ...state, cardsThisRound: 7 }).state;
+    expect(state.deckCount).toBe(2);
+
+    const result = withdrawPlayers(state, [state.playerOrder[0]!], ctx);
+    if (!result.ok) throw new Error('falhou');
+    // 7 jogadores × 7 cartas = 49 → volta a caber em 1 baralho.
+    expect(result.state.deckCount).toBe(1);
+  });
+
+  it('CA-297/CA-055: sobrando 1, encerra com VITORIA_POR_ABANDONO', () => {
+    let state = createMatch({ matchId: 'm', seed: 'aband', playerIds: players(3) });
+    state = settle(state).state;
+    const result = withdrawPlayers(state, state.playerOrder.slice(0, 2), ctx);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.state.endReason).toBe('VITORIA_POR_ABANDONO');
+    expect(result.state.winnerIds).toEqual([state.playerOrder[2]!]);
+  });
+});
+
+// --- CA-310: propriedade ---------------------------------------------------
+
+describe('CA-310: teste de propriedade', () => {
+  it('1.000 partidas aleatórias terminam sem violar invariante', () => {
+    const tieRules = ['EMPATE_ANULA_VAZA', 'EMPATE_ANULA_CARTAS'] as const;
+    let matches = 0;
+    let annulled = 0;
+    let sharedWins = 0;
+
+    for (let i = 0; i < 1000; i++) {
+      const seed = `prop-${i}`;
+      // Um rng próprio para a política de jogo, para que o caso seja reproduzível.
+      let cursor = 0;
+      const nextIndex = (max: number): number => {
+        cursor = (cursor * 1103515245 + 12345 + i) >>> 0;
+        return cursor % max;
+      };
+
+      const playerCount = 2 + (i % 7);
+      const options: Partial<MatchOptions> = {
+        vidasIniciais: 1 + (i % 4),
+        maxCartasPorRodada: 1 + (i % 10),
+        regraEmpate: tieRules[i % 2]!,
+      };
+
+      let result;
+      try {
+        result = playMatch(seed, playerCount, options, (_, legal) =>
+          legal[nextIndex(legal.length)]!,
+        );
+      } catch (error) {
+        throw new Error(`seed ${seed} (${playerCount}j, ${JSON.stringify(options)}): ${String(error)}`);
+      }
+
+      if (result.violations.length > 0) {
+        throw new Error(`seed ${seed} violou: ${result.violations.slice(0, 3).join('; ')}`);
+      }
+
+      expect(result.state.endReason).not.toBeNull();
+      expect(result.state.winnerIds!.length).toBeGreaterThan(0);
+
+      matches++;
+      annulled += result.state.history.reduce((n, h) => n + h.annulledTricks, 0);
+      if (result.state.winnerIds!.length > 1) sharedWins++;
+    }
+
+    expect(matches).toBe(1000);
+    // O corpus precisa exercitar de fato os casos interessantes, senão o teste
+    // passa sem provar nada.
+    expect(annulled).toBeGreaterThan(0);
+    expect(sharedWins).toBeGreaterThan(0);
+  }, 120_000);
+});

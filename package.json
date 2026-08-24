@@ -1,0 +1,26 @@
+{
+  "name": "fdp",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b --pretty"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.5"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "description": "Jogo de cartas de vazas, aposta e blefe para 2 a 8 pessoas, jogado no navegador.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  }
+}
