@@ -8,14 +8,21 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -b --pretty"
+    "typecheck": "tsc -b --pretty",
+    "dev": "tsx watch server/src/main.ts",
+    "start": "tsx server/src/main.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.23.12",
     "typescript": "^5.7.2",
     "vitest": "^3.0.5"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "hono": "^4.13.4",
+    "ws": "^8.21.3",
     "zod": "^4.4.3"
   },
   "description": "Jogo de cartas de vazas, aposta e blefe para 2 a 8 pessoas, jogado no navegador.",

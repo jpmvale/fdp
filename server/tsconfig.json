@@ -1,0 +1,17 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "baseUrl": "..",
+    "types": ["node"],
+    "composite": true
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../packages/rules" },
+    { "path": "../packages/protocol" },
+    { "path": "../packages/store" },
+    { "path": "../packages/room" }
+  ]
+}

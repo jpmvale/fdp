@@ -12,6 +12,9 @@
     },
     {
       "path": "./packages/room"
+    },
+    {
+      "path": "./server"
     }
   ]
 }

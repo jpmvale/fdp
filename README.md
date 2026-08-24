@@ -17,7 +17,7 @@ Em desenvolvimento. O jogo ainda não é jogável.
 | Fase | O quê | Status |
 |---|---|---|
 | M0 | Especificação completa | ✅ |
-| M1 | Servidor, sala, WebSocket, persistência | 🚧 em andamento |
+| M1 | Servidor, sala, WebSocket, persistência | 🚧 jogável local; falta Redis e deploy |
 | M2 | Lobby jogável | ⬜ |
 | M3 | Partida | ⬜ |
 | M4 | Endurecimento e entrega | ⬜ |
@@ -27,8 +27,8 @@ packages/rules/      ✅  motor de regras — puro e determinístico
 packages/store/      ✅  RoomStore: interface + memória (Redis pendente)
 packages/protocol/   ✅  contrato cliente ↔ servidor + validação
 packages/room/       ✅  máquina de sala, timers, pausa, auto-play
-server/              ⬜  Hono + WebSocket
-app/                 ⬜  cliente Vite + React
+server/              🚧  Hono + WebSocket — funcional, sem sessão assinada
+app/                 🚧  casca HTML para validar mecânicas; UI real vem depois
 ```
 
 ## Como se joga
@@ -56,9 +56,14 @@ Requer Node 24+.
 
 ```bash
 npm install
+npm start         # http://localhost:3000 — abra em 2-3 abas anônimas
 npm test          # 137 testes
 npm run typecheck
 ```
+
+Já dá para jogar uma partida completa local. O cliente atual é uma casca sem build,
+deliberadamente feia: existe para validar as mecânicas no navegador antes de investir
+em design. Ver [HANDOFF.md](HANDOFF.md).
 
 O motor de regras roda sem servidor, sem WebSocket e sem navegador. `npm test` inclui um teste
 de propriedade que simula **1.000 partidas** — 2 a 8 jogadores, ambos os modos de empate — e
