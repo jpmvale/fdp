@@ -215,11 +215,32 @@ ar). O ponto `email-infra` já existia; só nada apontava para ele.
 Vale como lembrete geral: **regra saudável não é a mesma coisa que aviso
 entregue**, e o painel do Grafana mostra a primeira, não a segunda.
 
-## O que ainda falta
+### O caminho foi exercitado de verdade (25/08/2026)
 
-- **Provar a entrega.** A configuração está conferida — a política aponta para
-  um ponto que existe, com o endereço certo, integração `email` válida —, mas
-  nenhum e-mail chegou ainda porque nada disparou. O caminho mais curto é o
-  botão **Test** em Alerting → Contact points → `email-infra`. O mais completo é
-  parar a sonda por seis minutos e deixar `fdp-sonda-parada` disparar de
-  verdade, o que exercita regra, política e ponto de contato de ponta a ponta.
+Parei a sonda e deixei `fdp-sonda-parada` disparar sozinha:
+
+| Momento | Estado |
+|---|---|
+| 17:15 | `inactive` — sonda acabara de parar |
+| 17:19 | `pending` — passaram os 300 s de frescor |
+| 17:24 | `firing` — o `for: 5m` se cumpriu |
+| 17:26 | `inactive` — sonda restaurada, alerta resolveu sozinho |
+
+O alertmanager registrou o alerta com **`receivers: ['email-infra']`**, sem
+silenciamento nem inibição. Ou seja: regra → política → ponto de contato, os
+três elos verificados. O único trecho que não dá para observar daqui é o último
+salto, do SMTP do Grafana Cloud até a caixa de entrada.
+
+Para repetir o teste:
+
+```bash
+# para a sonda
+ssh vps 'crontab -l | sed "s|^\* \* \* \* \* /home/deploy/bin/metrica-fdp.sh|#TESTE \0|" | crontab -'
+# ... esperar ~10 min e conferir o alerta ...
+# restaura
+ssh vps 'crontab -l | sed "s|^#TESTE ||" | crontab - && ~/bin/metrica-fdp.sh'
+```
+
+Dez minutos porque são 5 de frescor mais os 5 do `for`. **Enquanto dura, a
+monitoração do FDP está cega** — `vps_fdp_disponivel` congela no último valor —,
+então não é teste para fazer distraído.
