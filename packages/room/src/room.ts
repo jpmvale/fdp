@@ -7,6 +7,7 @@ import {
   AVATAR_EMOJIS,
   LIMITS,
   type BotDifficulty,
+  type ChatMessage,
   type Command,
 } from '@fdp/protocol';
 import {
@@ -100,6 +101,7 @@ export function createRoom(code: string, host: JoinParams, ctx: RoomCtx): Room {
     createdAt: ctx.now,
     lastActivityAt: ctx.now,
     phaseDeadline: null,
+    chat: [],
   };
 }
 
@@ -437,6 +439,40 @@ export function applyCommand(
       const updated = players.find((p) => p.id === playerId)!;
       return commit({ ...room, players }, ctx, [
         all({ type: 'room:playerUpdated', payload: { player: toPublicPlayer(updated) } }),
+      ]);
+    }
+
+    case 'chat:send': {
+      // Sala encerrada não recebe mensagem: não há para quem falar, e o
+      // histórico morre junto com ela (CA-331, CA-341).
+      if (room.status === 'ENCERRADA') return failWith('WRONG_STATUS', 'SALA_ENCERRADA');
+
+      // Bot não fala (CA-336). Estruturalmente ele nem tem socket por onde
+      // mandar; a guarda existe porque "impossível hoje" e "impossível" são
+      // coisas diferentes, e a barata é conferir.
+      if (player.bot !== null) return failWith('VALIDATION_FAILED', 'BOT_NAO_FALA');
+
+      // Aparar antes de medir: 280 espaços não são uma mensagem, e " oi " e
+      // "oi" são a mesma (RNF-014).
+      const texto = command.payload.text.trim();
+      if (texto.length === 0 || texto.length > LIMITS.chatTextMax) {
+        return failWith('VALIDATION_FAILED', 'MENSAGEM_INVALIDA');
+      }
+
+      const mensagem: ChatMessage = {
+        id: ctx.newId(),
+        playerId,
+        // Copiado agora, de propósito — ver `ChatMessage` em `04`.
+        nickname: player.nickname,
+        text: texto,
+        at: ctx.now,
+      };
+
+      // A mais antiga cai quando entra a que passa do teto (RNF-015).
+      const chat = [...room.chat, mensagem].slice(-LIMITS.chatHistoryMax);
+
+      return commit({ ...room, chat }, ctx, [
+        all({ type: 'chat:message', payload: { message: mensagem } }),
       ]);
     }
 
@@ -862,6 +898,10 @@ export function snapshotFor(room: Room, viewerId: PlayerId): Emission['event'] {
           }
         : null,
       phaseDeadline: room.phaseDeadline,
+      // O histórico no retrato é o que o faz sobreviver a recarregar a página e
+      // a reconectar, e o que dá a conversa inteira a quem chega depois
+      // (CA-334, CA-335).
+      chat: room.chat,
       match: room.match ? project(room.match, viewerId) : null,
     },
   };

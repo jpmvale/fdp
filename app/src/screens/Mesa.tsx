@@ -6,7 +6,7 @@ import { Feltro } from '../components/Feltro';
 import { Vidas } from '../components/Vidas';
 import type { Retrato, PlayerView } from '../state/tipos';
 
-export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoApostar, aoJogar, aoAbrirRegras }: {
+export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoApostar, aoJogar, aoAbrirRegras, aoEnviarChat }: {
   retrato: Retrato;
   eu: string;
   partida: PlayerView;
@@ -15,6 +15,7 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
   aoApostar: (valor: number) => void;
   aoJogar: (cardId: string) => void;
   aoAbrirRegras: () => void;
+  aoEnviarChat: (texto: string) => void;
 }) {
   const nome = (id: string) => retrato.players.find((p) => p.id === id)?.nickname ?? '—';
   const ausentes = new Set(retrato.pause?.absentPlayerIds ?? []);
@@ -50,7 +51,7 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
         <Mao partida={partida} selecionada={selecionada} aoSelecionar={aoSelecionar} podeJogar={minhaVez && partida.phase === 'VAZAS'} />
       )}
 
-      <Chat />
+      <Chat mensagens={retrato.chat} eu={eu} aoEnviar={aoEnviarChat} />
     </div>
   );
 }

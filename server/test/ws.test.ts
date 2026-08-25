@@ -330,6 +330,29 @@ describe('CA-124: rate limit por conexão', () => {
       .toBeGreaterThan(0);
   });
 
+  it('CA-339: o chat não tem cota própria — gasta o mesmo orçamento', async () => {
+    const sala = await criarSala();
+    const client = await connect(sala.code, sala.token);
+    await client.waitFor('room:snapshot');
+    client.frames.length = 0;
+
+    // A consequência é deliberada: quem inunda o chat gasta o próprio direito
+    // de jogar. O limite se paga sozinho, sem mecanismo novo (`05` §7).
+    for (let i = 0; i < LIMITS.commandsPerWindow + 3; i++) {
+      client.send('chat:send', { text: `spam ${i}` });
+    }
+    await client.quiet(200);
+
+    const limitados = client.frames.filter((f) => f.payload?.code === 'RATE_LIMITED');
+    expect(limitados).toHaveLength(3);
+
+    // E, barrado, ele também não consegue mais jogar: é o mesmo balde.
+    client.frames.length = 0;
+    client.send('room:resync', {});
+    await client.quiet(150);
+    expect(client.frames.some((f) => f.payload?.code === 'RATE_LIMITED')).toBe(true);
+  });
+
   it('o limite é por conexão: uma aba barrada não barra a outra', async () => {
     const sala = await criarSala('Ana');
     const beto = await entrar(sala.code, 'Beto');

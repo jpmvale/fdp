@@ -75,6 +75,13 @@ export const commandSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('player:leave'), payload: empty }),
   z.object({
+    type: z.literal('chat:send'),
+    // O teto aqui é sobre o texto CRU: o aparo acontece na sala, e recusar
+    // 300 espaços antes de aparar é barato. O piso de 1 caractere depois de
+    // aparado é que exige o aparo, e por isso fica lá (RNF-014).
+    payload: z.object({ text: z.string().min(1).max(LIMITS.chatTextMax * 2) }).strict(),
+  }),
+  z.object({
     type: z.literal('host:kick'),
     payload: z.object({ playerId: z.string().min(1) }).strict(),
   }),

@@ -10,7 +10,7 @@ const DIFICULDADES: { valor: BotDifficulty; rotulo: string; explica: string }[] 
   { valor: 'MEDIO', rotulo: 'Médio', explica: 'Aposta pela força da mão e segura carta alta.' },
 ];
 
-export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRemoverBot, aoAbrirPerfil, aoAbrirRegras, aoSair }: {
+export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRemoverBot, aoAbrirPerfil, aoAbrirRegras, aoSair, aoEnviarChat }: {
   retrato: Retrato;
   eu: string;
   aoIniciar: () => void;
@@ -20,6 +20,7 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
   aoAbrirPerfil: () => void;
   aoAbrirRegras: () => void;
   aoSair: () => void;
+  aoEnviarChat: (texto: string) => void;
 }) {
   const [dificuldade, setDificuldade] = useState<BotDifficulty>('MEDIO');
   const jogadores = retrato.players.filter((p) => !p.isSpectator);
@@ -136,7 +137,7 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
         </button>
       </div>
 
-      <Chat />
+      <Chat mensagens={retrato.chat} eu={eu} aoEnviar={aoEnviarChat} />
 
       {/* RF-025: toda tela tem saída explícita. Sem isto, entrar numa sala era
           um caminho de mão única — só fechando a aba, o que o servidor leria

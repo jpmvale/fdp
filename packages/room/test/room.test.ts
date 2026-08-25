@@ -18,6 +18,7 @@ import {
   nextDeadline,
   normalizeCode,
   reconnect,
+  snapshotFor,
   tick,
   type Emission,
   type Room,
@@ -644,5 +645,121 @@ describe('CA-328: sala só com bots não vive para sempre', () => {
 
     const depois = tick(room, ctxAt(20 + LIMITS.lobbyIdleMs + 1));
     expect(depois.room.status).toBe('ENCERRADA');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Chat (RF-017) — `docs/10` §4.9
+// ---------------------------------------------------------------------------
+
+describe('CA-330 a CA-341: chat da mesa', () => {
+  const dizer = (text: string): Command => ({ type: 'chat:send', payload: { text } });
+  const mensagens = (r: Room) => r.chat;
+
+  it('CA-330: a mensagem sai para TODOS, inclusive quem enviou', () => {
+    const { room, emissions } = ok(applyCommand(roomWith(3), 'p2', dizer('boa noite'), ctxAt(50)));
+    const evento = emissions.find((e) => e.event.type === 'chat:message');
+
+    expect(evento).toBeDefined();
+    expect(evento!.audience).toBe('ALL');
+    expect(mensagens(room)).toHaveLength(1);
+    expect(mensagens(room)[0]!.text).toBe('boa noite');
+  });
+
+  it('CA-338: o payload tem exatamente os cinco campos, e nada da partida', () => {
+    const { room, emissions } = ok(applyCommand(roomWith(2), 'p1', dizer('oi'), ctxAt(50)));
+    const payload = (emissions.find((e) => e.event.type === 'chat:message')!.event as
+      { payload: { message: Record<string, unknown> } }).payload;
+
+    // A lista fechada é o critério: um campo a mais aqui — "quantas cartas o
+    // autor tem na mão", para enfeitar a bolha — é como a rodada de testa
+    // vazaria, e o payload é opaco demais para alguém notar em revisão.
+    expect(Object.keys(payload.message).sort()).toEqual(['at', 'id', 'nickname', 'playerId', 'text']);
+    expect(mensagens(room)[0]).toEqual(payload.message);
+  });
+
+  it('CA-331: vale no lobby, na partida, na pausa e no fim — e não em ENCERRADA', () => {
+    let room = roomWith(2);
+    expect(applyCommand(room, 'p1', dizer('no lobby'), ctxAt(50)).ok).toBe(true);
+
+    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(60))).room;
+    expect(applyCommand(room, 'p1', dizer('em partida'), ctxAt(70)).ok).toBe(true);
+
+    const encerrada: Room = { ...room, status: 'ENCERRADA' };
+    const recusado = applyCommand(encerrada, 'p1', dizer('e agora'), ctxAt(80));
+    expect(recusado.ok).toBe(false);
+  });
+
+  it('CA-332: vazio, só espaço e acima de 280 são recusados', () => {
+    const room = roomWith(2);
+    for (const ruim of ['', '   ', '\n\t ', 'x'.repeat(LIMITS.chatTextMax + 1)]) {
+      expect(applyCommand(room, 'p1', dizer(ruim), ctxAt(50)).ok).toBe(false);
+    }
+    // No limite exato, passa — e o texto é guardado aparado.
+    const { room: depois } = ok(applyCommand(room, 'p1', dizer(`  ${'x'.repeat(LIMITS.chatTextMax)}  `), ctxAt(50)));
+    expect(mensagens(depois)[0]!.text).toHaveLength(LIMITS.chatTextMax);
+  });
+
+  it('CA-333: no teto, a mais antiga cai', () => {
+    let room = roomWith(2);
+    for (let i = 0; i < LIMITS.chatHistoryMax + 5; i++) {
+      room = ok(applyCommand(room, 'p1', dizer(`msg ${i}`), ctxAt(100 + i))).room;
+    }
+    expect(mensagens(room)).toHaveLength(LIMITS.chatHistoryMax);
+    expect(mensagens(room)[0]!.text).toBe('msg 5');
+    expect(mensagens(room).at(-1)!.text).toBe(`msg ${LIMITS.chatHistoryMax + 4}`);
+  });
+
+  it('CA-334/CA-335: o histórico vai no retrato, para quem recarrega e para quem chega depois', () => {
+    let room = roomWith(2);
+    room = ok(applyCommand(room, 'p1', dizer('antes de você chegar'), ctxAt(50))).room;
+    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(60))).room;
+
+    // Entrar com partida em andamento = espectador (RF-014).
+    const comEspectador = ok(join(room, { playerId: 'p9', nickname: 'Tarde', avatar: AVATAR }, ctxAt(70))).room;
+    const retrato = snapshotFor(comEspectador, 'p9') as { payload: { chat: unknown[] } };
+
+    expect(retrato.payload.chat).toHaveLength(1);
+    // E o espectador pode escrever.
+    expect(applyCommand(comEspectador, 'p9', dizer('cheguei'), ctxAt(80)).ok).toBe(true);
+  });
+
+  it('CA-336: bot não fala', () => {
+    const room = ok(applyCommand(
+      roomWith(1), 'p1', { type: 'host:addBot', payload: { difficulty: 'FACIL' } }, ctxAt(10),
+    )).room;
+    const bot = room.players.find((p) => p.bot !== null)!;
+
+    const recusado = applyCommand(room, bot.id, dizer('boa jogada'), ctxAt(20));
+    expect(recusado.ok).toBe(false);
+    if (!recusado.ok) expect(recusado.motivo).toBe('BOT_NAO_FALA');
+  });
+
+  it('CA-337: o apelido é congelado no envio', () => {
+    let room = roomWith(2);
+    room = ok(applyCommand(room, 'p2', dizer('era J2'), ctxAt(50))).room;
+    room = ok(applyCommand(
+      room, 'p2', { type: 'player:setProfile', payload: { nickname: 'OutroNome', avatar: AVATAR } }, ctxAt(60),
+    )).room;
+    room = ok(applyCommand(room, 'p2', dizer('agora sou OutroNome'), ctxAt(70))).room;
+
+    expect(mensagens(room)[0]!.nickname).toBe('J2');
+    expect(mensagens(room)[1]!.nickname).toBe('OutroNome');
+
+    // E sair não reescreve o que já foi dito.
+    const depoisDeSair = ok(leave(room, 'p2', ctxAt(80))).room;
+    expect(mensagens(depoisDeSair)[0]!.nickname).toBe('J2');
+  });
+
+  it('CA-341: o histórico morre com a sala', () => {
+    let room = roomWith(1);
+    room = ok(applyCommand(room, 'p1', dizer('tem alguém aí'), ctxAt(50))).room;
+    room = ok(leave(room, 'p1', ctxAt(60))).room;
+
+    const expirada = tick(room, ctxAt(60 + LIMITS.lobbyIdleMs + 1)).room;
+    expect(expirada.status).toBe('ENCERRADA');
+    // Sala encerrada não aceita mais mensagem: o histórico vai embora com o TTL
+    // do store, sem caminho de recuperação (CA-341).
+    expect(applyCommand(expirada, 'p1', dizer('ainda dá?'), ctxAt(99)).ok).toBe(false);
   });
 });

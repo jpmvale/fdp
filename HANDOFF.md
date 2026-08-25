@@ -54,12 +54,15 @@ Para parar: `pkill -f "tsx server"`.
 | `server/` | HTTP de `06`, WebSocket de `05`, sessão, limites, persistência, `SIGTERM` |
 | `app/` | Cliente Vite + React com o design system Nocturne |
 
+Chat (RF-017) implementado contra CA-330 a CA-341, incluindo a garantia que
+protege a mecânica: `EV-040` sai idêntico para todos, com exatamente cinco
+campos e nada derivado da partida (CA-338).
+
 ## O que ainda é provisório
 
 | Item | Situação hoje | Precisa virar |
 |---|---|---|
-| Aplicação incremental de eventos | O cliente pede o retrato a cada evento | Os redutores por evento, na camada `state/` |
-| Chat (RF-017) | **Só a casca** na tela; o contrato já está especificado em `04`, `05` e `10` §4.9 | Implementar servidor e cliente contra CA-330 a CA-341 |
+| Aplicação incremental de eventos | O cliente pede o retrato a cada evento, **menos `chat:message`**, que é aplicado local | Os redutores por evento, na camada `state/` |
 
 A **decisão** de reconciliação de `05` §3 está pronta e testada em
 [`app/src/net/reconcile.ts`](app/src/net/reconcile.ts). O que falta é o outro
@@ -139,8 +142,7 @@ falha do meu brief, que já foi corrigido.
 ## Decisões que valem lembrar
 
 - **`docs/` é a fonte da verdade.** Requisito sem teste que cite seu ID é
-  requisito não entregue. RF-017 (chat) já tem critérios (CA-330 a CA-341) e
-  segue em débito até existir código que os satisfaça.
+  requisito não entregue.
 - **Chat e bots entraram no escopo depois** (P9 e P10 em `docs/00` §5),
   revertendo exclusões da v1. A decisão está registrada no documento, não só no
   código.
@@ -184,10 +186,9 @@ printf "\n%s\n" "$(cat chave.pub)" >> ~/.ssh/authorized_keys
 
 ## O que fazer a seguir
 
-1. **O chat de verdade.** O contrato está fechado — `ChatMessage` em `04`,
-   `chat:send` e `EV-040` em `05`, limites em `05` §7, e CA-330 a CA-341 em
-   `10` §4.9. Falta o servidor, o cliente e os testes. Hoje a tela existe e diz
-   que não funciona.
-2. **Redutores por evento** no cliente, no lugar do resync a cada evento.
-3. **Regras de alerta no Grafana** sobre `vps_fdp_disponivel` e
+1. **Redutores por evento** no cliente, no lugar do resync a cada evento.
+   `chat:message` já é aplicado localmente — não como começo dos redutores, mas
+   porque ali o resync seria absurdo: uma conversa animada viraria uma
+   tempestade de retratos completos para acrescentar uma linha de texto.
+2. **Regras de alerta no Grafana** sobre `vps_fdp_disponivel` e
    `vps_fdp_ultima_sonda_segundos` (a sonda parou).

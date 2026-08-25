@@ -1,5 +1,5 @@
 import type { PlayerView, MatchOptions } from '@fdp/rules';
-import type { PublicPlayer, RoomStatus } from '@fdp/protocol';
+import type { ChatMessage, PublicPlayer, RoomStatus } from '@fdp/protocol';
 
 /** O retrato de `EV-001`, já projetado para quem está olhando. */
 export interface Retrato {
@@ -16,7 +16,8 @@ export interface Retrato {
     hardDeadline: number;
   } | null;
   phaseDeadline: number | null;
+  chat: ChatMessage[];
   match: PlayerView | null;
 }
 
-export type { PlayerView, PublicPlayer };
+export type { PlayerView, PublicPlayer, ChatMessage };

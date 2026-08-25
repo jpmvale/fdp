@@ -83,6 +83,21 @@ export interface PublicPlayer {
   bot?: { difficulty: BotDifficulty };
 }
 
+/**
+ * Mensagem de chat (RF-017).
+ *
+ * O `nickname` é COPIADO no envio, e não resolvido pelo `playerId` na hora de
+ * exibir: quem troca de apelido ou sai da sala faria o histórico se reescrever
+ * sozinho, e conversa que muda de autor depois de dita não é histórico.
+ */
+export interface ChatMessage {
+  id: string;
+  playerId: PlayerId;
+  nickname: string;
+  text: string;
+  at: number;
+}
+
 export interface PauseInfo {
   since: number;
   absentPlayerIds: PlayerId[];
@@ -105,6 +120,7 @@ export type Command =
   | { type: 'room:resync'; payload: Record<string, never> }
   | { type: 'player:setProfile'; payload: { nickname: string; avatar: Avatar } }
   | { type: 'player:leave'; payload: Record<string, never> }
+  | { type: 'chat:send'; payload: { text: string } }
   | { type: 'host:kick'; payload: { playerId: PlayerId } }
   | { type: 'host:addBot'; payload: { difficulty: BotDifficulty } }
   | { type: 'host:removeBot'; payload: { playerId: PlayerId } }
@@ -145,6 +161,8 @@ export type ServerEvent =
   | { type: 'round:phaseChanged'; payload: { phase: RoundPhase; activePlayerId: PlayerId | null; deadline: number | null; forbiddenBet?: number | null } }
   | { type: 'round:resolved'; payload: { summary: unknown; lives: Record<PlayerId, number>; eliminated: PlayerId[] } }
   | { type: 'match:ended'; payload: { winnerIds: PlayerId[]; lives: Record<PlayerId, number>; endReason: string } }
+  // EV-040 — chat (RF-017)
+  | { type: 'chat:message'; payload: { message: ChatMessage } }
   // EV-015..EV-017 — genéricos
   | { type: 'system:notice'; payload: { code: string; params?: Record<string, unknown> } }
   | { type: 'ack'; payload: { commandId: string } }
@@ -264,6 +282,14 @@ export const LIMITS = {
   maxSpectators: 4,
   /** RNF-013: reenvio do mesmo `id` é idempotente nesta janela. */
   idempotencyWindowMs: 30_000,
+  /** RNF-014: tamanho da mensagem de chat, depois de aparada. */
+  chatTextMax: 280,
+  /**
+   * RNF-015: teto do histórico por sala. O histórico vive dentro do valor que
+   * o Redis lê e escreve a cada mudança de estado — sem teto, uma sala de 4
+   * horas com gente falante cresce sem limite.
+   */
+  chatHistoryMax: 200,
   /** `03` §2.1 */
   transportGraceMs: 10_000,
   reconnectGraceMs: 60_000,

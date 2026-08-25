@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { PROTOCOL_VERSION, type Avatar as AvatarProto } from '@fdp/protocol';
+import { LIMITS, PROTOCOL_VERSION, type Avatar as AvatarProto } from '@fdp/protocol';
 import { conectar, type Conexao } from './net/socket';
 import * as sessao from './net/sessao';
 import { frase } from './net/mensagens';
 import { useEstado, definir, ler, avisar, errar } from './state/loja';
-import type { Retrato } from './state/tipos';
+import type { ChatMessage, Retrato } from './state/tipos';
 import { BloqueioConexao, FaixaConexao, bloqueia } from './components/Conexao';
 import { Home } from './screens/Home';
 import { Perfil } from './screens/Perfil';
@@ -217,6 +217,7 @@ export function App() {
               bet,
             })}
             aoAbrirRegras={() => setRegrasAbertas(true)}
+            aoEnviarChat={(text) => enviar('chat:send', { text })}
             aoJogar={(cardId) => {
               enviar('move:playCard', {
                 matchId: partida.matchId,
@@ -240,6 +241,7 @@ export function App() {
           aoAbrirPerfil={() => setPerfilAberto(true)}
           aoAbrirRegras={() => setRegrasAbertas(true)}
           aoSair={sairDaMesa}
+          aoEnviarChat={(text) => enviar('chat:send', { text })}
         />
       )}
 
@@ -335,6 +337,19 @@ function receber(msg: { type: string; payload: unknown }, conexao: () => Conexao
     definir({ retrato: msg.payload as Retrato, cartaSelecionada: null });
     return;
   }
+  // O ÚNICO evento aplicado localmente, em vez de pedir o retrato inteiro.
+  // Não é o começo dos redutores: é que aqui o resync seria absurdo — uma
+  // conversa animada viraria uma tempestade de retratos completos, cada um
+  // carregando a partida inteira para acrescentar uma linha de texto. O estado
+  // do jogo não muda com uma mensagem, então não há o que reconciliar.
+  if (msg.type === 'chat:message') {
+    const { message } = msg.payload as { message: ChatMessage };
+    definir((e) => e.retrato
+      ? { retrato: { ...e.retrato, chat: [...e.retrato.chat, message].slice(-LIMITS.chatHistoryMax) } }
+      : {});
+    return;
+  }
+
   if (msg.type === 'error') {
     const p = msg.payload as { code: string; params?: { motivo?: string } };
     errar(frase(p.params?.motivo, p.code));

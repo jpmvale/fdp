@@ -13,6 +13,7 @@
 import type {
   Avatar,
   BotDifficulty,
+  ChatMessage,
   ConnectionStatus,
   ErrorCode,
   PublicPlayer,
@@ -73,6 +74,8 @@ export interface Room {
    * automática. `null` sempre que a sala está pausada (INV-15).
    */
   phaseDeadline: number | null;
+  /** RF-017. Vive e morre com a sala; teto em `LIMITS.chatHistoryMax`. */
+  chat: ChatMessage[];
 }
 
 /** Evento já endereçado. A camada de transporte só entrega — não decide nada. */
