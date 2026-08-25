@@ -133,9 +133,44 @@ Numa queda, `vps_fdp_salas` **preserva a última contagem conhecida** em vez de
 publicar 0: zero salas e "não sei" são estados diferentes, e um gráfico que
 despenca a zero durante um incidente conta a história errada depois.
 
-Falta escrever as regras de alerta no Grafana. As duas que valem: `vps_fdp_disponivel == 0`
-por alguns minutos, e `time() - vps_fdp_ultima_sonda_segundos > 300` (a sonda
-parou, e o silêncio não pode significar "tudo bem").
+### Alertas
+
+As regras estão em [`alertas-grafana.yml`](alertas-grafana.yml), no formato de
+provisionamento do Grafana (schema v1). Para aplicar:
+
+1. Descubra o UID da fonte de dados Prometheus do stack pessoal (1749973) —
+   aparece na URL ao abrir a fonte em **Connections → Data sources**.
+2. Troque `SUBSTITUA_PELO_UID_DO_PROMETHEUS` pelo UID nas duas regras.
+3. **Alerting → Alert rules → New alert rule → Import from file**, ou pela API
+   de provisionamento com um token de serviço com escopo de alerting.
+
+São duas, e só duas:
+
+| Regra | Dispara quando | Severidade |
+|---|---|---|
+| FDP fora do ar | `vps_fdp_disponivel == 0` por 3 min | crítica |
+| A sonda parou | `time() - vps_fdp_ultima_sonda_segundos > 300` | aviso |
+
+A segunda é a que o silêncio não engana. Sem ela, cron desligado ou máquina fora
+do ar deixam `vps_fdp_disponivel` congelado no último valor conhecido — que
+provavelmente é 1. Nada falha, ninguém é avisado, e o painel segue verde
+mostrando um número velho.
+
+Ambas usam `noDataState: Alerting`: sem dado é "não sei", e para disponibilidade
+não saber é motivo de alerta.
+
+CPU, memória e disco **não** viram alerta de propósito. Numa VPS com quatro apps
+eles sobem por motivo legítimo o tempo todo, e alerta que dispara sem alguém
+agir treina a pessoa a ignorar a próxima notificação — inclusive a que importava.
+
+**Antes de confiar nos alertas, confirme que as séries chegam.** Consulte
+`vps_fdp_disponivel` no Explore do stack pessoal. Isto não é formalidade: o
+comentário do `vps-metricas.alloy` registra que em 04/08/2026 uma consulta
+voltou com ZERO séries enquanto o Alloy reportava centenas de pontos enviados
+sem falha — "enviado com sucesso" não diz para onde. Eu verifiquei o caminho até
+o exportador e a lista de permissão, e que o pipeline de infraestrutura não tem
+falha de envio; o que acontece dentro do Grafana eu não tenho credencial para
+ver.
 
 ## Operação
 
@@ -155,4 +190,6 @@ custo de derrubar as sessões vivas.
 
 ## O que ainda falta
 
-- **Regras de alerta** no Grafana sobre as métricas acima.
+- **Aplicar** [`alertas-grafana.yml`](alertas-grafana.yml) no stack pessoal:
+  falta o UID da fonte de dados e a importação, que precisam de acesso ao
+  Grafana.

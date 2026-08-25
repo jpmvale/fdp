@@ -1,0 +1,127 @@
+# Alertas do FDP — provisionamento do Grafana (schema v1).
+#
+# Importar em Alerting → Alert rules → New alert rule → Import from file, ou
+# aplicar pela API de provisionamento com um token de serviço.
+#
+# ANTES DE IMPORTAR: troque `SUBSTITUA_PELO_UID_DO_PROMETHEUS` pelo UID da fonte
+# de dados Prometheus do stack pessoal (1749973), o mesmo para onde o
+# `vps-metricas.alloy` exporta. O UID aparece na URL ao abrir a fonte em
+# Connections → Data sources.
+#
+# ---------------------------------------------------------------------------
+# Por que só dois alertas
+#
+# Alerta que dispara sem alguém agir é ruído, e ruído treina a pessoa a ignorar
+# a próxima notificação — inclusive a que importava. Estes dois cobrem as duas
+# perguntas que têm resposta acionável: "o jogo está fora do ar?" e "eu ainda
+# sei se o jogo está fora do ar?".
+#
+# CPU, memória e disco NÃO viram alerta aqui de propósito: numa VPS com quatro
+# apps eles sobem por motivo legítimo o tempo todo, e o gráfico responde melhor
+# do que a notificação.
+# ---------------------------------------------------------------------------
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: fdp
+    folder: FDP
+    # A sonda escreve de minuto em minuto; avaliar mais rápido que isso só
+    # gastaria consulta relendo o mesmo ponto.
+    interval: 1m
+    rules:
+      # -----------------------------------------------------------------
+      - uid: fdp-fora-do-ar
+        title: FDP fora do ar
+        condition: FORA
+        for: 3m
+        # Sem dado é "não sei", e para disponibilidade não saber é motivo de
+        # alerta: a máquina desligada produz exatamente esta situação, e o
+        # silêncio não pode significar "tudo bem".
+        noDataState: Alerting
+        execErrState: Alerting
+        labels:
+          severidade: critica
+          servico: fdp
+        annotations:
+          summary: 'https://fdp.imp-software.cloud não responde há 3 minutos'
+          description: >-
+            A sonda percorre DNS, TLS, Caddy e aplicação, na ordem que o jogador
+            percorre — então a falha pode estar em qualquer um dos quatro, e não
+            só no container. Comece por `docker ps --filter name=fdp` e
+            `docker logs fdp-api --tail 50`; se o container estiver de pé,
+            suspeite do Caddy (`docker logs caddy --tail 30`) antes da aplicação.
+          runbook_url: https://github.com/jpmvale/fdp/blob/main/deploy/README.md
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: SUBSTITUA_PELO_UID_DO_PROMETHEUS
+            model:
+              refId: A
+              instant: true
+              expr: vps_fdp_disponivel
+          - refId: FORA
+            datasourceUid: __expr__
+            model:
+              refId: FORA
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+
+      # -----------------------------------------------------------------
+      # O alerta que o silêncio não engana.
+      #
+      # Sem ele, cron desligado, crontab apagado ou máquina fora do ar deixam
+      # `vps_fdp_disponivel` congelado no último valor conhecido — que
+      # provavelmente é 1. Nada falha, ninguém é avisado, e o painel continua
+      # verde mostrando um número velho. É a mesma razão pela qual os backups
+      # publicam o timestamp do último sucesso.
+      - uid: fdp-sonda-parada
+        title: A sonda do FDP parou de reportar
+        condition: PARADA
+        for: 5m
+        noDataState: Alerting
+        execErrState: Alerting
+        labels:
+          severidade: aviso
+          servico: fdp
+        annotations:
+          summary: 'A sonda do FDP não reporta há mais de 5 minutos'
+          description: >-
+            O alerta de disponibilidade só vale enquanto alguém está medindo.
+            Enquanto isto estiver disparado, considere `vps_fdp_disponivel` sem
+            valor — ele pode estar mostrando um número de antes. Verifique o cron
+            (`ssh vps crontab -l`) e rode a sonda à mão
+            (`ssh vps '~/bin/metrica-fdp.sh && cat ~/metricas/fdp.prom'`).
+          runbook_url: https://github.com/jpmvale/fdp/blob/main/deploy/README.md
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: SUBSTITUA_PELO_UID_DO_PROMETHEUS
+            model:
+              refId: A
+              instant: true
+              # Idade da última sonda, em segundos. `time()` é o relógio do
+              # Prometheus, não o da VPS — é isso que faz a conta continuar
+              # valendo quando a VPS para de mandar qualquer coisa.
+              expr: time() - vps_fdp_ultima_sonda_segundos
+          - refId: PARADA
+            datasourceUid: __expr__
+            model:
+              refId: PARADA
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    # 300 s = cinco sondas perdidas. Uma ou duas são hiccup de
+                    # cron ou de rede e não merecem notificação.
+                    params: [300]
