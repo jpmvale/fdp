@@ -192,6 +192,34 @@ export interface ErrorPayload {
   params?: Record<string, unknown>;
 }
 
+/**
+ * Códigos de fechamento do WebSocket.
+ *
+ * A faixa 4000–4999 é reservada à aplicação. Existem para que o cliente saiba
+ * **se deve insistir**: um deploy pede reconexão imediata; um token inválido
+ * pede limpar a sessão e recomeçar. Sem essa distinção, o cliente ou martela um
+ * servidor que o recusa, ou desiste de uma partida que ainda está de pé.
+ */
+export const CLOSE_CODES = {
+  /** RNF-065: desligamento gracioso. Reconecte já — a sala continua lá. */
+  SERVER_RESTART: 4001,
+  /** ERR-003: limpe a sessão e refaça o join. */
+  INVALID_TOKEN: 4003,
+  /** ERR-001: a sala não existe mais. */
+  ROOM_NOT_FOUND: 4004,
+  /** ERR-409: outra aba assumiu a sessão. Não reconecte por conta própria. */
+  SESSION_TAKEN: 4009,
+} as const;
+
+export type CloseCode = (typeof CLOSE_CODES)[keyof typeof CLOSE_CODES];
+
+/** Fechamentos em que reconectar sozinho é o comportamento certo. */
+export function shouldReconnect(closeCode: number): boolean {
+  return closeCode !== CLOSE_CODES.SESSION_TAKEN &&
+    closeCode !== CLOSE_CODES.INVALID_TOKEN &&
+    closeCode !== CLOSE_CODES.ROOM_NOT_FOUND;
+}
+
 // ---------------------------------------------------------------------------
 // Limites (`05` §7)
 // ---------------------------------------------------------------------------

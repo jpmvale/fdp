@@ -76,8 +76,15 @@
 const $ = (h) => { const t = document.createElement('template'); t.innerHTML = h.trim(); return t.content.firstElementChild; };
 const app = document.getElementById('app');
 
-const S = { screen: 'home', me: null, token: null, code: null, snap: null, sel: null, log: [], err: null };
+const S = { screen: 'home', me: null, token: null, code: null, wsUrl: null, snap: null, sel: null, log: [], err: null };
 let ws = null;
+
+// `06` §4: uma sessão por sala, para participar de salas diferentes em abas
+// diferentes. O token é assinado e escopado — guardá-lo aqui não dá acesso a
+// nada além daquela sala, e ele expira com ela.
+const guardado = (code) => localStorage.getItem(`fdp.session.${code}`);
+const guardar = (code, token) => localStorage.setItem(`fdp.session.${code}`, token);
+const esquecer = (code) => localStorage.removeItem(`fdp.session.${code}`);
 
 const api = (path, body) => fetch(path, {
   method: body ? 'POST' : 'GET',
@@ -86,10 +93,22 @@ const api = (path, body) => fetch(path, {
 }).then(async (r) => { const d = await r.json(); if (!r.ok) throw new Error(d.motivo || d.code); return d; });
 
 function connect() {
-  ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws?token=${S.token}`);
+  ws = new WebSocket(`${S.wsUrl}?token=${encodeURIComponent(S.token)}`);
   ws.onmessage = (e) => handle(JSON.parse(e.data));
   // Reconectar é um resync: não há caminho separado para recuperar partida.
-  ws.onclose = () => { if (S.token) setTimeout(connect, 700); };
+  // Mas nem todo fechamento pede insistência: sessão assumida em outra aba e
+  // token inválido são respostas, não falhas de rede. Martelar o servidor
+  // nesses casos é o cliente brigando com uma decisão já tomada.
+  ws.onclose = (e) => {
+    if (e.code === 4009) { S.err = 'sala aberta em outra aba'; S.token = null; render(); return; }
+    if (e.code === 4003 || e.code === 4004) { esquecer(S.code); sair(); return; }
+    if (S.token) setTimeout(connect, 700);
+  };
+}
+
+function sair() {
+  S.screen = 'home'; S.token = null; S.snap = null; S.code = null; S.wsUrl = null;
+  render();
 }
 
 const cmd = (type, payload = {}) =>
@@ -159,7 +178,29 @@ function home() {
 
 function enter(session) {
   S.me = session.playerId; S.token = session.sessionToken; S.code = session.roomCode;
+  S.wsUrl = session.wsUrl;
+  guardar(session.roomCode, session.sessionToken);
+  localStorage.setItem('fdp.ultima', session.roomCode);
   connect(); render();
+}
+
+/**
+ * Recarregar a página não pode custar o lugar na mesa (CA-040). O token
+ * guardado revalida em `/session`, que devolve o mesmo `playerId`; se ele não
+ * valer mais, cai na home limpo em vez de tentar conectar com lixo.
+ */
+async function retomar() {
+  const code = new URLSearchParams(location.search).get('sala') || localStorage.getItem('fdp.ultima');
+  if (!code) return false;
+  const token = guardado(code);
+  if (!token) return false;
+  try {
+    enter(await api(`/api/rooms/${code}/session`, { sessionToken: token }));
+    return true;
+  } catch {
+    esquecer(code);
+    return false;
+  }
 }
 
 function room() {
@@ -331,7 +372,9 @@ const cardClass = (c) => `card ${!c ? 'back' : RED.has(c.suit) ? 'red' : ''}`;
 const cardFace = (c) => (c ? `${c.rank}<br>${SUIT[c.suit]}` : '?');
 
 setInterval(() => { if (S.snap?.status === 'PAUSADA') render(); }, 1000);
+
 render();
+void retomar();
 </script>
 </body>
 </html>

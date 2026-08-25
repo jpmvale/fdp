@@ -8,6 +8,19 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+
+    # Sem Redis de pé, a suíte de contrato do RoomStore se pula sozinha e o CI
+    # daria verde sem ter testado a implementação que vai para produção.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -22,9 +35,23 @@ jobs:
       - name: Typecheck
         run: npx tsc -b --pretty
 
-      # Inclui CA-310/CA-311: 1.000 partidas simuladas sem violar invariante.
+      # Inclui CA-310/CA-311: 1.000 partidas simuladas sem violar invariante,
+      # e a suíte de contrato do RoomStore contra Redis de verdade.
       - name: Testes
         run: npm test
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
+
+      # A suíte de Redis se pula sem REDIS_URL; aqui ela é obrigatória.
+      - name: O contrato do RoomStore rodou contra Redis
+        run: |
+          if npm test -- packages/store 2>&1 | grep -q "skipped"; then
+            echo "::error::a suíte de contrato do Redis foi pulada no CI"
+            exit 1
+          fi
+          echo "contrato verificado contra Redis"
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
 
       # RJ-143: o motor de regras não pode alcançar UI, rede nem store.
       - name: Fronteira de imports do motor de regras

@@ -66,8 +66,18 @@ Cada evento carrega `stateVersion`. O cliente guarda o último aplicado.
 | Situação | Ação do cliente |
 |---|---|
 | `evento.stateVersion == local + 1` | aplicar normalmente |
-| `evento.stateVersion <= local` | descartar (duplicata ou fora de ordem) |
+| `evento.stateVersion == local` | aplicar: é continuação do mesmo lote (ver abaixo) |
+| `evento.stateVersion < local` | descartar (estado já superado) |
 | `evento.stateVersion > local + 1` | **buraco detectado** → enviar `room:resync` |
+
+Uma mutação de sala incrementa `stateVersion` **uma vez** e pode emitir vários
+eventos, todos carregando a mesma versão: `host:startMatch` sozinho produz
+`room:statusChanged`, `match:started`, `round:started` e `round:phaseChanged`
+numa tacada. Por isso `== local` é continuação de lote, e não duplicata —
+descartá-lo deixaria a mesa sem cartas. O que se perde é a deduplicação de um
+evento repetido byte a byte, que o WebSocket sobre TCP não produz e que o
+servidor não emite; o que se preserva é o que a regra existe para garantir:
+buraco de versão vira resync, nunca estado divergente em silêncio.
 
 `room:resync` faz o servidor responder com um `room:snapshot` completo. O cliente descarta
 integralmente seu estado local e adota o snapshot.

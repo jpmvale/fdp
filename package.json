@@ -10,7 +10,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc -b --pretty",
     "dev": "tsx watch server/src/main.ts",
-    "start": "tsx server/src/main.ts"
+    "start": "tsx server/src/main.ts",
+    "redis": "docker run --rm -p 6379:6379 --name fdp-redis redis:7-alpine"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

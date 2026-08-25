@@ -15,16 +15,7 @@
   ],
   "references": [
     {
-      "path": "../packages/rules"
-    },
-    {
       "path": "../packages/protocol"
-    },
-    {
-      "path": "../packages/store"
-    },
-    {
-      "path": "../packages/room"
     }
   ]
 }

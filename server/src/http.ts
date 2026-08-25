@@ -1,0 +1,303 @@
+/**
+ * Endpoints HTTP (`06`).
+ *
+ * O HTTP cobre só o que acontece **antes** de existir um WebSocket: criar sala,
+ * verificar sala e obter sessão. Nenhum endpoint aqui expõe estado de partida —
+ * nem placar, nem cartas (RNF-004).
+ */
+
+import { randomBytes, randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { Hono } from 'hono';
+import type { HttpBindings } from '@hono/node-server';
+import {
+  AVATAR_COLORS,
+  AVATAR_EMOJIS,
+  LIMITS,
+  type Avatar,
+  type ErrorCode,
+} from '@fdp/protocol';
+import { avatarSchema, nicknameSchema, roomCodeSchema } from '@fdp/protocol/validate';
+import {
+  createRoom,
+  generateFreeCode,
+  isPresent,
+  join,
+  seatedPlayers,
+  spectators,
+  type Room,
+} from '@fdp/room';
+import type { Hub } from './hub.js';
+import { createRateLimiter } from './limits.js';
+import type { SessionSigner } from './session.js';
+
+export interface HttpOptions {
+  hub: Hub;
+  signer: SessionSigner;
+  /** Caminho do cliente servido do disco. Recarrega a cada request em dev. */
+  clientPath: string;
+  now?: () => number;
+  /** Origem permitida em CORS (RNF-002). Ausente = só mesma origem. */
+  allowedOrigin?: string | undefined;
+  /** Atrás do Caddy o IP verdadeiro vem em `X-Forwarded-For`. */
+  trustProxy?: boolean;
+  version?: string;
+}
+
+/** Paleta fechada de `07` §4: é como se identifica quem é quem na mesa. */
+const AVATARS: Avatar[] = AVATAR_COLORS.map((color, index) => ({
+  emoji: AVATAR_EMOJIS[index]!,
+  color,
+}));
+
+function freeAvatar(room: Room | null, wanted?: Avatar): Avatar {
+  const taken = new Set(
+    (room?.players ?? []).filter(isPresent).map((p) => `${p.avatar.emoji}|${p.avatar.color}`),
+  );
+  if (wanted && !taken.has(`${wanted.emoji}|${wanted.color}`)) return wanted;
+  return AVATARS.find((a) => !taken.has(`${a.emoji}|${a.color}`)) ?? AVATARS[0]!;
+}
+
+/**
+ * CA-006: dois jogadores pedindo "Ana" precisam existir os dois, com apelidos
+ * distintos. Recusar o segundo seria pior — quem chegou depois não tem culpa, e
+ * "esse apelido já existe" numa sala de amigos é atrito puro.
+ */
+function distinctNickname(room: Room | null, wanted: string): string {
+  const taken = new Set(
+    (room?.players ?? []).filter(isPresent).map((p) => p.nickname.toLocaleLowerCase('pt-BR')),
+  );
+  if (!taken.has(wanted.toLocaleLowerCase('pt-BR'))) return wanted;
+  for (let suffix = 2; suffix <= LIMITS.maxPlayers + LIMITS.maxSpectators + 1; suffix++) {
+    const candidate = `${wanted} ${suffix}`;
+    if (!taken.has(candidate.toLocaleLowerCase('pt-BR'))) return candidate;
+  }
+  return `${wanted} ${randomBytes(2).toString('hex')}`;
+}
+
+interface Identity {
+  nickname: string;
+  avatar?: Avatar | undefined;
+}
+
+/** RNF-072: nada de cliente chega à lógica de jogo sem passar por schema. */
+function parseIdentity(body: unknown): { ok: true; value: Identity } | { ok: false } {
+  const raw = (body ?? {}) as { nickname?: unknown; avatar?: unknown };
+  const nickname = nicknameSchema.safeParse(raw.nickname);
+  if (!nickname.success) return { ok: false };
+
+  if (raw.avatar === undefined) return { ok: true, value: { nickname: nickname.data } };
+  const avatar = avatarSchema.safeParse(raw.avatar);
+  if (!avatar.success) return { ok: false };
+  return { ok: true, value: { nickname: nickname.data, avatar: avatar.data } };
+}
+
+export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindings }> {
+  const { hub, signer, clientPath } = options;
+  const now = options.now ?? Date.now;
+  const version = options.version ?? 'dev';
+
+  // RNF-003. Janelas de uma hora, por IP.
+  const createLimit = createRateLimiter({ limit: 10, windowMs: 60 * 60_000 });
+  const joinLimit = createRateLimiter({ limit: 60, windowMs: 60 * 60_000 });
+
+  const app = new Hono<{ Bindings: HttpBindings }>();
+
+  const clientIp = (c: { env: HttpBindings; req: { header(name: string): string | undefined } }): string => {
+    if (options.trustProxy) {
+      // O primeiro da lista é o cliente; os demais são proxies encadeados.
+      const forwarded = c.req.header('x-forwarded-for')?.split(',')[0]?.trim();
+      if (forwarded) return forwarded;
+    }
+    return c.env.incoming.socket.remoteAddress ?? 'desconhecido';
+  };
+
+  const wsUrl = (c: { req: { header(name: string): string | undefined } }, code: string): string => {
+    const host = c.req.header('host') ?? 'localhost';
+    const secure = (c.req.header('x-forwarded-proto') ?? '').split(',')[0]?.trim() === 'https';
+    return `${secure ? 'wss' : 'ws'}://${host}/api/rooms/${code}/ws`;
+  };
+
+  // RNF-005: cabeçalhos de segurança em toda resposta.
+  app.use('*', async (c, next) => {
+    // Nonce por resposta: é o que permite CSP sem `unsafe-inline` (RNF-078)
+    // mesmo com o cliente provisório, que ainda é um arquivo só.
+    const nonce = randomBytes(16).toString('base64');
+    c.set('nonce' as never, nonce as never);
+
+    await next();
+
+    c.header('X-Content-Type-Options', 'nosniff');
+    c.header('Referrer-Policy', 'no-referrer');
+    c.header('X-Frame-Options', 'DENY');
+    c.header(
+      'Content-Security-Policy',
+      [
+        "default-src 'self'",
+        `script-src 'nonce-${nonce}'`,
+        // RNF-078 restringe `unsafe-inline` a **script**, e é o que dá para
+        // fazer: um nonce cobre elementos `<style>`, mas não atributos
+        // `style=`, que o cliente provisório usa em toda parte. Quando a UI de
+        // `07` chegar com CSS Modules, isto aperta para `'self'`.
+        `style-src 'self' 'unsafe-inline'`,
+        "img-src 'self' data:",
+        // `'self'` cobre ws/wss da mesma origem; não há endpoint externo.
+        "connect-src 'self'",
+        "base-uri 'none'",
+        "form-action 'none'",
+        "frame-ancestors 'none'",
+        "object-src 'none'",
+      ].join('; '),
+    );
+
+    // RNF-002: CORS restrito. Sem origem configurada, só mesma origem — que é
+    // o caso do deploy de `11` §1, com o Caddy servindo tudo do mesmo host.
+    const origin = c.req.header('origin');
+    if (options.allowedOrigin && origin === options.allowedOrigin) {
+      c.header('Access-Control-Allow-Origin', origin);
+      c.header('Vary', 'Origin');
+    }
+  });
+
+  const fail = (code: ErrorCode, params?: Record<string, unknown>) =>
+    params ? { code, params } : { code };
+
+  const limited = (retryAfterMs: number) => fail('RATE_LIMITED', { retryAfterMs });
+
+  app.post('/api/rooms', async (c) => {
+    const rate = createLimit.check(clientIp(c), now());
+    if (!rate.allowed) return c.json(limited(rate.retryAfterMs), 429);
+
+    const identity = parseIdentity(await c.req.json().catch(() => ({})));
+    if (!identity.ok) return c.json(fail('VALIDATION_FAILED'), 422);
+
+    const code = generateFreeCode(
+      (n) => randomBytes(n),
+      (candidate) => hub.get(candidate) !== undefined,
+    );
+    const playerId = randomUUID();
+    const ctx = hub.ctx();
+
+    hub.adopt(
+      createRoom(
+        code,
+        { playerId, nickname: identity.value.nickname, avatar: freeAvatar(null, identity.value.avatar) },
+        ctx,
+      ),
+    );
+
+    return c.json(
+      {
+        roomCode: code,
+        playerId,
+        sessionToken: signer.sign(playerId, code, ctx.now),
+        wsUrl: wsUrl(c, code),
+      },
+      201,
+    );
+  });
+
+  app.get('/api/rooms/:code', (c) => {
+    // Consulta pública: leve, `no-store`, e sem nada de partida (RNF-004/006).
+    c.header('Cache-Control', 'no-store');
+
+    const parsed = roomCodeSchema.safeParse(c.req.param('code'));
+    if (!parsed.success) return c.json(fail('ROOM_NOT_FOUND'), 404);
+
+    const room = hub.get(parsed.data);
+    if (!room || room.status === 'ENCERRADA') return c.json(fail('ROOM_NOT_FOUND'), 404);
+
+    return c.json({
+      roomCode: room.code,
+      status: room.status,
+      playerCount: seatedPlayers(room).length,
+      maxPlayers: LIMITS.maxPlayers,
+      canJoinAsPlayer:
+        room.status === 'LOBBY' && seatedPlayers(room).length < LIMITS.maxPlayers,
+      canJoinAsSpectator: spectators(room).length < LIMITS.maxSpectators,
+    });
+  });
+
+  app.post('/api/rooms/:code/join', async (c) => {
+    const rate = joinLimit.check(clientIp(c), now());
+    if (!rate.allowed) return c.json(limited(rate.retryAfterMs), 429);
+
+    const parsed = roomCodeSchema.safeParse(c.req.param('code'));
+    if (!parsed.success) return c.json(fail('ROOM_NOT_FOUND'), 404);
+
+    const room = hub.get(parsed.data);
+    if (!room || room.status === 'ENCERRADA') return c.json(fail('ROOM_NOT_FOUND'), 404);
+
+    const identity = parseIdentity(await c.req.json().catch(() => ({})));
+    if (!identity.ok) return c.json(fail('VALIDATION_FAILED'), 422);
+
+    const playerId = randomUUID();
+    const ctx = hub.ctx();
+    const result = join(
+      room,
+      {
+        playerId,
+        nickname: distinctNickname(room, identity.value.nickname),
+        avatar: freeAvatar(room, identity.value.avatar),
+      },
+      ctx,
+    );
+    if (!result.ok) {
+      return c.json(fail(result.code, { motivo: result.motivo }), result.code === 'ROOM_FULL' ? 409 : 422);
+    }
+
+    hub.commit(result);
+    const joined = result.room.players.find((p) => p.id === playerId);
+
+    return c.json({
+      roomCode: result.room.code,
+      playerId,
+      sessionToken: signer.sign(playerId, result.room.code, ctx.now),
+      wsUrl: wsUrl(c, result.room.code),
+      role: joined?.isSpectator ? 'SPECTATOR' : 'PLAYER',
+    });
+  });
+
+  /**
+   * CA-007: retoma sem criar jogador novo. É o que sustenta "fechei a aba sem
+   * querer e voltei" — e é o motivo de o token ser escopado à sala: ele só
+   * serve para reentrar exatamente onde já se estava.
+   */
+  app.post('/api/rooms/:code/session', async (c) => {
+    const parsed = roomCodeSchema.safeParse(c.req.param('code'));
+    if (!parsed.success) return c.json(fail('ROOM_NOT_FOUND'), 404);
+
+    const body = (await c.req.json().catch(() => ({}))) as { sessionToken?: unknown };
+    const token = typeof body.sessionToken === 'string' ? body.sessionToken : '';
+    const verified = signer.verify(token, now(), parsed.data);
+    if (!verified.ok) return c.json(fail('INVALID_TOKEN'), 401);
+
+    const room = hub.get(parsed.data);
+    if (!room || room.status === 'ENCERRADA') return c.json(fail('ROOM_NOT_FOUND'), 404);
+
+    const player = room.players.find((p) => p.id === verified.claims.playerId);
+    // Quem saiu ou foi expulso não retoma: refaz o join como qualquer um.
+    if (!player || !isPresent(player)) return c.json(fail('INVALID_TOKEN'), 401);
+
+    return c.json({
+      roomCode: room.code,
+      playerId: player.id,
+      sessionToken: token,
+      wsUrl: wsUrl(c, room.code),
+      role: player.isSpectator ? 'SPECTATOR' : 'PLAYER',
+    });
+  });
+
+  app.get('/api/health', (c) => c.json({ ok: true, version, rooms: hub.roomCount }));
+
+  // Cliente: um arquivo, servido do disco. Recarrega a cada request para que
+  // editar o HTML não exija reiniciar o servidor.
+  app.get('*', (c) => {
+    const nonce = c.get('nonce' as never) as unknown as string;
+    const html = readFileSync(clientPath, 'utf8')
+      .replaceAll('<script type="module">', `<script type="module" nonce="${nonce}">`);
+    return c.html(html);
+  });
+
+  return app;
+}
