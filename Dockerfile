@@ -10,10 +10,11 @@ FROM node:24-alpine AS cliente
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-COPY packages/rules/package.json    packages/rules/
-COPY packages/store/package.json    packages/store/
-COPY packages/protocol/package.json packages/protocol/
-COPY packages/room/package.json     packages/room/
+# `packages/` inteiro, e NÃO um COPY por pacote: a lista enumerada envelhece
+# em silêncio. Foi o que aconteceu ao acrescentar `@fdp/bot` — o npm não linkou
+# o workspace que não estava na lista, e a imagem subiu para morrer no primeiro
+# import. O custo é cache de camada mais curto; `npm ci` aqui leva segundos.
+COPY packages ./packages
 # Com devDependencies: é aqui que o Vite existe.
 RUN npm ci
 
@@ -31,10 +32,7 @@ RUN apk add --no-cache tini
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-COPY packages/rules/package.json    packages/rules/
-COPY packages/store/package.json    packages/store/
-COPY packages/protocol/package.json packages/protocol/
-COPY packages/room/package.json     packages/room/
+COPY packages ./packages
 RUN npm ci --omit=dev
 
 COPY . .
