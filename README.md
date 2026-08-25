@@ -17,17 +17,17 @@ Em desenvolvimento. O jogo ainda não é jogável.
 | Fase | O quê | Status |
 |---|---|---|
 | M0 | Especificação completa | ✅ |
-| M1 | Servidor, sala, WebSocket, persistência | 🚧 jogável local; falta Redis e deploy |
+| M1 | Servidor, sala, WebSocket, persistência | 🚧 completo em código; falta o deploy na VPS |
 | M2 | Lobby jogável | ⬜ |
 | M3 | Partida | ⬜ |
 | M4 | Endurecimento e entrega | ⬜ |
 
 ```
 packages/rules/      ✅  motor de regras — puro e determinístico
-packages/store/      ✅  RoomStore: interface + memória (Redis pendente)
+packages/store/      ✅  RoomStore: interface, memória e Redis — mesma suíte
 packages/protocol/   ✅  contrato cliente ↔ servidor + validação
 packages/room/       ✅  máquina de sala, timers, pausa, auto-play
-server/              🚧  Hono + WebSocket — funcional, sem sessão assinada
+server/              ✅  HTTP + WebSocket, sessão assinada, limites, SIGTERM
 app/                 🚧  casca HTML para validar mecânicas; UI real vem depois
 ```
 
@@ -57,8 +57,17 @@ Requer Node 24+.
 ```bash
 npm install
 npm start         # http://localhost:3000 — abra em 2-3 abas anônimas
-npm test          # 137 testes
+npm test          # 246 testes
 npm run typecheck
+```
+
+Sem `REDIS_URL` o servidor sobe com store em memória e as salas morrem com o processo.
+Com Redis, elas sobrevivem a reinício — um `SIGTERM` no meio de uma partida devolve a
+mesa exatamente onde estava:
+
+```bash
+npm run redis     # noutro terminal
+FDP_SESSION_SECRET=<32+ caracteres> REDIS_URL=redis://127.0.0.1:6379 npm start
 ```
 
 Já dá para jogar uma partida completa local. O cliente atual é uma casca sem build,
@@ -79,6 +88,10 @@ Os dois já encontraram bugs reais que nenhuma revisão de código teria pego:
   conservação de cartas sem sintoma visível.
 - Uma partida encerrada por retirada mantinha o "jogador da vez" apontando para quem acabou de
   sair, fazendo a interface pedir jogada a um fantasma.
+
+E um que eles **não** pegaram, porque a invariante estava mal traduzida: a sala ficava presa em
+`EM_PARTIDA` depois de uma vitória, tornando a revanche inalcançável. `03` §5 sempre exigiu
+partida *ativa*; o código só verificava se havia partida. Apareceu jogando.
 
 ## Arquitetura
 
