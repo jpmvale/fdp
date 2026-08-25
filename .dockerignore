@@ -6,3 +6,4 @@ design
 *.md
 .github
 deploy
+app/build
