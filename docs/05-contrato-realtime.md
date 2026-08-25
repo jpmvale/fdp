@@ -174,7 +174,7 @@ tentativa de trapaça nunca seja mascarada por um erro de regra.
 | EV-011 | `round:started` | `{ roundNumber, cardsThisRound, isForeheadRound, firstBidderId, foreheadCards }` | **projetado** |
 | EV-012 | `round:phaseChanged` | `{ phase, activePlayerId, deadline, forbiddenBet? }` | todos |
 | EV-020 | `move:betPlaced` | `{ playerId, bet, betsSoFar, forbiddenBet }` | todos |
-| EV-021 | `move:cardPlayed` | `{ playerId, card, trickNumber, nextPlayerId }` | todos |
+| EV-021 | `move:cardPlayed` | `{ playerId, card, trickNumber, nextPlayerId, deadline }` | todos |
 | EV-022 | `trick:resolved` | `{ trickNumber, plays, winnerId, annulled, nextLeaderId, tricksWon }` | todos |
 | EV-023 | `round:revealed` | `{ cards: Record<PlayerId, Card> }` — só rodada de testa | todos |
 | EV-013 | `round:resolved` | `{ summary: RoundSummary, lives, eliminated }` | todos |
@@ -199,7 +199,10 @@ Regras de projeção:
 - **EV-012** envia `forbiddenBet` apenas quando o `activePlayerId` é o último apostador, e
   apenas para ele — os demais não precisam do valor e enviá-lo a todos entregaria de graça uma
   conta que o jogador deveria fazer sozinho.
-- **EV-021** carrega a carta real: uma vez jogada, ela é pública (RJ-066).
+- **EV-021** carrega a carta real: uma vez jogada, ela é pública (RJ-066). E
+  carrega o `deadline` da vez que começa: entre as cartas de uma vaza a fase não
+  muda, então não há `round:phaseChanged` no caminho, e sem o prazo aqui o
+  cliente não teria como saber quando o turno novo termina.
 - **EV-024** cumpre RJ-116: auto-play nunca é silencioso.
 - **EV-030 a EV-033** implementam o ciclo de pausa (`03` §1.2). `EV-032` é emitido a todos —
   não só ao host — para que a mesa inteira entenda que existe uma decisão pendente e quem

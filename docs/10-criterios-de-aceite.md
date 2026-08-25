@@ -227,6 +227,25 @@ CA-340 não é paranoia de formulário: o chat é o único lugar do produto onde
 jogador escreve texto que aparece na tela dos outros. É a superfície de injeção
 inteira, num só campo.
 
+### 4.9.1 Redutores do cliente (`11` §6)
+
+| ID | Nível | Regras | Critério |
+|---|---|---|---|
+| CA-342 | I | RF-010 | **Dado** uma partida completa na máquina de sala, **quando** o cliente aplica cada evento pelo redutor, **então** o estado local é **idêntico** ao `snapshotFor` do servidor depois de cada comando, para todos os jogadores |
+| CA-343 | U | RF-010 | **Dado** um evento que o redutor não sabe aplicar — desconhecido, transição estrutural, ou faltando o estado de que depende —, **então** ele devolve `null` e o cliente pede o retrato |
+
+CA-342 é a régua que torna os redutores seguros. Um redutor errado não quebra:
+ele diverge em silêncio, e a tela fica *plausível* — mostrando uma vaza que não
+aconteceu, ou uma carta que já foi jogada. Nenhum teste por evento pega isso,
+porque cada um passa sozinho.
+
+Na medição de 25/08/2026, uma partida de 3 jogadores até o fim: **246 eventos
+reduzidos contra 110 resyncs, 69%**. O que resta pedindo retrato são as
+transições estruturais — começo de partida, de rodada e de vaza, resolução e
+pausa —, e é assim porque os eventos que as anunciam não carregam o estado
+necessário para reconstruí-las. Enquanto não carregarem, resync é a resposta
+certa.
+
 ### 4.10 Propriedade e ponta a ponta
 
 | ID | Nível | Critério |

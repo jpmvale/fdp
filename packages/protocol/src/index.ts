@@ -169,7 +169,7 @@ export type ServerEvent =
   | { type: 'error'; payload: ErrorPayload }
   // EV-020..EV-024 — jogadas
   | { type: 'move:betPlaced'; payload: { playerId: PlayerId; bet: number; betsSoFar: Record<PlayerId, number>; forbiddenBet: number | null } }
-  | { type: 'move:cardPlayed'; payload: { playerId: PlayerId; card: Card; trickNumber: number; nextPlayerId: PlayerId | null } }
+  | { type: 'move:cardPlayed'; payload: { playerId: PlayerId; card: Card; trickNumber: number; nextPlayerId: PlayerId | null; deadline: number | null } }
   | { type: 'trick:resolved'; payload: { trickNumber: number; winnerId: PlayerId | null; annulled: boolean; annulledValue: number | null; nextLeaderId: PlayerId | null; tricksWon: Record<PlayerId, number> } }
   | { type: 'round:revealed'; payload: { cards: Record<PlayerId, Card> } }
   | { type: 'move:autoPlayed'; payload: { playerId: PlayerId; kind: 'BET' | 'CARD'; value: number | Card } }

@@ -62,12 +62,13 @@ campos e nada derivado da partida (CA-338).
 
 | Item | Situação hoje | Precisa virar |
 |---|---|---|
-| Aplicação incremental de eventos | O cliente pede o retrato a cada evento, **menos `chat:message`**, que é aplicado local | Os redutores por evento, na camada `state/` |
 
-A **decisão** de reconciliação de `05` §3 está pronta e testada em
-[`app/src/net/reconcile.ts`](app/src/net/reconcile.ts). O que falta é o outro
-lado: aplicar cada evento ao estado local em vez de pedir o retrato inteiro.
-Correto como está, só mais conversa do que o necessário.
+Os **redutores por evento** de `11` §6 estão em
+[`app/src/state/redutores.ts`](app/src/state/redutores.ts), ligados ao
+reconciliador de `05` §3 que já existia. Cada redutor devolve o estado novo ou
+`null` — "não sei montar isto" —, e `null` termina onde tudo terminava antes:
+pedindo o retrato. Medido em 69% dos eventos reduzidos numa partida completa
+(CA-342).
 
 ## Verificado funcionando
 
@@ -186,9 +187,9 @@ printf "\n%s\n" "$(cat chave.pub)" >> ~/.ssh/authorized_keys
 
 ## O que fazer a seguir
 
-1. **Redutores por evento** no cliente, no lugar do resync a cada evento.
-   `chat:message` já é aplicado localmente — não como começo dos redutores, mas
-   porque ali o resync seria absurdo: uma conversa animada viraria uma
-   tempestade de retratos completos para acrescentar uma linha de texto.
-2. **Regras de alerta no Grafana** sobre `vps_fdp_disponivel` e
+1. **Regras de alerta no Grafana** sobre `vps_fdp_disponivel` e
    `vps_fdp_ultima_sonda_segundos` (a sonda parou).
+2. **Completar os eventos estruturais**, se os 31% de resync incomodarem:
+   `round:phaseChanged` não carrega a vaza que o motor acaba de criar, e
+   `trick:resolved` não carrega a ordem de jogo da próxima. Enquanto não
+   carregarem, o redutor pede o retrato — e está certo em pedir.

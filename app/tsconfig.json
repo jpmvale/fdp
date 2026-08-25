@@ -26,6 +26,9 @@
     },
     {
       "path": "../packages/rules"
+    },
+    {
+      "path": "../packages/room"
     }
   ]
 }

@@ -807,6 +807,11 @@ export function translate(events: readonly EngineEvent[], room: Room): Emission[
               card,
               trickNumber: event.trickNumber,
               nextPlayerId: match.round.activePlayerId,
+              // O prazo da vez que COMEÇA agora. Entre as cartas de uma vaza
+              // não há `round:phaseChanged` — a fase não muda —, então sem
+              // isto o cliente fica com o prazo do turno anterior e a barra
+              // do turno mente.
+              deadline: room.phaseDeadline,
             },
           }));
         }

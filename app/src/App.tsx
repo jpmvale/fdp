@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { LIMITS, PROTOCOL_VERSION, type Avatar as AvatarProto } from '@fdp/protocol';
 import { conectar, type Conexao } from './net/socket';
+import { createReconciler } from './net/reconcile';
+import { reduzir } from './state/redutores';
 import * as sessao from './net/sessao';
 import { frase } from './net/mensagens';
 import { useEstado, definir, ler, avisar, errar } from './state/loja';
-import type { ChatMessage, Retrato } from './state/tipos';
+import type { Retrato } from './state/tipos';
+import type { Reconciler } from './net/reconcile';
 import { BloqueioConexao, FaixaConexao, bloqueia } from './components/Conexao';
 import { Home } from './screens/Home';
 import { Perfil } from './screens/Perfil';
@@ -25,6 +28,13 @@ export function App() {
    * servidor precisa de reação.
    */
   const saindo = useRef(false);
+  /**
+   * `05` §3: decide, para cada quadro, entre aplicar, descartar e pedir o
+   * estado inteiro. Estava escrito e testado desde o começo, e até agora não
+   * era usado — o cliente pedia o retrato a cada evento, o que é sempre
+   * correto e nunca aproveitava a versão que vem no quadro.
+   */
+  const reconciliador = useRef(createReconciler());
   const [regrasAbertas, setRegrasAbertas] = useState(false);
   // O que o Perfil vai fazer ao confirmar: criar sala, entrar numa, ou só
   // salvar (quando já se está na mesa).
@@ -37,8 +47,12 @@ export function App() {
     sessao.lembrarSala(s.roomCode);
     definir({ tela: 'sala', eu: s.playerId, codigo: s.roomCode });
     conexao.current?.fechar();
+    // Socket novo: o estado local não vale mais nada até o próximo snapshot.
+    reconciliador.current.reset();
     conexao.current = conectar(s.wsUrl, s.sessionToken, {
-      aoReceber: (msg) => { if (!saindo.current) receber(msg, () => conexao.current); },
+      aoReceber: (msg) => {
+        if (!saindo.current) receber(msg, reconciliador.current, () => conexao.current);
+      },
       aoMudarEstado: (c) => definir({ conexao: c }),
     });
   };
@@ -328,35 +342,49 @@ async function juntar(codigo: string, apelido: string, avatar: AvatarProto, entr
 }
 
 /**
- * Todo evento que muda o jogo pede o retrato novo. Simples e sempre correto —
- * o servidor é a autoridade. Os redutores por evento, que evitariam essa ida e
- * volta, ainda não existem.
+ * O caminho de um quadro do servidor.
+ *
+ * Duas decisões em sequência, e elas são diferentes: o **reconciliador** olha a
+ * versão e diz se este quadro pode ser aplicado; o **redutor** olha o conteúdo
+ * e diz se sabe aplicá-lo. Qualquer um dos dois em dúvida termina no mesmo
+ * lugar — pedir o retrato ao servidor, que é a autoridade.
  */
-function receber(msg: { type: string; payload: unknown }, conexao: () => Conexao | null) {
-  if (msg.type === 'room:snapshot') {
-    definir({ retrato: msg.payload as Retrato, cartaSelecionada: null });
-    return;
-  }
-  // O ÚNICO evento aplicado localmente, em vez de pedir o retrato inteiro.
-  // Não é o começo dos redutores: é que aqui o resync seria absurdo — uma
-  // conversa animada viraria uma tempestade de retratos completos, cada um
-  // carregando a partida inteira para acrescentar uma linha de texto. O estado
-  // do jogo não muda com uma mensagem, então não há o que reconciliar.
-  if (msg.type === 'chat:message') {
-    const { message } = msg.payload as { message: ChatMessage };
-    definir((e) => e.retrato
-      ? { retrato: { ...e.retrato, chat: [...e.retrato.chat, message].slice(-LIMITS.chatHistoryMax) } }
-      : {});
-    return;
-  }
-
+function receber(
+  msg: { type: string; payload: unknown; stateVersion?: number },
+  reconciliador: Reconciler,
+  conexao: () => Conexao | null,
+): void {
   if (msg.type === 'error') {
     const p = msg.payload as { code: string; params?: { motivo?: string } };
     errar(frase(p.params?.motivo, p.code));
     return;
   }
+
+  const decisao = reconciliador.receive({ type: msg.type, stateVersion: msg.stateVersion ?? 0 });
+
+  if (decisao.action === 'RESYNC') {
+    conexao()?.enviar('room:resync' as never, {});
+    return;
+  }
+  if (decisao.action === 'DISCARD') return;
+
+  if (msg.type === 'room:snapshot') {
+    definir({ retrato: msg.payload as Retrato, cartaSelecionada: null });
+    return;
+  }
+
   narrar(msg);
-  if (msg.type !== 'ack') conexao()?.enviar('room:resync' as never, {});
+
+  const atual = ler().retrato;
+  const reduzido = atual ? reduzir(atual, msg) : null;
+
+  if (reduzido) {
+    definir({ retrato: reduzido });
+    return;
+  }
+
+  // O redutor não soube: o retrato inteiro resolve, como sempre resolveu.
+  conexao()?.enviar('room:resync' as never, {});
 }
 
 /** Nada que muda a mesa pode acontecer em silêncio. */

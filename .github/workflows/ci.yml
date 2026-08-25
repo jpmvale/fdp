@@ -72,6 +72,19 @@ jobs:
         env:
           REDIS_URL: redis://127.0.0.1:6379
 
+      # O cliente não conhece a máquina de sala. O TESTE de equivalência dos
+      # redutores conhece — é a razão de ele existir, comparar os dois lados —,
+      # e por isso `app/tsconfig.json` referencia `packages/room`. Sem esta
+      # trava a referência viraria porta aberta para o `app/src` importar a
+      # sala e passar a decidir regra no cliente.
+      - name: O cliente não importa a máquina de sala
+        run: |
+          if grep -rn "@fdp/room" app/src; then
+            echo "::error::app/src importou @fdp/room — regra de jogo não se decide no cliente"
+            exit 1
+          fi
+          echo "fronteira do cliente ok"
+
       # RJ-143: o motor de regras não pode alcançar UI, rede nem store.
       - name: Fronteira de imports do motor de regras
         run: |
