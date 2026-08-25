@@ -1,0 +1,58 @@
+# Unidade do systemd para o FDP (`11` §7).
+#
+# Instalar em /etc/systemd/system/fdp.service.
+
+[Unit]
+Description=FDP — servidor de jogo
+Documentation=https://github.com/jpmvale/fdp
+After=network-online.target redis-server.service
+Wants=network-online.target
+Requires=redis-server.service
+
+[Service]
+Type=simple
+User=fdp
+Group=fdp
+WorkingDirectory=/opt/fdp
+
+# Segredos fora do repositório, sempre (`11` §7).
+EnvironmentFile=/etc/fdp/env
+# Escrito pelo deploy a cada subida; opcional para que a primeira suba sem ele.
+EnvironmentFile=-/etc/fdp/version
+Environment=NODE_ENV=production
+
+# `tsx` é dependência de execução: os pacotes do workspace exportam `.ts` e os
+# imports usam `.js`, que o resolvedor do Node não mapeia de volta.
+ExecStart=/usr/bin/node /opt/fdp/node_modules/.bin/tsx /opt/fdp/server/src/main.ts
+
+Restart=always
+RestartSec=2
+
+# RNF-065: o processo fecha os sockets com código de "reconecte" e persiste as
+# salas antes de sair. `TimeoutStopSec` precisa caber nisso — o desligamento tem
+# guarda própria de 5 s, e matar antes transformaria o deploy em queda seca.
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+# Logs no journal, para RNF-090.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=fdp
+
+# Endurecimento: o processo não precisa de nada além da própria pasta.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+ReadWritePaths=/opt/fdp
+
+[Install]
+WantedBy=multi-user.target

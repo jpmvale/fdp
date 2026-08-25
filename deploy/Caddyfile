@@ -1,0 +1,47 @@
+# Caddy — borda do FDP (`11` §1 e §7).
+#
+# TLS automático via Let's Encrypt: o domínio precisa apontar para esta VPS
+# antes do primeiro `systemctl reload caddy`, senão a emissão falha.
+#
+# Instalar em /etc/caddy/Caddyfile e trocar os dois valores abaixo.
+
+{
+	email SEU-EMAIL@exemplo.com
+}
+
+SEU-DOMINIO.com {
+	encode zstd gzip
+
+	# O upgrade de WebSocket é transparente no reverse_proxy: `/api/rooms/{code}/ws`
+	# entra por aqui como qualquer outra rota de `/api`.
+	#
+	# Hoje o processo Node serve também o cliente, porque ele ainda é um arquivo
+	# único sem build. Quando a SPA de `07` existir, o bloco comentado abaixo
+	# passa a servir os estáticos do disco e só `/api/*` continua no proxy.
+	reverse_proxy 127.0.0.1:3000 {
+		# Sem isto o servidor vê o IP do Caddy, e o rate limit por IP de RNF-003
+		# vira rate limit global — um jogador esgotaria a cota de todos.
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+
+		# Partida de 20 min não pode ser cortada por timeout de leitura.
+		transport http {
+			read_timeout 0
+			write_timeout 0
+		}
+	}
+
+	# handle /api/* {
+	# 	reverse_proxy 127.0.0.1:3000
+	# }
+	# handle {
+	# 	root * /opt/fdp/app/dist
+	# 	try_files {path} /index.html
+	# 	file_server
+	# }
+
+	log {
+		output file /var/log/caddy/fdp.log
+		format json
+	}
+}
