@@ -17,6 +17,14 @@ import { Fim } from './screens/Fim';
 export function App() {
   const estado = useEstado();
   const conexao = useRef<Conexao | null>(null);
+  /**
+   * Já pedimos para sair. Entre o comando e o socket fechar existe uma janela
+   * de milissegundos em que o servidor ainda responde — e responde que este
+   * jogador não está mais na sala, o que é verdade e vira um erro vermelho na
+   * cara de quem acabou de decidir ir embora. Depois do pedido, nada mais do
+   * servidor precisa de reação.
+   */
+  const saindo = useRef(false);
   const [regrasAbertas, setRegrasAbertas] = useState(false);
   // O que o Perfil vai fazer ao confirmar: criar sala, entrar numa, ou só
   // salvar (quando já se está na mesa).
@@ -24,12 +32,13 @@ export function App() {
   const [perfilAberto, setPerfilAberto] = useState(false);
 
   const entrar = (s: sessao.Sessao) => {
+    saindo.current = false;
     sessao.guardar(s.roomCode, s.sessionToken);
     sessao.lembrarSala(s.roomCode);
     definir({ tela: 'sala', eu: s.playerId, codigo: s.roomCode });
     conexao.current?.fechar();
     conexao.current = conectar(s.wsUrl, s.sessionToken, {
-      aoReceber: (msg) => receber(msg, () => conexao.current),
+      aoReceber: (msg) => { if (!saindo.current) receber(msg, () => conexao.current); },
       aoMudarEstado: (c) => definir({ conexao: c }),
     });
   };
@@ -92,6 +101,23 @@ export function App() {
   const enviar = (tipo: string, payload?: unknown) =>
     conexao.current?.enviar(tipo as never, payload);
 
+  /**
+   * Sair da mesa DE PROPÓSITO, que não é a mesma coisa que cair.
+   *
+   * Fechar o socket e ir embora faria o servidor tratar como queda: os outros
+   * veriam "fulano caiu", a mesa esperaria por alguém que não vai voltar e, no
+   * meio de uma partida, pausaria. O comando diz que a saída foi decidida, e a
+   * sala trata como saída.
+   *
+   * O `setTimeout` existe porque fechar o socket no mesmo tique descartaria o
+   * quadro recém-enfileirado: a mensagem sairia pela metade, ou não sairia.
+   */
+  const sairDaMesa = () => {
+    saindo.current = true;
+    enviar('player:leave');
+    setTimeout(voltarAoInicio, 150);
+  };
+
   const foraDaSala = estado.tela === 'home' || estado.tela === 'perfil';
 
   if (foraDaSala || !estado.retrato) {
@@ -122,7 +148,12 @@ export function App() {
         <Erro texto={estado.erro} />
         {bloqueioAtual}
         {regrasAbertas && estado.retrato && (
-          <Menu retrato={estado.retrato} partida={estado.retrato.match} aoFechar={() => setRegrasAbertas(false)} />
+          <Menu
+            retrato={estado.retrato}
+            partida={estado.retrato.match}
+            aoFechar={() => setRegrasAbertas(false)}
+            aoSair={sairDaMesa}
+          />
         )}
       </Casca>
     );
@@ -164,7 +195,13 @@ export function App() {
       )}
 
       {acabou && partida ? (
-        <Fim retrato={retrato} eu={eu} partida={partida} aoRevanche={() => enviar('host:rematch')} />
+        <Fim
+          retrato={retrato}
+          eu={eu}
+          partida={partida}
+          aoRevanche={() => enviar('host:rematch')}
+          aoSair={sairDaMesa}
+        />
       ) : partida ? (
         <>
           <Mesa
@@ -202,6 +239,7 @@ export function App() {
           aoRemoverBot={(playerId) => enviar('host:removeBot', { playerId })}
           aoAbrirPerfil={() => setPerfilAberto(true)}
           aoAbrirRegras={() => setRegrasAbertas(true)}
+          aoSair={sairDaMesa}
         />
       )}
 
@@ -209,7 +247,12 @@ export function App() {
       <Erro texto={estado.erro} />
       {bloqueioAtual}
       {regrasAbertas && (
-        <Menu retrato={retrato} partida={partida} aoFechar={() => setRegrasAbertas(false)} />
+        <Menu
+          retrato={retrato}
+          partida={partida}
+          aoFechar={() => setRegrasAbertas(false)}
+          aoSair={sairDaMesa}
+        />
       )}
     </Casca>
   );

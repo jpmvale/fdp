@@ -17,11 +17,12 @@ const MOTIVOS: Record<EndReason, string> = {
   ENCERRADA_POR_AUSENCIA: 'A pausa passou do limite esperando quem caiu.',
 };
 
-export function Fim({ retrato, eu, partida, aoRevanche }: {
+export function Fim({ retrato, eu, partida, aoRevanche, aoSair }: {
   retrato: Retrato;
   eu: string;
   partida: PlayerView;
   aoRevanche: () => void;
+  aoSair: () => void;
 }) {
   const vencedores = partida.winnerIds ?? [];
   const souHost = retrato.hostId === eu;
@@ -71,9 +72,19 @@ export function Fim({ retrato, eu, partida, aoRevanche }: {
         })}
       </div>
 
-      {souHost
-        ? <button onClick={aoRevanche}>Revanche com o mesmo grupo</button>
-        : <p className="fraco" style={{ textAlign: 'center' }}>O host pode pedir revanche.</p>}
+      {/* Toda tela precisa de uma ação de saída explícita (RF-025). Aqui
+          faltava: quem não era host não tinha botão nenhum, e o host só tinha
+          revanche — quem quisesse parar de jogar ficava preso na tela de fim,
+          sem nada para fazer além de fechar a aba. */}
+      {souHost && <button onClick={aoRevanche}>Revanche com o mesmo grupo</button>}
+
+      <button className="fantasma" onClick={aoSair}>Sair da mesa</button>
+
+      {!souHost && (
+        <p className="fraco" style={{ textAlign: 'center' }}>
+          Se ficar, o host ainda pode pedir revanche com o mesmo grupo.
+        </p>
+      )}
     </div>
   );
 }

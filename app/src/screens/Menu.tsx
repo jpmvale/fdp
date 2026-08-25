@@ -13,12 +13,16 @@ import type { PlayerView, Retrato } from '../state/tipos';
  * Abre no log quando há partida: no meio do jogo a pergunta quase sempre é o
  * que rolou, e quem quer as regras clica uma vez. Sem partida, só há regras.
  */
-export function Menu({ retrato, partida, aoFechar }: {
+export function Menu({ retrato, partida, aoFechar, aoSair }: {
   retrato: Retrato;
   partida: PlayerView | null;
   aoFechar: () => void;
+  aoSair: () => void;
 }) {
   const [aba, setAba] = useState<'log' | 'regras'>(partida ? 'log' : 'regras');
+  const [confirmando, setConfirmando] = useState(false);
+
+  const emPartida = partida !== null && partida.endReason === null;
 
   return (
     <div
@@ -59,6 +63,30 @@ export function Menu({ retrato, partida, aoFechar }: {
           : <Regras />}
 
         <button onClick={aoFechar}>Voltar para a mesa</button>
+
+        {/* Sair no meio da partida é RETIRADA (RJ-154): as cartas e as vidas
+            vão embora e a rodada é refeita sem a pessoa. Por isso o segundo
+            toque — não é cerimônia, é que um toque acidental aqui custaria a
+            partida de quem tocou e atrapalharia a mesa inteira. */}
+        {confirmando ? (
+          <div className="cartao pilha" style={{ gap: 8 }}>
+            <p className="fraco" style={{ textAlign: 'center' }}>
+              {emPartida
+                ? 'Sair agora é desistir: suas vidas e cartas vão embora e a rodada recomeça sem você.'
+                : 'Você sai da mesa e volta ao início.'}
+            </p>
+            <button className="perigo" onClick={aoSair}>
+              {emPartida ? 'Desistir e sair' : 'Sair da mesa'}
+            </button>
+            <button className="fantasma" onClick={() => setConfirmando(false)}>
+              Ficar
+            </button>
+          </div>
+        ) : (
+          <button className="fantasma" onClick={() => setConfirmando(true)}>
+            Sair da mesa
+          </button>
+        )}
       </div>
     </div>
   );

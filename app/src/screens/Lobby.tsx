@@ -10,7 +10,7 @@ const DIFICULDADES: { valor: BotDifficulty; rotulo: string; explica: string }[] 
   { valor: 'MEDIO', rotulo: 'Médio', explica: 'Aposta pela força da mão e segura carta alta.' },
 ];
 
-export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRemoverBot, aoAbrirPerfil, aoAbrirRegras }: {
+export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRemoverBot, aoAbrirPerfil, aoAbrirRegras, aoSair }: {
   retrato: Retrato;
   eu: string;
   aoIniciar: () => void;
@@ -19,6 +19,7 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
   aoRemoverBot: (playerId: string) => void;
   aoAbrirPerfil: () => void;
   aoAbrirRegras: () => void;
+  aoSair: () => void;
 }) {
   const [dificuldade, setDificuldade] = useState<BotDifficulty>('MEDIO');
   const jogadores = retrato.players.filter((p) => !p.isSpectator);
@@ -136,6 +137,11 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
       </div>
 
       <Chat />
+
+      {/* RF-025: toda tela tem saída explícita. Sem isto, entrar numa sala era
+          um caminho de mão única — só fechando a aba, o que o servidor leria
+          como queda e faria a mesa esperar por quem não vai voltar. */}
+      <button className="fantasma" onClick={aoSair}>Sair da mesa</button>
 
       {souHost ? (
         <div className="pilha" style={{ gap: 8 }}>
