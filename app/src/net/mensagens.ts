@@ -20,7 +20,7 @@ const FRASES: Record<string, string> = {
 
   // Jogada inválida.
   APOSTA_FORA_DO_INTERVALO: 'Essa aposta não existe nesta rodada.',
-  CARTA_NAO_ESTA_NA_MAO: 'Essa carta não está mais na sua mão.',
+  CARTA_NAO_ESTA_NA_MAO: 'Você não tem mais essa carta.',
   JOGADOR_INATIVO: 'Você não está mais nesta partida.',
 
   // Sala.

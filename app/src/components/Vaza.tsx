@@ -148,7 +148,7 @@ function rotuloDaCarta(
   anulada: boolean,
 ): string {
   const quem = souEu ? 'você' : jogador?.nickname ?? 'alguém';
-  const estado = ganhando ? ', ganhando a vaza' : anulada ? ', anulada por empate' : '';
+  const estado = ganhando ? ', ganhando a mão' : anulada ? ', anulada por empate' : '';
   return `${quem} jogou ${card.rank}${estado}`;
 }
 

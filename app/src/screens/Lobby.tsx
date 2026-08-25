@@ -6,8 +6,8 @@ import type { Retrato } from '../state/tipos';
 
 /** Só as que hoje jogam diferente. As outras duas ainda não existem. */
 const DIFICULDADES: { valor: BotDifficulty; rotulo: string; explica: string }[] = [
-  { valor: 'FACIL', rotulo: 'Fácil', explica: 'Aposta e joga no chute, sem olhar a mão.' },
-  { valor: 'MEDIO', rotulo: 'Médio', explica: 'Aposta pela força da mão e segura carta alta.' },
+  { valor: 'FACIL', rotulo: 'Fácil', explica: 'Aposta e joga no chute, sem olhar as cartas.' },
+  { valor: 'MEDIO', rotulo: 'Médio', explica: 'Aposta pela força das cartas e segura carta alta.' },
 ];
 
 export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRemoverBot, aoAbrirPerfil, aoAbrirRegras, aoSair, aoEnviarChat }: {

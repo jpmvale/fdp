@@ -1,7 +1,7 @@
 /**
  * As regras, acessíveis a qualquer momento sem sair da partida (RF-015).
  *
- * Sobreposição e não tela nova: quem abre as regras está no meio de uma mão e
+ * Sobreposição e não tela nova: quem abre as regras está jogando e
  * quer voltar para ela. Sair da partida para consultar como se aposta seria o
  * pior momento possível para perder a mesa de vista.
  *
@@ -13,26 +13,26 @@ export function Regras() {
   return (
     <div className="pilha">
     <Bloco titulo="O objetivo">
-      Você começa com <b>5 vidas</b>. A cada rodada declara <b>quantas vazas
-      vai ganhar</b>. Errou a aposta, perde uma vida por vaza de diferença —
+      Você começa com <b>5 vidas</b>. A cada rodada declara <b>quantas mãos
+      vai ganhar</b>. Errou a aposta, perde uma vida por mão de diferença —
       para mais ou para menos. Zerou, está fora. Último de pé vence.
     </Bloco>
 
     <Bloco titulo="A aposta que ninguém quer">
       A soma das apostas da mesa <b>nunca pode fechar</b> com o número de
-      vazas da rodada. Quem aposta por último fica proibido do valor que
+      mãos da rodada. Quem aposta por último fica proibido do valor que
       fecharia a conta — e é obrigado a estragar a vida de alguém, inclusive
       a própria. <b>Não existe rodada em que todo mundo acerta.</b>
     </Bloco>
 
-    <Bloco titulo="Jogando as vazas">
-      Ganha a vaza a <b>carta mais alta</b>, na ordem 2 3 4 5 6 7 8 9 10 J Q
+    <Bloco titulo="Jogando as mãos">
+      Ganha a mão a <b>carta mais alta</b>, na ordem 2 3 4 5 6 7 8 9 10 J Q
       K A. E é só isso:
       <ul style={{ margin: '8px 0 0 18px', display: 'grid', gap: 4 }}>
         <li><b>Naipe não vale nada</b> — é ilustração da carta.</li>
         <li><b>Não existe trunfo</b> nem manilha.</li>
-        <li><b>Não precisa seguir naipe</b>: toda carta da sua mão é sempre jogável.</li>
-        <li>Empate na maior carta? <b>Ninguém leva a vaza.</b></li>
+        <li><b>Não precisa seguir naipe</b>: todas as suas cartas são sempre jogáveis.</li>
+        <li>Empate na maior carta? <b>Ninguém leva a mão.</b></li>
       </ul>
     </Bloco>
 

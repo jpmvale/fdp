@@ -61,7 +61,7 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
 function Cabecalho({ partida, retrato, aoAbrirRegras }: {
   partida: PlayerView; retrato: Retrato; aoAbrirRegras: () => void;
 }) {
-  const fase = partida.phase === 'APOSTAS' ? 'Fase de apostas' : 'Fase de vazas';
+  const fase = partida.phase === 'APOSTAS' ? 'Fase de apostas' : 'Jogando as mãos';
   const daVez = partida.activePlayerId === retrato.match?.viewerId;
   const estavel = retrato.status !== 'PAUSADA';
 
@@ -75,7 +75,7 @@ function Cabecalho({ partida, retrato, aoAbrirRegras }: {
           <div className="fraco">
             {fase}{daVez ? ' · vez de você' : ''}
             {partida.phase !== 'APOSTAS' && !partida.isForeheadRound &&
-              ` · vaza ${partida.trickNumber} de ${partida.cardsThisRound}`}
+              ` · mão ${partida.trickNumber} de ${partida.cardsThisRound}`}
           </div>
         </div>
 
@@ -177,11 +177,11 @@ function AvisoDaVaza({ partida, nome, eu }: {
       // Empate silencioso passa por bug (`07` §2.4): diz o valor e quem puxa.
       const puxa = ultima.nextLeaderId;
       setAviso(
-        `Empate em ${ultima.annulledValue} — ninguém levou a vaza.` +
+        `Empate em ${ultima.annulledValue} — ninguém levou a mão.` +
         (puxa ? ` ${puxa === eu ? 'Você puxa' : `${nome(puxa)} puxa`} a próxima.` : ''),
       );
     } else {
-      setAviso(ultima.winnerId === eu ? 'Você levou a vaza' : `${nome(ultima.winnerId)} levou a vaza`);
+      setAviso(ultima.winnerId === eu ? 'Você levou a mão' : `${nome(ultima.winnerId)} levou a mão`);
     }
 
     // Dois tempos: aos 2 s começa a sair, e só some do DOM quando a saída
@@ -236,7 +236,7 @@ function EmpateNaVaza({ partida }: { partida: PlayerView }) {
       padding: '8px 12px', borderRadius: 'var(--r-md)', fontSize: 13,
       background: 'rgba(255,255,255,0.05)', textAlign: 'center',
     }}>
-      Empate em {valor} — ninguém leva a vaza.
+      Empate em {valor} — ninguém leva a mão.
     </div>
   );
 }
@@ -295,7 +295,7 @@ function Mao({ partida, selecionada, aoSelecionar, podeJogar }: {
   return (
     <div className="pilha" style={{ gap: 6 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <span className="rotulo">sua mão</span>
+        <span className="rotulo">suas cartas</span>
         {/* RJ-023: nenhuma carta fica desabilitada — todas são sempre jogáveis. */}
         <span className="fraco">toda carta é jogável</span>
       </div>

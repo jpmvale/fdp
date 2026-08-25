@@ -144,9 +144,9 @@ stateDiagram-v2
     APOSTAS --> APOSTAS: aposta aceita, ainda faltam jogadores
     APOSTAS --> VAZAS: todos apostaram e cartasNaRodada > 1
     APOSTAS --> REVELACAO: todos apostaram e cartasNaRodada == 1
-    VAZAS --> RECOLHIMENTO: vaza resolvida, ainda restam vazas
-    RECOLHIMENTO --> VAZAS: pausa cumprida, próxima vaza aberta
-    VAZAS --> RESOLUCAO: última vaza resolvida
+    VAZAS --> RECOLHIMENTO: vaza resolvida
+    RECOLHIMENTO --> VAZAS: pausa cumprida, ainda restam vazas
+    RECOLHIMENTO --> RESOLUCAO: pausa cumprida, era a última vaza
     REVELACAO --> RESOLUCAO: cartas reveladas
     RESOLUCAO --> [*]
 ```
@@ -156,7 +156,7 @@ stateDiagram-v2
 | `DISTRIBUICAO` | automática | servidor | nenhum | — | Cartas distribuídas (RJ-041) |
 | `APOSTAS` | **sequencial** | `activePlayerId` | `move:bet` | `BET_TIMEOUT`, só se conectado | Todos os ativos apostaram |
 | `VAZAS` | **sequencial** | `activePlayerId` | `move:playCard` | `PLAY_TIMEOUT`, só se conectado | `cartasNaRodada` vazas resolvidas |
-| `RECOLHIMENTO` | automática | servidor | nenhum | pausa 1,5 s | Próxima vaza aberta pelo puxador de RJ-065 |
+| `RECOLHIMENTO` | automática | servidor | nenhum | pausa 1,5 s | Próxima vaza aberta pelo puxador de RJ-065, ou `RESOLUCAO` se era a última |
 | `REVELACAO` | automática | servidor | nenhum | pausa 3 s | Cartas reveladas aos donos |
 | `RESOLUCAO` | automática | servidor | nenhum | pausa 3 s | Vidas debitadas, eliminações aplicadas |
 
@@ -188,8 +188,10 @@ como as demais pausas: com a vaza seguinte já aberta, um bot joga em `BOT_THINK
 passa a mostrar uma vaza que já não está em disputa. Durante `RECOLHIMENTO` não há
 `activePlayerId` e nenhuma jogada é aceita; a vaza fechada vive **apenas** em
 `resolvedTricks`, nunca também em `vazaAtual` — duplicá-la contaria as cartas duas vezes e
-quebraria INV-03. A última vaza da rodada não passa por aqui: quem cumpre o papel é
-`RESOLUCAO`, que já mostra o acerto de contas.
+quebraria INV-03. **A última vaza da rodada também passa por aqui** — ela ia direto ao acerto
+de contas e era a única do jogo cujo resultado ninguém via, porque a tela trocava no mesmo
+instante em que a carta vencedora aparecia. Só a rodada de testa fica de fora: lá as cartas
+estão nas testas, não na mesa, e quem mostra o resultado é `REVELACAO`.
 
 ### 4.2 Transições automáticas
 

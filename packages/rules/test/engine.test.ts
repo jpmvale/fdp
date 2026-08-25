@@ -659,17 +659,24 @@ describe('CA-346: RECOLHIMENTO — a vaza fica na mesa antes de recolher', () =>
     expect(recusa.ok).toBe(false);
   });
 
-  it('a última vaza da rodada não passa por RECOLHIMENTO: vai direto à conta', () => {
-    // A pausa existe para o intervalo ENTRE vazas. No fim da rodada quem faz o
-    // papel dela é RESOLUCAO, que já mostra o acerto de contas — encadear as
-    // duas seria mostrar a mesma vaza parada duas vezes seguidas.
+  it('a última vaza da rodada também é recolhida, e só então vem a conta', () => {
+    // Ela ia direto ao acerto de contas, e era a única vaza do jogo cujo
+    // resultado ninguém via: a tela trocava no mesmo quadro em que a carta
+    // vencedora aparecia.
     let state = primeiraVazaFechada();
     state = settle(state).state;
     while (state.round.phase === 'VAZAS') {
       state = must(applyMove(state, legalMoves(state)[0]!, ctx));
     }
 
-    expect(state.round.phase).toBe('RESOLUCAO');
+    expect(state.round.phase).toBe('RECOLHIMENTO');
+    expect(state.round.resolvedTricks).toHaveLength(2);
+
+    // E o passo seguinte é a conta, não outra vaza.
+    const depois = must(advance(state, ctx));
+    expect(depois.round.phase).toBe('RESOLUCAO');
+    expect(depois.round.currentTrick).toBeNull();
+    expect(checkInvariants(depois)).toEqual([]);
   });
 
   it('a rodada de testa não tem pausa de vaza: a revelação já é a pausa', () => {

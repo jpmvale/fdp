@@ -57,7 +57,7 @@ export function Log({ retrato, partida }: { retrato: Retrato; partida: PlayerVie
             .join(', ');
           return (
             <Linha key={numero}>
-              <b>Vaza {numero}:</b> {cartas}.{' '}
+              <b>Mão {numero}:</b> {cartas}.{' '}
               {vaza.annulledValue !== null
                 ? <span style={{ color: 'var(--texto-medio)' }}>Empate em {vaza.annulledValue} — de ninguém.</span>
                 : <span style={{ color: 'var(--texto-medio)' }}>{nome(vaza.winnerId)} levou.</span>}
@@ -117,8 +117,8 @@ export function Log({ retrato, partida }: { retrato: Retrato; partida: PlayerVie
               <Linha>
                 <span className="fraco">
                   {rodada.annulledTricks === 1
-                    ? '1 vaza empatou e não foi de ninguém.'
-                    : `${rodada.annulledTricks} vazas empataram e não foram de ninguém.`}
+                    ? '1 mão empatou e não foi de ninguém.'
+                    : `${rodada.annulledTricks} mãos empataram e não foram de ninguém.`}
                 </span>
               </Linha>
             )}

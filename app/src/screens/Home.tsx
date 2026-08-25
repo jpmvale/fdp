@@ -21,12 +21,12 @@ export function Home({ aoCriar, aoEntrar, aoAbrirRegras, codigoInicial }: {
   return (
     <div className="pilha" style={{ gap: 16 }}>
       <header className="pilha" style={{ gap: 6, paddingTop: 24 }}>
-        <span className="rotulo">jogo de vazas, aposta e blefe</span>
+        <span className="rotulo">jogo de mãos, aposta e blefe</span>
         <h1 style={{ fontSize: 44, fontWeight: 500, letterSpacing: '-0.03em', lineHeight: 1 }}>
           FDP
         </h1>
         <p style={{ color: 'var(--texto-medio)', fontSize: 15, textWrap: 'pretty' }}>
-          Vazas, aposta e blefe. De 2 a 8 pessoas, cada uma no seu celular.
+          Mãos, aposta e blefe. De 2 a 8 pessoas, cada uma no seu celular.
         </p>
       </header>
 

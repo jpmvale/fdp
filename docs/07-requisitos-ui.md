@@ -5,6 +5,10 @@ Status: **ESTÁVEL**
 Alvo primário: **celular em pé**, largura de 360 px, uma mão, tela pequena. Desktop é uma
 adaptação do mesmo layout, não um design separado.
 
+**Vocabulário de tela:** o que `docs/` chama de *vaza*, a interface chama de **"mão"**, e o que
+seria "a mão do jogador" é **"suas cartas"**. A razão está em `01`; toda cópia desta seção
+segue esse vocabulário, mesmo quando o requisito ao lado cita a regra pelo nome técnico.
+
 ## 1. Regras globais de UI
 
 | ID | Requisito |
@@ -79,12 +83,14 @@ consultada do jogo e **DEVE** ser legível de relance, sem contas mentais.
 
 #### Fase de vazas
 
-- **Própria mão** fixa na base, em leque horizontal rolável; carta selecionada sobe e mostra
+- **Suas cartas** fixas na base, em leque horizontal rolável; carta selecionada sobe e mostra
   "jogar". Toda carta é jogável (RJ-013) — não há carta desabilitada nesta fase.
 - Cartas jogadas na vaza corrente ficam no centro, ancoradas junto ao avatar de quem jogou.
-- Fim de vaza: a carta vencedora é destacada por 1,5 a 3 s antes de a mesa limpar.
+- Fim de vaza: a carta vencedora é destacada por 1,5 a 3 s antes de a mesa limpar. **Vale para
+  a última vaza da rodada também** — sem isso ela é a única cujo resultado ninguém vê, porque a
+  tela do acerto de contas entra no mesmo instante em que a vencedora aparece.
 - **Vaza anulada** **DEVE** ser explicada, não apenas mostrada: "empate em K — ninguém leva a
-  vaza" e, se aplicável, "{nome} puxa a próxima" (RJ-086). Empate silencioso gera a impressão
+  mão" e, se aplicável, "{nome} puxa a próxima" (RJ-086). Empate silencioso gera a impressão
   de bug.
 
 #### Rodada de 1 carta (testa)

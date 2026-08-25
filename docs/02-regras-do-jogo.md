@@ -136,9 +136,9 @@ stateDiagram-v2
     APOSTAS --> VAZAS: cartasNaRodada > 1
     APOSTAS --> REVELACAO: cartasNaRodada == 1
     VAZAS --> VAZAS: ainda restam vazas
-    VAZAS --> RECOLHIMENTO: vaza concluída, ainda restam vazas
-    RECOLHIMENTO --> VAZAS: pausa cumprida
-    VAZAS --> RESOLUCAO: última vaza concluída
+    VAZAS --> RECOLHIMENTO: vaza concluída
+    RECOLHIMENTO --> VAZAS: ainda restam vazas
+    RECOLHIMENTO --> RESOLUCAO: era a última vaza
     REVELACAO --> RESOLUCAO
     RESOLUCAO --> [*]
 ```

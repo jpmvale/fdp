@@ -536,6 +536,14 @@ function settleTrick(
   const resolvedTricks = [...round.resolvedTricks, resolved];
   const isLastTrick = trickNumber >= state.cardsThisRound;
 
+  // A ÚLTIMA vaza também passa pelo recolhimento. Ela ia direto ao acerto de
+  // contas, e era a única do jogo cujo resultado ninguém via: a mesa trocava
+  // de tela no mesmo quadro em que a carta vencedora aparecia. Quem sai daqui
+  // é `collectTrick`, que então segue para `RESOLUCAO` em vez de abrir vaza
+  // nova.
+  //
+  // A rodada de testa continua fora: lá as cartas estão nas testas, não na
+  // mesa, e quem cumpre o papel de mostrar o resultado é `REVELACAO`.
   if (isLastTrick) {
     return {
       state: {
@@ -547,12 +555,12 @@ function settleTrick(
           currentTrick: null,
           resolvedTricks,
           activePlayerId: null,
-          phase: round.isForeheadRound ? round.phase : 'RESOLUCAO',
+          phase: round.isForeheadRound ? round.phase : 'RECOLHIMENTO',
         },
       },
       events: round.isForeheadRound
         ? events
-        : [...events, { type: 'round:phaseChanged', phase: 'RESOLUCAO', activePlayerId: null }],
+        : [...events, { type: 'round:phaseChanged', phase: 'RECOLHIMENTO', activePlayerId: null }],
     };
   }
 
@@ -604,6 +612,15 @@ function collectTrick(state: MatchState): MoveResult {
   // para sempre, que é exatamente o defeito que o projeto não admite.
   if (!ultima || ultima.nextLeaderId === null) {
     throw new Error('RECOLHIMENTO sem vaza resolvida é estado impossível');
+  }
+
+  // Recolhida a última vaza da rodada, o que vem é a conta — não outra vaza.
+  if (round.trickNumber >= state.cardsThisRound) {
+    return {
+      ok: true,
+      state: { ...state, round: { ...round, phase: 'RESOLUCAO' } },
+      events: [{ type: 'round:phaseChanged', phase: 'RESOLUCAO', activePlayerId: null }],
+    };
   }
 
   const nextLeaderId = ultima.nextLeaderId;

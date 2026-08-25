@@ -38,7 +38,7 @@ português é o que aparece para o jogador.
 | **Monte** | `stock` | Sobra do sabot não distribuída na rodada. Oculto de todos. |
 | **Carta** | `Card` | Unidade de jogo. Estrutura em `04` §3. |
 | **Jogada** | `Move` | Ação de um jogador que altera o estado da partida. Toda jogada é validada pelo servidor. |
-| **Vaza** | `Trick` | Disputa em que cada jogador ativo joga uma carta; a maior vence. Uma rodada de N cartas tem N vazas. |
+| **Vaza** | `Trick` | Disputa em que cada jogador ativo joga uma carta; a maior vence. Uma rodada de N cartas tem N vazas. **A interface chama isto de "mão"** — ver a nota abaixo. |
 | **Puxar** | `lead` | Ser o primeiro a jogar numa vaza. Quem vence uma vaza puxa a seguinte. |
 | **Aposta** | `bet` | Quantidade de vazas que o jogador declara que vai ganhar na rodada. Pública assim que declarada. |
 | **Soma proibida** | — | Restrição que impede `soma(apostas) == cartasNaRodada`. Recai só sobre o último apostador. Ver `02` RJ-053. |
@@ -50,6 +50,23 @@ português é o que aparece para o jogador.
 | **Condenado** | — | Jogador já morto que segue jogando as vazas restantes da rodada (RJ-009). |
 | **Pausa** | `PAUSADA` | Partida congelada porque um jogador desconectou (RJ-117). |
 | **Placar** | `scores` | Estado público de cada jogador: vidas, aposta da rodada e vazas ganhas. |
+
+### A interface diz "mão", o código diz "vaza"
+
+Decisão de 25/08/2026, a pedido do usuário: **na tela, uma vaza se chama "mão"** — "rodada 2,
+mão 3", "Ana levou a mão". É o vocabulário que o grupo usa jogando, e o produto fala a língua
+de quem joga.
+
+`docs/` e o código continuam em "vaza". Não é descuido: são 110 regras `RJ-###` com
+identificador estável, mais `Trick`, `tricksWon`, `trickNumber` e `mortoEmVaza` atravessando
+quatro pacotes. Renomear tudo isso movimenta a espinha do projeto para não mudar nada que o
+jogador veja.
+
+A troca criou uma colisão que precisou de resposta: **"mão" já significava as cartas que o
+jogador tem na tela** ("sua mão", "toda carta da sua mão é jogável"). Como a palavra passou a
+ser a disputa, as cartas do jogador viraram **"suas cartas"** na interface inteira. Sem isso a
+mesma tela usaria a mesma palavra para duas coisas diferentes, que é pior que qualquer um dos
+dois nomes sozinho.
 
 ## Técnicos
 

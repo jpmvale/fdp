@@ -83,17 +83,20 @@ export function Feltro({ retrato, eu, partida }: {
         pointerEvents: 'none',
       }}>
         <span className="rotulo" style={{ color: '#7f9ab5' }}>
-          {partida.phase === 'APOSTAS' ? 'apostas da mesa' : 'vazas da rodada'}
+          {partida.phase === 'APOSTAS' ? 'apostas da mesa' : 'mãos da rodada'}
         </span>
         <span style={{ fontSize: 26, fontWeight: 500, lineHeight: 1 }}>
           {partida.phase === 'APOSTAS' ? somaDeApostas(partida) : vazasFeitas}
-          <span style={{ color: '#7f9ab5', fontSize: 16 }}> de {partida.cardsThisRound} vazas</span>
+          <span style={{ color: '#7f9ab5', fontSize: 16 }}> de {partida.cardsThisRound} mãos</span>
         </span>
-        <span style={{ fontSize: 11, color: '#9dbad4' }}>
-          {partida.phase === 'APOSTAS'
-            ? `${apostaram} de ${total} já apostaram`
-            : `vaza ${partida.trickNumber} de ${partida.cardsThisRound}`}
-        </span>
+        {/* Só nas apostas: com as mãos rolando, "mão X de Y" já está no
+            cabeçalho, e repetir a mesma contagem a 200 px de distância não
+            informa — só ocupa o espaço que as cartas vão usar. */}
+        {partida.phase === 'APOSTAS' && (
+          <span style={{ fontSize: 11, color: '#9dbad4' }}>
+            {apostaram} de {total} já apostaram
+          </span>
+        )}
       </div>}
 
       <Vaza
