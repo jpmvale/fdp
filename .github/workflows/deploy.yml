@@ -66,11 +66,29 @@ jobs:
       - name: Chave de deploy
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_DEPLOY_KEY }}" > ~/.ssh/id_deploy
+
+          # `printf '%s\n'` e `tr -d '\r'`: a chave precisa terminar em quebra
+          # de linha, e um segredo colado de um editor de Windows chega com CR
+          # no fim de cada linha. Os dois casos produzem o mesmo erro cru do
+          # OpenSSH — "error in libcrypto" —, que não diz nada sobre a causa.
+          printf '%s\n' "${{ secrets.VPS_DEPLOY_KEY }}" | tr -d '\r' > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
+
+          # Falha aqui, com o motivo escrito, em vez de lá adiante como
+          # "Permission denied (publickey)" — que manda procurar no lugar
+          # errado, o servidor, quando o problema está no segredo.
+          if ! ssh-keygen -y -f ~/.ssh/id_deploy > /dev/null 2>&1; then
+            echo "::error::VPS_DEPLOY_KEY não é uma chave privada OpenSSH válida. Cole o arquivo INTEIRO, com as linhas BEGIN e END — e a privada, não a .pub."
+            exit 1
+          fi
+
+          # Impressão digital não é segredo, e é o que permite comparar com a
+          # entrada do authorized_keys sem expor chave nenhuma.
+          echo "chave carregada: $(ssh-keygen -lf ~/.ssh/id_deploy | awk '{print $2}')"
+
           # Fixa a identidade do host: sem isto, `StrictHostKeyChecking=no`
           # aceitaria qualquer servidor que atendesse no meio do caminho.
-          echo "${{ secrets.VPS_HOST_KEY }}" > ~/.ssh/known_hosts
+          printf '%s\n' "${{ secrets.VPS_HOST_KEY }}" | tr -d '\r' > ~/.ssh/known_hosts
 
       # A chave está presa a `~/bin/deploy.sh` por forced command: o que vai
       # aqui chega em SSH_ORIGINAL_COMMAND e nunca é executado como shell.
