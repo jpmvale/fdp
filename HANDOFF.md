@@ -49,7 +49,7 @@ Para parar: `pkill -f "tsx server"`.
 | Pacote | O quê |
 |---|---|
 | `packages/rules` | Motor de regras puro e determinístico. 110 regras `RJ-###` |
-| `packages/bot` | Decisão dos bots — puro, só depende de `rules`. Fácil e médio |
+| `packages/bot` | Decisão dos bots — puro, só depende de `rules`. As quatro dificuldades |
 | `packages/store` | `RoomStore` de 6 métodos, em memória **e em Redis**, mesma suíte de contrato |
 | `packages/protocol` | Contrato cliente ↔ servidor, tipos e validação separados |
 | `packages/room` | Máquina de sala: ciclo de vida, conexão, pausa, timers, auto-play, bots |
@@ -224,8 +224,9 @@ deliberadas, ambas comentadas no código:
   atropelam e vazam dos 360 px, e nenhum ajuste de raio resolve — o limite é
   largura de cartão contra largura de tela. Vale o arranjo do design: até 3 em
   cima, o resto nas laterais, você na base.
-- **A carta fica dentro do assento**, não solta no feltro ancorada a quem jogou.
-  Ancorada ao centro cobre nomes e placar com a mesa cheia.
+- **A carta de testa fica no assento; a carta jogada, no centro.** O canvas
+  desenha as duas na mesa. A de testa está na cabeça da pessoa, e é do assento
+  que ela fala; na revelação ela também vai para o centro, e o assento esvazia.
 
 **Três erros do design, conferidos contra `docs/` e NÃO implementados:** trunfo
 (não existe no FDP), "naipe da vaza" (RJ-022: naipe não tem efeito algum) e —
@@ -270,7 +271,13 @@ auto-declarado que estava errado. O canvas agora traz os dois números certos.
   código.
 - **O bot não pode trapacear por construção**: `packages/bot` recebe a mesma
   `PlayerView` que um humano. A informação que ele não deve ver não chega até
-  lá, então não há disciplina a manter (CA-325).
+  lá, então não há disciplina a manter (CA-325). O que separa um nível do outro
+  não é acesso a informação, é **quanto do que está à vista ele usa** —
+  `leitura.ts` é a camada onde isso mora.
+- **A escada de dificuldade é medida em torneio, não afirmada** (CA-348). A
+  primeira versão do realista PERDIA do difícil, e foi o torneio que pegou: ele
+  comparava a soma parcial das apostas contra a rodada inteira, e quem apostava
+  cedo enxergava uma mesa vazia.
 - **Mutação de sala não pode conter `await`** (`docs/11` §5).
 - **Eventos com estado oculto saem já projetados, um por destinatário.**
 - **Um `commit` incrementa `stateVersion` uma vez e pode emitir vários eventos.**

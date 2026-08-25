@@ -132,8 +132,12 @@ export function checkNoLeak(state: MatchState, viewerId: PlayerId): string[] {
   const serialized = JSON.stringify(project(state, viewerId));
   const violations: string[] = [];
 
+  // "Até a revelação" quer dizer até REVELACAO — a fase que leva esse nome.
+  // Antes isto era `=== 'RESOLUCAO'`, o que empurrava o segredo para depois do
+  // acerto de contas e deixava a fase de revelação sem revelar nada.
   const foreheadRevealed =
-    state.round.isForeheadRound && state.round.phase === 'RESOLUCAO';
+    state.round.isForeheadRound &&
+    (state.round.phase === 'REVELACAO' || state.round.phase === 'RESOLUCAO');
 
   for (const [playerId, cardIds] of Object.entries(state.hidden.hands)) {
     const isOwn = playerId === viewerId;

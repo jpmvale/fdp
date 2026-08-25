@@ -194,6 +194,8 @@ e o jogo inteiro depende de a mesa confiar no que está acontecendo.
 | CA-326 | I | RF-018 | **Dado** o host no lobby, **quando** senta bots, **então** cada um tem id, nome e avatar próprios, o teto é 7, só o host mexe, e `host:removeBot` recusa jogador humano |
 | CA-327 | I | RF-018 | **Dado** uma partida de humano + bots, **quando** é a vez de um bot, **então** ele joga dentro de `botThinkMs` sem `move:autoPlayed`, e a partida termina sem violar invariante |
 | CA-328 | I | RF-018 | **Dado** uma sala onde só restam bots, **quando** o ócio vence, **então** ela encerra como qualquer outra |
+| CA-348 | I | RF-018 | **Dado** as quatro dificuldades em partidas completas, **então** cada nível vence mais que o anterior — medido em torneio, não afirmado |
+| CA-349 | I | RJ-023, RJ-054 | **Dado** qualquer dificuldade, **quando** joga partidas inteiras, **então** o motor não recusa nenhuma jogada |
 
 ### 4.9 Chat (RF-017)
 
@@ -217,6 +219,21 @@ destes critérios existe por isso.
 | CA-339 | I | RNF-010 | **Dado** um cliente que estoura o orçamento de comandos mandando mensagens, **então** recebe `ERR-009` como em qualquer outro comando — o chat não tem cota própria |
 | CA-340 | E | RF-017, RNF-030 | **Dado** uma mensagem contendo `<script>` ou outra marcação, **então** ela aparece como TEXTO na tela de todos, sem ser interpretada |
 | CA-341 | I | RF-017 | **Dado** uma sala que expira ou é encerrada, **então** o histórico morre com ela — não há chat recuperável depois |
+
+**A escada de dificuldade é medida, não declarada** (CA-348). Um bot "difícil"
+que não ganha mais que um médio é código a mais e nada além disso. O torneio de
+25/08/2026, em partidas completas com o motor de verdade:
+
+| Mesa | Resultado |
+|---|---|
+| difícil × realista, 120 partidas | 35 × **85** |
+| fácil, médio, difícil, realista, 200 partidas | 0 · 44 · 74 · **84** |
+
+A primeira versão do realista **perdia** do difícil (55 × 66), e foi o torneio
+que pegou: ele corrigia a aposta pela soma já prometida na mesa, comparando uma
+soma PARCIAL contra as mãos da rodada inteira — quem apostava cedo enxergava
+uma mesa vazia e apostava demais. A correção passou a ser proporcional a
+quantos já apostaram.
 
 CA-338 é o critério que protege a mecânica: `EV-040` é o único evento do jogo
 que sai idêntico para todos, e é assim porque não há nada a projetar. Um campo a

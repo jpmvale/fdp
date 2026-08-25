@@ -48,33 +48,7 @@ export function Fim({ retrato, eu, partida, aoRevanche, aoSair }: {
         <p className="fraco">{partida.endReason ? MOTIVOS[partida.endReason] : ''}</p>
       </div>
 
-      <div className="cartao pilha" style={{ gap: 4 }}>
-        <span className="rotulo">classificação</span>
-        {ordem.map((id, i) => {
-          const jogador = retrato.players.find((p) => p.id === id);
-          if (!jogador) return null;
-          return (
-            <div key={id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 4px' }}>
-              <span style={{
-                width: 20, textAlign: 'right', color: 'var(--texto-apagado)',
-                fontVariantNumeric: 'tabular-nums',
-              }}>
-                {i + 1}
-              </span>
-              <Avatar avatar={jogador.avatar} tamanho={28} />
-              <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {jogador.nickname}{id === eu ? ' · você' : ''}
-              </span>
-              {saiu.has(id)
-                ? <span className="fraco">abandonou</span>
-                : <Vidas quantas={partida.lives[id] ?? 0} />}
-            </div>
-          );
-        })}
-      </div>
-
-      <Notas partida={partida} retrato={retrato} eu={eu} />
-      <Numeros partida={partida} retrato={retrato} eu={eu} />
+      <Desempenho partida={partida} retrato={retrato} eu={eu} ordem={ordem} saiu={saiu} />
       <Queda partida={partida} retrato={retrato} />
 
       {/* Toda tela precisa de uma ação de saída explícita (RF-025). Aqui
@@ -90,68 +64,6 @@ export function Fim({ retrato, eu, partida, aoRevanche, aoSair }: {
           Se ficar, o host ainda pode pedir revanche com o mesmo grupo.
         </p>
       )}
-    </div>
-  );
-}
-
-/**
- * Aposta contra mão feita, na partida inteira.
- *
- * É a pergunta que a mesa faz no fim — "você errou mais do que eu?" — e ela não
- * estava em lugar nenhum: a tela mostrava só as vidas que sobraram, que é o
- * resultado, não a história. Sai de `history`, somando rodada a rodada, e não
- * de um contador acumulado: rodada abortada (RJ-155) não debita vida de
- * ninguém, e um contador próprio erraria exatamente aí.
- */
-function Numeros({ partida, retrato, eu }: {
-  partida: PlayerView; retrato: Retrato; eu: string;
-}) {
-  if (partida.history.length === 0) return null;
-
-  const linhas = partida.playerOrder.map((id) => {
-    let apostou = 0;
-    let fez = 0;
-    let acertos = 0;
-    let jogadas = 0;
-    for (const r of partida.history) {
-      const aposta = r.bets[id];
-      if (aposta === undefined) continue;
-      jogadas++;
-      apostou += aposta;
-      const feitas = r.tricksWon[id] ?? 0;
-      fez += feitas;
-      if (aposta === feitas) acertos++;
-    }
-    return { id, apostou, fez, acertos, jogadas };
-  }).filter((l) => l.jogadas > 0);
-
-  return (
-    <div className="cartao pilha" style={{ gap: 6 }}>
-      <span className="rotulo">aposta contra mãos feitas</span>
-      <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'var(--texto-apagado)', padding: '0 2px' }}>
-        <span style={{ flex: 1 }} />
-        <span style={{ width: 58, textAlign: 'right' }}>apostou</span>
-        <span style={{ width: 42, textAlign: 'right' }}>fez</span>
-        <span style={{ width: 54, textAlign: 'right' }}>acertou</span>
-      </div>
-      {linhas.map(({ id, apostou, fez, acertos, jogadas }) => {
-        const jogador = retrato.players.find((p) => p.id === id);
-        return (
-          <div key={id} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
-            <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {jogador?.nickname ?? '?'}{id === eu ? ' · você' : ''}
-            </span>
-            <span style={{ width: 58, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{apostou}</span>
-            <span style={{ width: 42, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fez}</span>
-            <span style={{
-              width: 54, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
-              color: acertos > 0 ? 'var(--texto)' : 'var(--texto-apagado)',
-            }}>
-              {acertos} de {jogadas}
-            </span>
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -206,56 +118,128 @@ function Queda({ partida, retrato }: { partida: PlayerView; retrato: Retrato }) 
 }
 
 /**
- * A nota de desempenho, ordenada pela nota e não pela classificação.
+ * Uma seção só: nota, números e posição na mesma tabela.
  *
- * É de propósito que as duas listas discordem: a classificação diz quem
- * venceu, esta diz quem jogou melhor. Quando a mesma pessoa lidera as duas,
- * não há o que discutir; quando não, é exatamente aí que a mesa tem assunto.
+ * Antes eram três — classificação, desempenho e "aposta contra mãos feitas" —,
+ * e as três listavam as mesmas pessoas, cada uma numa ordem diferente. Quem
+ * quisesse comparar dois jogadores tinha de casar três listas de cabeça.
+ *
+ * A ordem é a de VITÓRIA, e é a mesma da classificação: quem venceu primeiro,
+ * quem abandonou por último (RJ-129). A nota vira mais uma coluna, e não um
+ * ranking concorrente — ela responde "quem jogou melhor", que com frequência é
+ * outra pessoa, e é justamente a comparação que dá assunto na mesa.
  */
-function Notas({ partida, retrato, eu }: {
-  partida: PlayerView; retrato: Retrato; eu: string;
+function Desempenho({ partida, retrato, eu, ordem, saiu }: {
+  partida: PlayerView;
+  retrato: Retrato;
+  eu: string;
+  ordem: string[];
+  saiu: Set<string>;
 }) {
-  const notas = desempenhoDaPartida(partida).filter((d) => d.rodadasJogadas > 0);
-  if (notas.length === 0) return null;
+  const notas = new Map(desempenhoDaPartida(partida).map((d) => [d.playerId, d]));
+  const numeros = numerosDaPartida(partida);
+  if (notas.size === 0) return null;
 
   return (
-    <div className="cartao pilha" style={{ gap: 8 }}>
+    <div className="cartao pilha" style={{ gap: 6 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
         <span className="rotulo">desempenho</span>
-        <span className="fraco">pontaria, acertos e quanto durou</span>
+        <span className="fraco" style={{ fontSize: 11 }}>na ordem de chegada</span>
       </div>
 
-      {notas.map((d) => {
-        const jogador = retrato.players.find((p) => p.id === d.playerId);
-        const { cor, rotulo } = CORES[d.faixa];
-        return (
-          <div key={d.playerId} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <Avatar avatar={jogador?.avatar ?? { emoji: '🦊', color: 'amber' }} tamanho={26} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 14 }}>
-                {jogador?.nickname ?? '?'}{d.playerId === eu ? ' · você' : ''}
-                {d.venceu && <span aria-hidden style={{ color: 'var(--texto-apagado)' }}> · venceu</span>}
-              </div>
-              <div className="fraco" style={{ fontSize: 11 }}>
-                {d.acertos} de {d.rodadasJogadas} {d.rodadasJogadas === 1 ? 'rodada' : 'rodadas'} em cheio
-                {d.abandonou && ' · abandonou'}
-              </div>
-            </div>
+      {/* Cabeçalho de coluna: sem ele os números viram três inteiros soltos que
+          cada um interpreta como quiser. */}
+      <div style={{
+        display: 'flex', gap: 6, fontSize: 10, color: 'var(--texto-apagado)',
+        padding: '0 2px', letterSpacing: '.02em',
+      }}>
+        <span style={{ flex: 1 }} />
+        {/* Uma palavra por coluna: "em cheio" quebrava em duas linhas e
+            empurrava o cabeçalho inteiro para baixo em 360 px. */}
+        <span style={{ width: 42, textAlign: 'right' }}>aposta</span>
+        <span style={{ width: 30, textAlign: 'right' }}>fez</span>
+        <span style={{ width: 44, textAlign: 'right' }}>cheios</span>
+        <span style={{ width: 38, textAlign: 'right' }}>nota</span>
+      </div>
 
-            {/* Número, palavra E cor: a cor é o terceiro canal, nunca o único
-                (RNF-031). Quem não distingue a cor lê "excelente" do lado. */}
-            <div style={{ textAlign: 'right' }}>
-              <div style={{
-                color: cor, fontSize: 22, fontWeight: 600, lineHeight: 1,
-                fontVariantNumeric: 'tabular-nums',
+      {ordem.map((id, i) => {
+        const jogador = retrato.players.find((p) => p.id === id);
+        const d = notas.get(id);
+        const n = numeros.get(id);
+        if (!jogador || !d || !n) return null;
+        const { cor, rotulo } = CORES[d.faixa];
+
+        return (
+          <div key={id} className="pilha" style={{ gap: 2 }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+              <span style={{
+                width: 12, textAlign: 'right', color: 'var(--texto-apagado)',
+                fontVariantNumeric: 'tabular-nums', fontSize: 11,
+              }}>
+                {i + 1}
+              </span>
+              <Avatar avatar={jogador.avatar} tamanho={22} />
+              <span style={{
+                flex: 1, minWidth: 0, whiteSpace: 'nowrap',
+                overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {jogador.nickname}{id === eu ? ' · você' : ''}
+              </span>
+
+              <span style={{ width: 42, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{n.apostou}</span>
+              <span style={{ width: 30, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{n.fez}</span>
+              <span style={{
+                width: 44, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+                color: n.acertos > 0 ? 'var(--texto)' : 'var(--texto-apagado)',
+              }}>
+                {n.acertos}/{n.jogadas}
+              </span>
+              {/* Número E cor; a palavra vem na linha de baixo. Cor nunca é o
+                  único canal (RNF-031). */}
+              <span style={{
+                width: 38, textAlign: 'right', color: cor,
+                fontWeight: 600, fontVariantNumeric: 'tabular-nums',
               }}>
                 {d.nota.toFixed(1)}
-              </div>
-              <div style={{ color: cor, fontSize: 10, letterSpacing: '.06em' }}>{rotulo}</div>
+              </span>
+            </div>
+
+            <div style={{
+              display: 'flex', gap: 6, alignItems: 'baseline',
+              fontSize: 10, color: 'var(--texto-apagado)', paddingLeft: 40,
+            }}>
+              <span style={{ flex: 1 }}>
+                {saiu.has(id)
+                  ? 'abandonou'
+                  : partida.lives[id] ? `${partida.lives[id]} de vida` : 'eliminado'}
+                {d.venceu && ' · venceu'}
+              </span>
+              <span style={{ color: cor, letterSpacing: '.06em' }}>{rotulo}</span>
             </div>
           </div>
         );
       })}
     </div>
   );
+}
+
+/** Aposta contra mão feita, na partida inteira — somado de `history`. */
+function numerosDaPartida(partida: PlayerView) {
+  const linhas = new Map<string, { apostou: number; fez: number; acertos: number; jogadas: number }>();
+  for (const id of partida.playerOrder) {
+    let apostou = 0, fez = 0, acertos = 0, jogadas = 0;
+    for (const r of partida.history) {
+      const aposta = r.bets[id];
+      // Rodada abortada (RJ-155) é refeita e não debita ninguém: contá-la
+      // puniria quem estava na mesa quando outra pessoa caiu.
+      if (aposta === undefined || r.aborted) continue;
+      jogadas++;
+      apostou += aposta;
+      const feitas = r.tricksWon[id] ?? 0;
+      fez += feitas;
+      if (aposta === feitas) acertos++;
+    }
+    if (jogadas > 0) linhas.set(id, { apostou, fez, acertos, jogadas });
+  }
+  return linhas;
 }

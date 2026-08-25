@@ -51,11 +51,19 @@ export function Feltro({ retrato, eu, partida }: {
   // motor esvazia `currentTrick` para não contar as cartas duas vezes.
   const recolhendo = partida.phase === 'RECOLHIMENTO';
   const fechada = partida.resolvedTricks[partida.resolvedTricks.length - 1];
-  const naMesa: JogadaNaMesa[] = partida.isForeheadRound
-    ? []
-    : recolhendo
-      ? fechada?.plays ?? []
-      : partida.currentTrick?.plays ?? [];
+  // Na testa as cartas ficam nas testas ENQUANTO se aposta. Na revelação elas
+  // vão para a mesa, como em qualquer rodada — é lá que se comparam, e é a
+  // única chance de o dono ver a própria carta antes de a rodada fechar.
+  const revelando = partida.isForeheadRound && partida.phase === 'REVELACAO';
+  const naMesa: JogadaNaMesa[] = revelando
+    ? partida.playerOrder
+        .filter((id) => partida.foreheadCards[id])
+        .map((id) => ({ playerId: id, card: partida.foreheadCards[id]! }))
+    : partida.isForeheadRound
+      ? []
+      : recolhendo
+        ? fechada?.plays ?? []
+        : partida.currentTrick?.plays ?? [];
   const viajando = useRecolhimento(recolhendo, retrato.phaseDeadline);
   const { baloes, descartar, perdasRecentes } = useBaloes(retrato.chat, partida);
 
@@ -214,7 +222,14 @@ const somaDeApostas = (partida: PlayerView) =>
  */
 function cartaDoAssento(partida: PlayerView, id: string, souEu: boolean) {
   if (!partida.isForeheadRound) return { mostra: false, carta: null };
-  return { mostra: true, carta: souEu ? null : partida.foreheadCards[id] ?? null };
+  // Na revelação as cartas saem das testas e vão para o centro: deixá-las
+  // também no assento mostraria a mesma carta em dois lugares.
+  if (partida.phase === 'REVELACAO') return { mostra: false, carta: null };
+  // `null` é o VERSO. E ele vem de a carta NÃO estar na projeção, não de um
+  // `if` aqui: enquanto se aposta, o servidor não manda a minha (RJ-100), e é
+  // essa ausência que a tela desenha. Escrever `souEu ? null` mentiria na
+  // revelação, quando o servidor passa a mandá-la.
+  return { mostra: true, carta: partida.foreheadCards[id] ?? null };
 }
 
 function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta, perdeu }: {
@@ -256,11 +271,12 @@ function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta, perdeu
       }}
     >
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        {/* A carta fica DENTRO do assento, e não solta no feltro.
-            Ancorada ao centro da mesa ela ficaria mais bonita, mas com 8
-            jogadores em 360 px as cartas cobrem os nomes e o placar do meio —
-            e uma mesa ilegível não é fidelidade, é decoração. Aqui não há
-            dúvida de quem jogou o quê, em nenhum tamanho de tela. */}
+        {/* A carta de TESTA fica no assento, porque é lá que ela está: na
+            cabeça da pessoa, à vista de todos menos dela. As cartas JOGADAS
+            vão para o centro (`Vaza`), onde se comparam — uma mão é uma
+            disputa, e espalhá-la pelos assentos obrigaria a comparar oito
+            cantos da tela. Na revelação, a carta de testa também vai para o
+            centro e este espaço fica vazio. */}
         {carta.mostra && (
           <Carta
             carta={carta.carta}

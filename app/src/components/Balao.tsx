@@ -22,7 +22,33 @@ export interface BalaoNaMesa {
 }
 
 /** Quanto tempo cada tipo fica na tela. */
-const DURACAO = { chat: 5_000, vida: 3_200 } as const;
+const DURACAO = { chat: 5_000, vida: 1_600 } as const;
+
+/**
+ * Teto de balões simultâneos POR PESSOA.
+ *
+ * Sem ele, quem escreve rápido empilha uma coluna de balões que sai do feltro e
+ * cobre os assentos vizinhos — e o limite de comandos do servidor (RNF-010,
+ * 20 por 10 s) é generoso demais para conter isso na tela. Passando de quatro,
+ * o mais antigo daquela pessoa sai para o novo entrar: quem fala demais ocupa
+ * o mesmo espaço de quem fala pouco.
+ */
+const TETO_POR_PESSOA = 4;
+
+/** Mantém só os últimos `TETO_POR_PESSOA` balões de cada jogador. */
+export function comTeto(baloes: BalaoNaMesa[]): BalaoNaMesa[] {
+  const contagem = new Map<string, number>();
+  const mantidos: BalaoNaMesa[] = [];
+  // De trás para a frente: os últimos são os que ficam.
+  for (let i = baloes.length - 1; i >= 0; i--) {
+    const b = baloes[i]!;
+    const quantos = contagem.get(b.playerId) ?? 0;
+    if (quantos >= TETO_POR_PESSOA) continue;
+    contagem.set(b.playerId, quantos + 1);
+    mantidos.unshift(b);
+  }
+  return mantidos;
+}
 
 export function Balao({ balao, x, y, empilhado, aoSumir }: {
   balao: BalaoNaMesa;
@@ -43,7 +69,7 @@ export function Balao({ balao, x, y, empilhado, aoSumir }: {
 
   useEffect(() => {
     const some = setTimeout(() => setSaindo(true), DURACAO[balao.tipo]);
-    const tira = setTimeout(() => aoSumir(balao.id), DURACAO[balao.tipo] + 260);
+    const tira = setTimeout(() => aoSumir(balao.id), DURACAO[balao.tipo] + (balao.tipo === 'vida' ? 140 : 260));
     return () => { clearTimeout(some); clearTimeout(tira); };
   }, [balao.id, balao.tipo, aoSumir]);
 
@@ -53,21 +79,23 @@ export function Balao({ balao, x, y, empilhado, aoSumir }: {
   const vida = balao.tipo === 'vida';
   // Empilha na direção em que o balão já aponta, para não voltar por cima do
   // assento nem sair do feltro.
-  const desvio = empilhado * (paraBaixo ? 34 : -34);
+  const desvio = empilhado * (paraBaixo ? 30 : -30);
 
   return (
     <div
-      className={`balao${saindo ? ' saindo' : ''}`}
+      className={`balao${vida ? ' balao-vida' : ''}${saindo ? ' saindo' : ''}`}
       style={{
         position: 'absolute',
         left: `${x}%`,
         top: `calc(${y}% + ${(paraBaixo ? 34 : -40) + desvio}px)`,
         transform: 'translateX(-50%)',
-        maxWidth: 132,
-        padding: '5px 9px',
-        borderRadius: 12,
-        fontSize: 12,
-        lineHeight: 1.35,
+        maxWidth: vida ? 84 : 132,
+        // O de vida é menor e mais rápido: ele não traz texto para ler, traz um
+        // sinal para perceber. O de chat carrega palavras e precisa de tempo.
+        padding: vida ? '2px 7px' : '5px 9px',
+        borderRadius: vida ? 10 : 12,
+        fontSize: vida ? 11 : 12,
+        lineHeight: 1.3,
         textAlign: 'center',
         wordBreak: 'break-word',
         pointerEvents: 'none',
@@ -123,10 +151,10 @@ export function useBaloes(chat: ChatMessage[], partida: PlayerView | null): {
     }
     const novas = chat.slice(chatVisto.current);
     chatVisto.current = chat.length;
-    setBaloes((atuais) => [
+    setBaloes((atuais) => comTeto([
       ...atuais,
       ...novas.map((m) => ({ id: `chat-${m.id}`, playerId: m.playerId, texto: m.text, tipo: 'chat' as const })),
-    ]);
+    ]));
   }, [chat]);
 
   useEffect(() => {
@@ -150,7 +178,7 @@ export function useBaloes(chat: ChatMessage[], partida: PlayerView | null): {
         tipo: 'vida' as const,
       }));
 
-    if (perdas.length > 0) setBaloes((atuais) => [...atuais, ...perdas]);
+    if (perdas.length > 0) setBaloes((atuais) => comTeto([...atuais, ...perdas]));
   }, [partida]);
 
   const descartar = (id: string) =>

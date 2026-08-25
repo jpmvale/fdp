@@ -86,8 +86,13 @@ export function project(state: MatchState, viewerId: PlayerId): PlayerView {
   let hand: Card[] = [];
 
   if (round.isForeheadRound && round.phase !== 'RESOLUCAO') {
+    // Em REVELACAO o segredo acabou: as apostas estão fechadas, não há mais
+    // decisão a tomar, e todo o resto da mesa já viu esta carta a rodada
+    // inteira. RJ-100 protege quem ainda precisa apostar às cegas — depois
+    // disso, esconder do dono é esconder de uma pessoa só.
+    const aindaSecreta = round.phase !== 'REVELACAO';
     for (const [playerId, cardIds] of Object.entries(hidden.hands)) {
-      if (playerId === viewerId) continue; // RJ-100
+      if (playerId === viewerId && aindaSecreta) continue; // RJ-100
       const cardId = cardIds[0];
       if (cardId) foreheadCards[playerId] = hidden.cards[cardId]!;
     }

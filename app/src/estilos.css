@@ -184,6 +184,14 @@ input:focus { border-color: var(--acento); }
   transition: opacity 240ms ease-in, transform 240ms ease-in;
 }
 
+/* O balão de vida é sinal, não texto: entra e sai mais rápido que o de chat,
+   que carrega palavras para ler. */
+.balao.balao-vida { animation-duration: 110ms; }
+.balao.balao-vida.saindo {
+  transform: translateX(-50%) translateY(-6px);
+  transition: opacity 130ms ease-in, transform 130ms ease-in;
+}
+
 /* O coração que cai: o débito de vida é o momento de maior carga da partida
    (`07` §2.4) e não pode ser um número que muda sozinho. */
 @keyframes coracao-cai {

@@ -143,11 +143,11 @@ stateDiagram-v2
     DISTRIBUICAO --> APOSTAS: cartas distribuídas
     APOSTAS --> APOSTAS: aposta aceita, ainda faltam jogadores
     APOSTAS --> VAZAS: todos apostaram e cartasNaRodada > 1
-    APOSTAS --> REVELACAO: todos apostaram e cartasNaRodada == 1
+    APOSTAS --> REVELACAO: todos apostaram e cartasNaRodada == 1 (EV-023 sai aqui)
     VAZAS --> RECOLHIMENTO: vaza resolvida
     RECOLHIMENTO --> VAZAS: pausa cumprida, ainda restam vazas
     RECOLHIMENTO --> RESOLUCAO: pausa cumprida, era a última vaza
-    REVELACAO --> RESOLUCAO: cartas reveladas
+    REVELACAO --> RESOLUCAO: pausa cumprida
     RESOLUCAO --> [*]
 ```
 
@@ -157,7 +157,7 @@ stateDiagram-v2
 | `APOSTAS` | **sequencial** | `activePlayerId` | `move:bet` | `BET_TIMEOUT`, só se conectado | Todos os ativos apostaram |
 | `VAZAS` | **sequencial** | `activePlayerId` | `move:playCard` | `PLAY_TIMEOUT`, só se conectado | `cartasNaRodada` vazas resolvidas |
 | `RECOLHIMENTO` | automática | servidor | nenhum | pausa 1,5 s | Próxima vaza aberta pelo puxador de RJ-065, ou `RESOLUCAO` se era a última |
-| `REVELACAO` | automática | servidor | nenhum | pausa 3 s | Cartas reveladas aos donos |
+| `REVELACAO` | automática | servidor | nenhum | pausa 3 s | Cartas na mesa, à vista de todos — inclusive dos donos |
 | `RESOLUCAO` | automática | servidor | nenhum | pausa 3 s | Vidas debitadas, eliminações aplicadas |
 
 **Toda fase de jogador é sequencial.** Em qualquer instante existe no máximo um
@@ -192,6 +192,12 @@ quebraria INV-03. **A última vaza da rodada também passa por aqui** — ela ia
 de contas e era a única do jogo cujo resultado ninguém via, porque a tela trocava no mesmo
 instante em que a carta vencedora aparecia. Só a rodada de testa fica de fora: lá as cartas
 estão nas testas, não na mesa, e quem mostra o resultado é `REVELACAO`.
+
+**`EV-023` sai ao ENTRAR em `REVELACAO`, não ao sair.** Antes ele saía no mesmo passo que
+resolvia a vaza e trocava para `RESOLUCAO`: a fase que se chama revelação gastava seus 3 s
+com as cartas ainda viradas, e o dono era o único da mesa que nunca via a própria — os
+outros a viram a rodada inteira. Agora a pausa é gasta com as cartas na mesa, que é para
+isso que ela existe (CA-347).
 
 ### 4.2 Transições automáticas
 

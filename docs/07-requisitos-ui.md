@@ -103,8 +103,14 @@ Esta é a tela mais distintiva do jogo e a mais fácil de errar.
 | RF-031 | As cartas dos demais **DEVEM** ser exibidas com a face para cima, grandes o bastante para leitura em 360 px |
 | RF-032 | A UI **DEVE** deixar explícito o que está acontecendo: "você não vê a sua carta — todos os outros veem" |
 | RF-033 | O seletor de aposta reduz a dois botões rotulados **"Ganho"** e **"Perco"**, não `1` e `0` |
-| RF-034 | Na revelação, a própria carta vira com animação e o resultado aparece só depois |
+| RF-034 | Na revelação, as cartas vão para o **centro da mesa**, a própria inclusive, e o resultado aparece só depois |
 | RF-035 | Nenhum elemento do DOM, atributo ou estado de cliente **DEVE** conter a própria carta antes de EV-023 (RF-024, RJ-100) |
+
+RF-034 mudou de forma em 25/08/2026: as cartas não viram no lugar, elas **saem das testas e
+vão para o centro**, como em qualquer outra mão — é lá que se comparam. Enquanto se aposta
+cada carta fica no assento do dono, que é onde ela está de verdade; na revelação o assento
+esvazia. Antes disso o dono era o único da mesa que nunca via a própria carta: a revelação
+saía no mesmo passo que fechava a rodada (ver `03` §4.2 e CA-347).
 
 RF-035 é requisito de segurança: numa rodada de testa, o único jogador que não pode saber a
 carta está com o DevTools na mão. A defesa é a projeção do servidor (`04` §5) — a UI apenas

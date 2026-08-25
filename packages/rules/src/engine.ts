@@ -287,8 +287,9 @@ function reveal(state: MatchState): MoveResult {
   return {
     ok: true,
     state: { ...settled.state, round: { ...settled.state.round, phase: 'RESOLUCAO' } },
+    // `round:revealed` já saiu ao ENTRAR em REVELACAO: aqui as cartas só saem
+    // da testa para a mesa e a vaza é resolvida.
     events: [
-      { type: 'round:revealed', cards: revealed },
       ...settled.events,
       { type: 'round:phaseChanged', phase: 'RESOLUCAO', activePlayerId: null },
     ],
@@ -390,6 +391,18 @@ function applyBet(state: MatchState, playerId: PlayerId, bet: number): MoveResul
 
   // Apostas encerradas.
   if (round.isForeheadRound) {
+    // A revelação acontece AQUI, ao entrar na fase que leva esse nome — e não
+    // no fim dela, junto com o acerto de contas. Antes, `round:revealed` saía
+    // no mesmo passo que resolvia a vaza e trocava para RESOLUCAO: não existia
+    // instante nenhum em que a mesa mostrasse as cartas viradas, e o dono da
+    // carta era o único da mesa que nunca a via. Agora a pausa da fase (`03`
+    // §4.2) é gasta com as cartas à vista, que é para isso que ela existe.
+    const naTesta: Record<PlayerId, string> = {};
+    for (const [playerId, cardIds] of Object.entries(state.hidden.hands)) {
+      const cardId = cardIds[0];
+      if (cardId) naTesta[playerId] = cardId;
+    }
+    events.push({ type: 'round:revealed', cards: naTesta });
     events.push({ type: 'round:phaseChanged', phase: 'REVELACAO', activePlayerId: null });
     return {
       ok: true,

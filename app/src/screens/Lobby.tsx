@@ -8,6 +8,8 @@ import type { Retrato } from '../state/tipos';
 const DIFICULDADES: { valor: BotDifficulty; rotulo: string; explica: string }[] = [
   { valor: 'FACIL', rotulo: 'Fácil', explica: 'Aposta e joga no chute, sem olhar as cartas.' },
   { valor: 'MEDIO', rotulo: 'Médio', explica: 'Aposta pela força das cartas e segura carta alta.' },
+  { valor: 'DIFICIL', rotulo: 'Difícil', explica: 'Conta as cartas que já saíram e joga para a aposta que fez.' },
+  { valor: 'REALISTA', rotulo: 'Realista', explica: 'Lê as apostas da mesa e mede o risco de cada carta. Ganha da maioria.' },
 ];
 
 export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRemoverBot, aoAbrirPerfil, aoAbrirRegras, aoSair, aoEnviarChat }: {
@@ -91,7 +93,13 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
             <span className="fraco">{bots.length} de {LIMITS.maxBots}</span>
           </div>
 
-          <div role="radiogroup" aria-label="dificuldade do bot" style={{ display: 'flex', gap: 6 }}>
+          {/* Duas colunas, não quatro numa fila: "Realista" não cabe em 75 px,
+              que é o que sobra para cada botão numa fila de quatro em 360. */}
+          <div
+            role="radiogroup"
+            aria-label="dificuldade do bot"
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6 }}
+          >
             {DIFICULDADES.map((d) => (
               <button
                 key={d.valor}
@@ -99,7 +107,6 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
                 aria-checked={d.valor === dificuldade}
                 onClick={() => setDificuldade(d.valor)}
                 className={d.valor === dificuldade ? '' : 'fantasma'}
-                style={{ flex: 1 }}
               >
                 {d.rotulo}
               </button>

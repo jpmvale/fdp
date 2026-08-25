@@ -242,6 +242,57 @@ describe('CA-281 a CA-286: projeção e vazamento', () => {
     }
   });
 
+  it('CA-347: na REVELAÇÃO o dono passa a ver a própria carta', () => {
+    // O dono era o único da mesa que nunca via a própria carta: a revelação
+    // saía no mesmo passo que resolvia a vaza e trocava para RESOLUCAO, onde
+    // `foreheadCards` já está vazio. A fase que se chama REVELACAO não
+    // revelava nada.
+    let state = settle(
+      createMatch({ matchId: 'm', seed: 'revelacao', playerIds: players(3) }),
+    ).state;
+    expect(state.round.isForeheadRound).toBe(true);
+
+    // Apostando, ninguém vê a própria — é o segredo que faz a rodada (RJ-100).
+    for (const viewer of state.playerOrder) {
+      expect(project(state, viewer).foreheadCards[viewer]).toBeUndefined();
+      expect(checkNoLeak(state, viewer)).toEqual([]);
+    }
+
+    // Fecha as apostas.
+    let revelou = false;
+    for (let i = 0; i < 4 && state.round.phase === 'APOSTAS'; i++) {
+      const quem = state.round.activePlayerId!;
+      // A conta do valor proibido é a mesma que o resto deste arquivo usa:
+      // derivada de `bidOrder` e `bets`, e não lida de `round.forbiddenBet`.
+      const postas = state.round.bidOrder.filter((id) => state.round.bets[id] !== undefined);
+      const ultimo = postas.length === state.round.bidOrder.length - 1;
+      const soma = postas.reduce((n, id) => n + state.round.bets[id]!, 0);
+      const proibido = ultimo ? state.cardsThisRound - soma : null;
+      let bet = 0;
+      while (bet === proibido) bet++;
+      const r = applyMove(state, {
+        type: 'bet', playerId: quem, roundNumber: state.roundNumber,
+        trickNumber: state.round.trickNumber, bet,
+      }, { now: 0 });
+      if (!r.ok) throw new Error(`aposta recusada: ${JSON.stringify(r)}`);
+      state = r.state;
+      if (r.events.some((e) => e.type === 'round:revealed')) revelou = true;
+    }
+
+    expect(state.round.phase).toBe('REVELACAO');
+    // O evento sai AO ENTRAR na fase, não no fim dela.
+    expect(revelou).toBe(true);
+
+    for (const viewer of state.playerOrder) {
+      const view = project(state, viewer);
+      // Agora a mesa inteira está à vista, o dono incluído.
+      expect(Object.keys(view.foreheadCards).sort()).toEqual([...state.playerOrder].sort());
+      expect(view.foreheadCards[viewer]).toBeDefined();
+      // E o verificador concorda: o segredo vale até a revelação, e ela chegou.
+      expect(checkNoLeak(state, viewer)).toEqual([]);
+    }
+  });
+
   it('CA-286: em rodada de N>1 vejo só a minha mão e a contagem alheia', () => {
     let state = createMatch({ matchId: 'm', seed: 'mao', playerIds: players(4) });
     state = settle({ ...state, cardsThisRound: 4 }).state;
