@@ -177,7 +177,7 @@ nem um evento esquecido nem um log de debug entregam a carta.
 | CA-305 | U | RJ-120 | **Dado** 2 jogadores numa rodada de 1 carta, **quando** o primeiro aposta, **então** a aposta do segundo é forçada a um único valor legal — e a rodada resolve normalmente |
 | CA-306 | U | RJ-125, RJ-043 | **Dado** qualquer estado alcançável, **então** a asserção de suficiência do sabot nunca dispara |
 
-### 4.9 Bots (RF-018)
+### 4.8 Bots (RF-018)
 
 O que estes critérios protegem, antes de tudo, é a **honestidade**: um bot que
 enxergasse a mão alheia deixaria de ser adversário e viraria juiz desonesto —
@@ -195,7 +195,39 @@ e o jogo inteiro depende de a mesa confiar no que está acontecendo.
 | CA-327 | I | RF-018 | **Dado** uma partida de humano + bots, **quando** é a vez de um bot, **então** ele joga dentro de `botThinkMs` sem `move:autoPlayed`, e a partida termina sem violar invariante |
 | CA-328 | I | RF-018 | **Dado** uma sala onde só restam bots, **quando** o ócio vence, **então** ela encerra como qualquer outra |
 
-### 4.8 Propriedade e ponta a ponta
+### 4.9 Chat (RF-017)
+
+O chat é a única coisa no produto que o servidor **não entende**: o payload é
+texto opaco. Isso o torna, ao mesmo tempo, a funcionalidade mais simples de
+implementar e o lugar mais fácil de vazar estado oculto sem ninguém notar —
+basta um campo derivado da partida entrar no evento "por conveniência". Metade
+destes critérios existe por isso.
+
+| ID | Nível | Regras | Critério |
+|---|---|---|---|
+| CA-330 | I | RF-017 | **Dado** um jogador presente, **quando** envia `chat:send` com texto válido, **então** todos na sala recebem `EV-040` com o mesmo `id`, `nickname`, `text` e `at` — e quem enviou recebe também |
+| CA-331 | I | RF-017 | **Dado** o chat em qualquer status menos `ENCERRADA` — lobby, partida, pausa e fim —, **quando** alguém envia, **então** a mensagem é aceita; em `ENCERRADA`, recusada |
+| CA-332 | U | RNF-014 | **Dado** texto vazio, só espaços, ou acima de 280 caracteres depois de aparado, **então** o comando é recusado e nada é publicado |
+| CA-333 | U | RNF-015 | **Dado** uma sala com 200 mensagens, **quando** entra a 201ª, **então** o histórico continua com 200 e a mais antiga saiu |
+| CA-334 | I | RF-017, CA-007 | **Dado** um jogador que recarrega a página ou reconecta, **então** o `room:snapshot` traz o histórico e ele volta a ver a conversa inteira |
+| CA-335 | I | RF-017, RF-014 | **Dado** um espectador que entra com a partida em andamento, **então** ele vê o histórico anterior à entrada e pode escrever |
+| CA-336 | I | RF-018 | **Dado** uma mesa com bots, **então** nenhum bot envia mensagem, e `chat:send` em nome de um bot é recusado |
+| CA-337 | I | RF-017 | **Dado** um jogador que trocou de apelido ou saiu da sala, **então** as mensagens que ele já enviou continuam mostrando o apelido de quando foram enviadas |
+| CA-338 | U | INV-13, RNF-005 | **Dado** o payload de `EV-040`, **então** ele contém exatamente `{id, playerId, nickname, text, at}` — nenhum campo derivado do estado da partida, e o mesmo objeto para todos os destinatários |
+| CA-339 | I | RNF-010 | **Dado** um cliente que estoura o orçamento de comandos mandando mensagens, **então** recebe `ERR-009` como em qualquer outro comando — o chat não tem cota própria |
+| CA-340 | E | RF-017, RNF-030 | **Dado** uma mensagem contendo `<script>` ou outra marcação, **então** ela aparece como TEXTO na tela de todos, sem ser interpretada |
+| CA-341 | I | RF-017 | **Dado** uma sala que expira ou é encerrada, **então** o histórico morre com ela — não há chat recuperável depois |
+
+CA-338 é o critério que protege a mecânica: `EV-040` é o único evento do jogo
+que sai idêntico para todos, e é assim porque não há nada a projetar. Um campo a
+mais ali — "quantas cartas o autor tem na mão", para enfeitar a bolha — é
+exatamente como a rodada de testa vazaria.
+
+CA-340 não é paranoia de formulário: o chat é o único lugar do produto onde um
+jogador escreve texto que aparece na tela dos outros. É a superfície de injeção
+inteira, num só campo.
+
+### 4.10 Propriedade e ponta a ponta
 
 | ID | Nível | Critério |
 |---|---|---|

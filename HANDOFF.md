@@ -59,7 +59,7 @@ Para parar: `pkill -f "tsx server"`.
 | Item | Situação hoje | Precisa virar |
 |---|---|---|
 | Aplicação incremental de eventos | O cliente pede o retrato a cada evento | Os redutores por evento, na camada `state/` |
-| Chat (RF-017) | **Só a casca**, com o campo desabilitado dizendo isso | Evento em `05`, campo em `04`, e critérios de aceite |
+| Chat (RF-017) | **Só a casca** na tela; o contrato já está especificado em `04`, `05` e `10` §4.9 | Implementar servidor e cliente contra CA-330 a CA-341 |
 
 A **decisão** de reconciliação de `05` §3 está pronta e testada em
 [`app/src/net/reconcile.ts`](app/src/net/reconcile.ts). O que falta é o outro
@@ -139,7 +139,8 @@ falha do meu brief, que já foi corrigido.
 ## Decisões que valem lembrar
 
 - **`docs/` é a fonte da verdade.** Requisito sem teste que cite seu ID é
-  requisito não entregue. **RF-017 (chat) está em débito por essa régua.**
+  requisito não entregue. RF-017 (chat) já tem critérios (CA-330 a CA-341) e
+  segue em débito até existir código que os satisfaça.
 - **Chat e bots entraram no escopo depois** (P9 e P10 em `docs/00` §5),
   revertendo exclusões da v1. A decisão está registrada no documento, não só no
   código.
@@ -183,8 +184,10 @@ printf "\n%s\n" "$(cat chave.pub)" >> ~/.ssh/authorized_keys
 
 ## O que fazer a seguir
 
-1. **Critérios de aceite do chat**, e depois o chat de verdade — evento em `05`,
-   campo em `04`. Hoje a tela existe e diz que não funciona.
+1. **O chat de verdade.** O contrato está fechado — `ChatMessage` em `04`,
+   `chat:send` e `EV-040` em `05`, limites em `05` §7, e CA-330 a CA-341 em
+   `10` §4.9. Falta o servidor, o cliente e os testes. Hoje a tela existe e diz
+   que não funciona.
 2. **Redutores por evento** no cliente, no lugar do resync a cada evento.
 3. **Regras de alerta no Grafana** sobre `vps_fdp_disponivel` e
    `vps_fdp_ultima_sonda_segundos` (a sonda parou).

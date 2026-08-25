@@ -94,6 +94,7 @@ existe caminho de código separado para "recuperar partida".
 | `room:resync` | `{}` | qualquer | Devolve `room:snapshot` |
 | `player:setProfile` | `{ nickname, avatar }` | qualquer, só em `LOBBY` | Atualiza perfil |
 | `player:leave` | `{}` | qualquer | Sai da sala |
+| `chat:send` | `{ text }` | qualquer presente, **exceto bot**, em qualquer status menos `ENCERRADA` | Publica a mensagem para a sala (RF-017) |
 | `host:kick` | `{ playerId }` | host, só em `LOBBY` | Remove jogador |
 | `host:setOptions` | `{ options }` | host, só em `LOBBY` | Ajusta opções da partida |
 | `host:startMatch` | `{}` | host, só em `LOBBY` | Inicia partida |
@@ -183,6 +184,7 @@ tentativa de trapaça nunca seja mascarada por um erro de regra.
 | EV-032 | `match:decisionUnlocked` | `{}` | todos (só o host age) |
 | EV-033 | `match:resumed` | `{ phase, activePlayerId, deadline }` | todos |
 | EV-034 | `round:aborted` | `{ roundNumber, withdrawnPlayerIds }` | todos |
+| EV-040 | `chat:message` | `{ message: ChatMessage }` | todos, **idêntico para todos** |
 
 Regras de projeção:
 
@@ -202,6 +204,12 @@ Regras de projeção:
 - **EV-030 a EV-033** implementam o ciclo de pausa (`03` §1.2). `EV-032` é emitido a todos —
   não só ao host — para que a mesa inteira entenda que existe uma decisão pendente e quem
   precisa tomá-la.
+- **EV-040** é o único evento do jogo que sai **igual para todo mundo, por
+  construção**. Não há projeção por destinatário porque não há nada a projetar:
+  o payload é o texto que a pessoa digitou, e mais nada. Isso é uma garantia,
+  não uma economia — chat é o canal em que estado oculto vazaria sem ninguém
+  perceber, já que a mensagem é opaca ao servidor. Nenhum campo derivado do
+  estado da partida pode entrar aqui, nunca.
 - **EV-034** precede a redistribuição de RJ-155. Depois dele vem um `round:started` novo com o
   **mesmo** `roundNumber`; o cliente **DEVE** descartar apostas e vazas locais daquela rodada.
 
@@ -253,6 +261,19 @@ sua frequência **DEVERIA** ser monitorada.
 | RNF-011 | Máx. 32 KB por mensagem do cliente |
 | RNF-012 | Máx. 8 jogadores + 4 espectadores por sala |
 | RNF-013 | Comandos com o mesmo `id` dentro de 30 s são idempotentes: reenvio devolve o `ack` original sem reexecutar |
+| RNF-014 | Mensagem de chat: 1–280 caracteres depois de aparada; vazia ou só espaço é recusada |
+| RNF-015 | Histórico de chat da sala: no máximo 200 mensagens; a mais antiga cai quando entra a 201ª |
 
 RNF-013 é o que torna seguro o cliente reenviar um comando após reconectar sem saber se ele
 chegou. Sem idempotência, uma jogada pode ser aplicada duas vezes.
+
+`chat:send` **conta no orçamento de RNF-010** como qualquer outro comando, e não
+tem cota própria. A consequência é deliberada e vale dizer em voz alta: quem
+inunda o chat gasta o próprio direito de jogar, e o limite se paga sozinho sem
+mecanismo novo. Vinte comandos por 10 s é folgado para quem digita e apertado
+para quem automatiza. Se um dia isso incomodar alguém digitando rápido no meio
+de uma vaza, a saída é cota separada — não teto maior.
+
+RNF-015 existe porque o histórico vive na sala e a sala vive em Redis: sem teto,
+uma sala de 4 horas com gente falante cresce sem limite dentro do valor que é
+lido e escrito a cada mudança de estado.

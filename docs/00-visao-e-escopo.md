@@ -96,7 +96,7 @@ completar mesa, e persistência de histórico de partidas.
 | P7 | Jogador **desconectado** pausa a partida; host decide após 60 s; pausa morre em 10 min | `02` §3.8.2 e §3.8.3 |
 | P8 | O baralho escala em número de baralhos, não em teto de cartas | `02` RJ-024 |
 | P6 | Português do Brasil é o único idioma da v1 | Textos centralizados mesmo assim, ver `08` |
-| P9 | Chat de texto entra na v1 (decisão de 25/08/2026, revertendo a exclusão original) | RF-017; na Mesa não pode roubar altura das cartas nem do cartão de adversário (`07`) |
+| P9 | Chat de texto entra na v1 (decisão de 25/08/2026, revertendo a exclusão original) | RF-017; contrato em `05`, critérios em `10` §4.9; na Mesa não pode roubar altura das cartas nem do cartão de adversário (`07`) |
 | P10 | Bots entram na v1, com dificuldade declarada (decisão de 25/08/2026) | RF-018; decisão em `packages/bot`, pura e determinística, alimentada pela MESMA projeção de um humano |
 
 ## 6. Riscos
@@ -111,6 +111,7 @@ completar mesa, e persistência de histórico de partidas.
 | Chat comer a tela mais apertada do produto | Mesa fica ilegível em 360 px com 8 jogadores | O chat na Mesa é subordinado às cartas e aos cartões de adversário; requisito de espaço em `07` |
 | Trapaça inspecionando a rede | Quebra a confiança do grupo | Servidor nunca envia estado oculto ao cliente (`09`) |
 | Bot enxergando o que jogador não vê | Deixa de ser adversário e vira juiz desonesto | `packages/bot` recebe `PlayerView`, a mesma projeção do humano — a informação não existe naquele lado (CA-325) |
+| Chat virando canal de vazamento de estado oculto | Destrói a mecânica sem ninguém perceber, porque o payload é opaco | `EV-040` carrega só o texto digitado, igual para todos, sem projeção por destinatário (CA-338) |
 | Vazar a própria carta na rodada de testa | Destrói a mecânica central do jogo | Projeção invertida por destinatário + INV-13, CA-281 e CA-285 |
 
 ## 7. Métricas de sucesso da v1

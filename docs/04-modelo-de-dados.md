@@ -23,8 +23,25 @@ interface Room {
   stateVersion: number;      // monotônico, incrementa a cada mudança
   createdAt: number;         // epoch ms
   lastActivityAt: number;    // base do TTL de inatividade
+  chat: ChatMessage[];       // RF-017; vive e morre com a sala
+}
+
+interface ChatMessage {
+  id: string;                // uuid do servidor, não do cliente
+  playerId: PlayerId;
+  nickname: string;          // COPIADO no envio, ver abaixo
+  text: string;              // 1–280 chars, já aparado — RNF-014
+  at: number;                // epoch ms, do servidor
 }
 ```
+
+O `nickname` é **copiado** para dentro da mensagem em vez de resolvido pelo
+`playerId` na hora de exibir. Quem trocou de apelido no lobby, ou saiu da sala,
+deixaria o histórico se reescrever sozinho ou virar "alguém" — e uma conversa
+que muda de autor depois de dita não é histórico, é confusão.
+
+O `chat` entra no retrato de `EV-001` como qualquer outro campo, e é isso que
+faz o histórico sobreviver a recarregar a página e a reconectar.
 
 ## 2. Jogador
 
