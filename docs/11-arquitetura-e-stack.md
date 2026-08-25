@@ -164,12 +164,13 @@ fdp/
 │       └── ws.ts            # handshake, envelope, roteamento de comandos
 ├── packages/
 │   ├── rules/               # ⭐ motor de regras — puro, sem dependências
+│   ├── bot/                 # decisão dos bots — puro, só depende de rules
 │   ├── protocol/            # tipos e schemas de `04` e `05` (fonte única)
 │   ├── store/               # RoomStore: interface + memória + Redis
 │   └── room/                # máquina de sala, timers, pausa, auto-play
 ├── deploy/
-│   ├── Caddyfile
-│   ├── fdp.service          # unit do systemd
+│   ├── Caddyfile            # bloco do site, para o Caddy compartilhado da VPS
+│   ├── metrica-fdp.sh       # sonda do caminho público, para o textfile collector
 │   └── README.md            # instalação passo a passo na VPS
 ├── locales/pt-BR.json
 └── test/e2e/

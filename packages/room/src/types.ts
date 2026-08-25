@@ -12,6 +12,7 @@
 
 import type {
   Avatar,
+  BotDifficulty,
   ConnectionStatus,
   ErrorCode,
   PublicPlayer,
@@ -38,6 +39,12 @@ export interface RoomPlayer {
   lastSeenAt: number;
   /** Quando o socket caiu. Base de `TRANSPORT_GRACE`. */
   socketLostAt: number | null;
+  /**
+   * Presente só em bot (RF-018). Um bot é um jogador como outro qualquer para
+   * o motor de regras: senta, aposta, joga e perde vida do mesmo jeito. O que
+   * muda é quem decide — e que ele nunca cai, então nunca pausa a mesa.
+   */
+  bot: { difficulty: BotDifficulty } | null;
 }
 
 export interface PauseState {
@@ -101,8 +108,14 @@ export function toPublicPlayer(player: RoomPlayer): PublicPlayer {
     connection: player.connection === 'RECONECTANDO' ? 'CONECTADO' : player.connection,
     isSpectator: player.isSpectator,
     joinedAt: player.joinedAt,
+    // Só aparece quando É bot: um campo `bot: null` em todo jogador humano
+    // seria ruído em cada quadro, e o cliente já lê a ausência como "humano".
+    ...(player.bot ? { bot: { difficulty: player.bot.difficulty } } : {}),
   };
 }
+
+/** Bot nunca está ausente: não tem socket para cair. */
+export const isBot = (player: RoomPlayer): boolean => player.bot !== null;
 
 /** Está na sala de verdade: nem saiu, nem foi removido. */
 export function isPresent(player: RoomPlayer): boolean {

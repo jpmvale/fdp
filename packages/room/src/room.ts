@@ -2,7 +2,13 @@
  * Ciclo de vida da sala, conexão e comandos (`03` §1 e §2).
  */
 
-import { LIMITS, type Command } from '@fdp/protocol';
+import {
+  AVATAR_COLORS,
+  AVATAR_EMOJIS,
+  LIMITS,
+  type BotDifficulty,
+  type Command,
+} from '@fdp/protocol';
 import {
   activePlayers,
   advance,
@@ -107,8 +113,61 @@ function newPlayer(params: JoinParams, now: number, isSpectator: boolean): RoomP
     joinedAt: now,
     lastSeenAt: now,
     socketLostAt: null,
+    bot: null,
   };
 }
+
+/** Nomes de bot: reconhecíveis como bot, e nunca confundíveis com gente. */
+const NOMES_DE_BOT = [
+  'Bot Ada', 'Bot Bardo', 'Bot Cazuza', 'Bot Dandara',
+  'Bot Elis', 'Bot Faísca', 'Bot Gaia',
+] as const;
+
+function newBot(
+  room: Room,
+  difficulty: BotDifficulty,
+  now: number,
+  ctx: RoomCtx,
+): RoomPlayer {
+  const usados = new Set(room.players.filter(isPresent).map((p) => p.nickname));
+  const nickname = NOMES_DE_BOT.find((n) => !usados.has(n)) ?? `Bot ${String(usados.size + 1)}`;
+
+  const tomados = new Set(
+    room.players.filter(isPresent).map((p) => `${p.avatar.emoji}|${p.avatar.color}`),
+  );
+  const avatar =
+    AVATARES.find((a) => !tomados.has(`${a.emoji}|${a.color}`)) ?? AVATARES[0]!;
+
+  // `newId` e não `randomSeed`: semente é para embaralhar e pode repetir entre
+  // chamadas. Ainda assim o id passa por conferência — dois jogadores com o
+  // mesmo id não dariam erro, dariam uma sala silenciosamente corrompida, e o
+  // custo de garantir aqui é uma comparação.
+  const existentes = new Set(room.players.map((p) => p.id));
+  let id = ctx.newId();
+  for (let n = 2; existentes.has(id); n++) id = `${ctx.newId()}-${n}`;
+
+  return {
+    id,
+    nickname,
+    avatar,
+    // Bot está sempre conectado, por construção: não tem socket para cair, e
+    // por isso nunca dispara pausa nem auto-play por ausência.
+    connection: 'CONECTADO',
+    isSpectator: false,
+    joinedAt: now,
+    lastSeenAt: now,
+    socketLostAt: null,
+    bot: { difficulty },
+  };
+}
+
+const AVATARES = AVATAR_COLORS.map((color, i) => ({
+  emoji: AVATAR_EMOJIS[i]!,
+  color,
+}));
+
+export const botsOf = (room: Room): RoomPlayer[] =>
+  room.players.filter((p) => isPresent(p) && p.bot !== null);
 
 export function seatedPlayers(room: Room): RoomPlayer[] {
   return room.players.filter((p) => isPresent(p) && !p.isSpectator);
@@ -317,6 +376,17 @@ function maybeResume(room: Room, ctx: RoomCtx, emissions: Emission[]): { room: R
 /** Prazo da fase corrente. Automática usa a pausa de legibilidade de 3 s. */
 export function deadlineFor(room: Room, now: number): number | null {
   if (!room.match || room.match.endReason !== null) return null;
+
+  // Bot na vez: o prazo é o tempo que ele "pensa", não o do relógio humano.
+  // Sem isso uma mesa de bots levaria 45 s por aposta esperando um estouro que
+  // não vai acontecer — o bot não esquece de jogar.
+  const ativo = room.match.round.activePlayerId;
+  const phase = room.match.round.phase;
+  if (ativo !== null && (phase === 'APOSTAS' || phase === 'VAZAS')) {
+    const jogador = room.players.find((p) => p.id === ativo);
+    if (jogador?.bot) return now + LIMITS.botThinkMs;
+  }
+
   switch (room.match.round.phase) {
     case 'APOSTAS':
       return now + LIMITS.betTimeoutMs;
@@ -381,6 +451,33 @@ export function applyCommand(
         { ...room, players: replace(room.players, target, { connection: 'REMOVIDO' }) },
         ctx,
         [all({ type: 'room:playerLeft', payload: { playerId: target, reason: 'KICKED' } })],
+      );
+    }
+
+    case 'host:addBot': {
+      if (room.status !== 'LOBBY') return failWith('WRONG_STATUS', 'SO_NO_LOBBY');
+      if (botsOf(room).length >= LIMITS.maxBots) {
+        return failWith('ROOM_FULL', 'BOTS_DEMAIS');
+      }
+      if (seatedPlayers(room).length >= LIMITS.maxPlayers) {
+        return failWith('ROOM_FULL', 'SALA_LOTADA');
+      }
+      const bot = newBot(room, command.payload.difficulty, ctx.now, ctx);
+      return commit({ ...room, players: [...room.players, bot] }, ctx, [
+        all({ type: 'room:playerJoined', payload: { player: toPublicPlayer(bot) } }),
+      ]);
+    }
+
+    case 'host:removeBot': {
+      if (room.status !== 'LOBBY') return failWith('WRONG_STATUS', 'SO_NO_LOBBY');
+      const alvo = room.players.find((p) => p.id === command.payload.playerId && isPresent(p));
+      // Só bot sai por aqui. Gente sai por `host:kick`, que é um gesto
+      // diferente e merece confirmação diferente.
+      if (!alvo || alvo.bot === null) return failWith('VALIDATION_FAILED', 'NAO_E_BOT');
+      return commit(
+        { ...room, players: room.players.filter((p) => p.id !== alvo.id) },
+        ctx,
+        [all({ type: 'room:playerLeft', payload: { playerId: alvo.id, reason: 'LEFT' } })],
       );
     }
 

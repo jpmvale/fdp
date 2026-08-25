@@ -1,15 +1,27 @@
-import { LIMITS } from '@fdp/protocol';
+import { useState } from 'react';
+import { LIMITS, type BotDifficulty } from '@fdp/protocol';
 import { CartaoJogador } from '../components/CartaoJogador';
 import type { Retrato } from '../state/tipos';
 
-export function Lobby({ retrato, eu, aoIniciar, aoExpulsar }: {
+/** Só as que hoje jogam diferente. As outras duas ainda não existem. */
+const DIFICULDADES: { valor: BotDifficulty; rotulo: string; explica: string }[] = [
+  { valor: 'FACIL', rotulo: 'Fácil', explica: 'Aposta e joga no chute, sem olhar a mão.' },
+  { valor: 'MEDIO', rotulo: 'Médio', explica: 'Aposta pela força da mão e segura carta alta.' },
+];
+
+export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRemoverBot }: {
   retrato: Retrato;
   eu: string;
   aoIniciar: () => void;
   aoExpulsar: (playerId: string) => void;
+  aoAdicionarBot: (dificuldade: BotDifficulty) => void;
+  aoRemoverBot: (playerId: string) => void;
 }) {
+  const [dificuldade, setDificuldade] = useState<BotDifficulty>('MEDIO');
   const jogadores = retrato.players.filter((p) => !p.isSpectator);
   const souHost = retrato.hostId === eu;
+  const bots = jogadores.filter((p) => p.bot);
+  const cabeMaisBot = bots.length < LIMITS.maxBots && jogadores.length < LIMITS.maxPlayers;
   const suficiente = jogadores.length >= LIMITS.minPlayers;
   const convite = `${location.origin}/?sala=${retrato.code}`;
 
@@ -56,8 +68,8 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar }: {
             {souHost && p.id !== eu && (
               <button
                 className="fantasma"
-                aria-label={`Expulsar ${p.nickname}`}
-                onClick={() => aoExpulsar(p.id)}
+                aria-label={p.bot ? `Tirar ${p.nickname} da mesa` : `Expulsar ${p.nickname}`}
+                onClick={() => (p.bot ? aoRemoverBot(p.id) : aoExpulsar(p.id))}
                 style={{ minWidth: 44, padding: 0 }}
               >
                 ✕
@@ -66,6 +78,50 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar }: {
           </div>
         ))}
       </div>
+
+      {souHost && (
+        <div className="cartao pilha" style={{ gap: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span className="rotulo">jogar com bots</span>
+            <span className="fraco">{bots.length} de {LIMITS.maxBots}</span>
+          </div>
+
+          <div role="radiogroup" aria-label="dificuldade do bot" style={{ display: 'flex', gap: 6 }}>
+            {DIFICULDADES.map((d) => (
+              <button
+                key={d.valor}
+                role="radio"
+                aria-checked={d.valor === dificuldade}
+                onClick={() => setDificuldade(d.valor)}
+                className={d.valor === dificuldade ? '' : 'fantasma'}
+                style={{ flex: 1 }}
+              >
+                {d.rotulo}
+              </button>
+            ))}
+          </div>
+
+          <p className="fraco">
+            {DIFICULDADES.find((d) => d.valor === dificuldade)?.explica}
+          </p>
+
+          <button
+            className="fantasma"
+            disabled={!cabeMaisBot}
+            onClick={() => aoAdicionarBot(dificuldade)}
+          >
+            + Sentar um bot {DIFICULDADES.find((d) => d.valor === dificuldade)?.rotulo.toLowerCase()}
+          </button>
+
+          {!cabeMaisBot && (
+            <p className="fraco">
+              {bots.length >= LIMITS.maxBots
+                ? 'Sete bots é o teto: uma mesa só de bot não é jogo.'
+                : 'A mesa está cheia.'}
+            </p>
+          )}
+        </div>
+      )}
 
       {souHost ? (
         <div className="pilha" style={{ gap: 8 }}>

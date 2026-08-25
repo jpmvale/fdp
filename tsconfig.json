@@ -5,6 +5,9 @@
       "path": "./packages/rules"
     },
     {
+      "path": "./packages/bot"
+    },
+    {
       "path": "./packages/store"
     },
     {

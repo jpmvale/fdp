@@ -8,8 +8,10 @@
  * O servidor chama `tick` periodicamente e sempre que um prazo vence.
  */
 
-import { LIMITS } from '@fdp/protocol';
-import { advance, autoMove, applyMove, isActive } from '@fdp/rules';
+import { LIMITS, type BotDifficulty } from '@fdp/protocol';
+import type { Move } from '@fdp/rules';
+import { advance, autoMove, applyMove, createRng, isActive, project } from '@fdp/rules';
+import { decidirAposta, decidirCarta } from '@fdp/bot';
 import {
   absentMatchPlayers,
   deadlineFor,
@@ -58,7 +60,7 @@ export function nextDeadline(room: Room): number | null {
   }
 
   candidates.push(room.createdAt + LIMITS.roomMaxLifeMs);
-  if (!room.players.some((p) => isPresent(p) && isOnline(p))) {
+  if (!room.players.some((p) => isPresent(p) && isOnline(p) && p.bot === null)) {
     candidates.push(room.lastActivityAt + LIMITS.lobbyIdleMs);
   }
 
@@ -262,6 +264,13 @@ function advanceMatchClock(room: Room, ctx: RoomCtx): { room: Room; emissions: E
     return { room, emissions: [] };
   }
 
+  // Bot: decide de verdade, e a jogada NÃO é auto-play. Auto-play é o que
+  // acontece com humano que não jogou a tempo, e anunciar a jogada de um bot
+  // como "ficou sem tempo" seria mentira na tela.
+  if (player.bot) {
+    return playBot(room, player.bot.difficulty, activeId, ctx);
+  }
+
   const move = autoMove(room.match);
   const result = applyMove(room.match, move, ctx);
   if (!result.ok) return { room, emissions: [] };
@@ -289,12 +298,63 @@ function advanceMatchClock(room: Room, ctx: RoomCtx): { room: Room; emissions: E
   return { room: next, emissions };
 }
 
+/**
+ * A vez de um bot.
+ *
+ * A decisão sai de `@fdp/bot`, que recebe a MESMA projeção que um humano
+ * receberia — é o que garante que o bot não vê o que não deveria. Se ele
+ * devolver jogada ilegal (defeito nosso, não do jogador), o auto-play cobre:
+ * a mesa não pode travar porque um bot se enganou.
+ */
+function playBot(
+  room: Room,
+  difficulty: BotDifficulty,
+  botId: string,
+  ctx: RoomCtx,
+): { room: Room; emissions: Emission[] } {
+  if (!room.match) return { room, emissions: [] };
+
+  const visao = project(room.match, botId);
+  const rng = createRng(ctx.randomSeed());
+  const phase = room.match.round.phase;
+
+  const base = { playerId: botId, roundNumber: visao.roundNumber, trickNumber: visao.trickNumber };
+
+  let move: Move;
+  try {
+    move = phase === 'APOSTAS'
+      ? { ...base, type: 'bet', bet: decidirAposta(visao, difficulty, rng) }
+      : { ...base, type: 'playCard', cardId: decidirCarta(visao, difficulty, rng) };
+  } catch {
+    move = autoMove(room.match);
+  }
+
+  let result = applyMove(room.match, move, ctx);
+  if (!result.ok) {
+    result = applyMove(room.match, autoMove(room.match), ctx);
+    if (!result.ok) return { room, emissions: [] };
+  }
+
+  let next: Room = {
+    ...room,
+    match: result.state,
+    phaseDeadline: deadlineFor({ ...room, match: result.state }, ctx.now),
+  };
+  const emissions = translate(result.events, next);
+  next = dealNow(next, ctx, emissions);
+
+  return { room: next, emissions };
+}
+
 /** TTL da sala: nada de estado morto acumulando (`00` §3). */
 function expireRoom(room: Room, ctx: RoomCtx): { room: Room; emissions: Emission[] } {
   if (room.status === 'ENCERRADA') return { room, emissions: [] };
 
   const tooOld = ctx.now >= room.createdAt + LIMITS.roomMaxLifeMs;
-  const nobodyOnline = !room.players.some((p) => isPresent(p) && isOnline(p));
+  // Só GENTE conta para "tem alguém aqui". Bot está sempre conectado por
+  // construção, então incluí-lo aqui deixaria viva para sempre qualquer sala
+  // que já teve um bot — o vazamento seria silencioso e permanente.
+  const nobodyOnline = !room.players.some((p) => isPresent(p) && isOnline(p) && p.bot === null);
   const idleTooLong = nobodyOnline && ctx.now >= room.lastActivityAt + LIMITS.lobbyIdleMs;
 
   if (!tooOld && !idleTooLong) return { room, emissions: [] };

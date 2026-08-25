@@ -60,6 +60,14 @@ export type RoomStatus =
  */
 export type ConnectionStatus = 'CONECTADO' | 'DESCONECTADO' | 'REMOVIDO' | 'SAIU';
 
+/**
+ * Dificuldades de bot (RF-018). `DIFICIL` e `REALISTA` estão declaradas antes
+ * de existirem porque o valor viaja no protocolo e no estado persistido:
+ * acrescentar depois obrigaria a migrar sala salva.
+ */
+export const BOT_DIFFICULTIES = ['FACIL', 'MEDIO', 'DIFICIL', 'REALISTA'] as const;
+export type BotDifficulty = (typeof BOT_DIFFICULTIES)[number];
+
 export interface PublicPlayer {
   id: PlayerId;
   nickname: string;
@@ -67,6 +75,12 @@ export interface PublicPlayer {
   connection: ConnectionStatus;
   isSpectator: boolean;
   joinedAt: number;
+  /**
+   * Presente só em bot. É informação PÚBLICA de propósito: uma mesa que não
+   * sabe quem é bot não sabe o que está jogando, e esconder isso seria a
+   * primeira mentira do produto.
+   */
+  bot?: { difficulty: BotDifficulty };
 }
 
 export interface PauseInfo {
@@ -92,6 +106,8 @@ export type Command =
   | { type: 'player:setProfile'; payload: { nickname: string; avatar: Avatar } }
   | { type: 'player:leave'; payload: Record<string, never> }
   | { type: 'host:kick'; payload: { playerId: PlayerId } }
+  | { type: 'host:addBot'; payload: { difficulty: BotDifficulty } }
+  | { type: 'host:removeBot'; payload: { playerId: PlayerId } }
   | { type: 'host:setOptions'; payload: { options: MatchOptions } }
   | { type: 'host:startMatch'; payload: Record<string, never> }
   | { type: 'host:endMatch'; payload: Record<string, never> }
@@ -105,6 +121,7 @@ export type CommandType = Command['type'];
 export const HOST_ONLY_COMMANDS = [
   'host:kick', 'host:setOptions', 'host:startMatch',
   'host:endMatch', 'host:rematch', 'host:resolveAbsence',
+  'host:addBot', 'host:removeBot',
 ] as const satisfies readonly CommandType[];
 
 // ---------------------------------------------------------------------------
@@ -232,6 +249,17 @@ export const LIMITS = {
   maxMessageBytes: 32 * 1024,
   /** RNF-012 */
   maxPlayers: 8,
+  /**
+   * RF-018: até 7 bots, que é `maxPlayers - 1`. O −1 não é decoração: uma mesa
+   * só de bots não é jogo, é demonstração, e ninguém precisa de sala para isso.
+   */
+  maxBots: 7,
+  /**
+   * Quanto um bot "pensa" antes de jogar. Não é dificuldade artificial: sem
+   * pausa a mesa inteira resolve numa piscada e o humano não vê o que
+   * aconteceu. Curto o bastante para não entediar.
+   */
+  botThinkMs: 900,
   minPlayers: 2,
   maxSpectators: 4,
   /** RNF-013: reenvio do mesmo `id` é idempotente nesta janela. */

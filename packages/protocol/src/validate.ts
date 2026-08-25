@@ -8,6 +8,7 @@
 
 import { z } from 'zod';
 import {
+  BOT_DIFFICULTIES,
   AVATAR_COLORS,
   AVATAR_EMOJIS,
   LIMITS,
@@ -75,6 +76,14 @@ export const commandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('player:leave'), payload: empty }),
   z.object({
     type: z.literal('host:kick'),
+    payload: z.object({ playerId: z.string().min(1) }).strict(),
+  }),
+  z.object({
+    type: z.literal('host:addBot'),
+    payload: z.object({ difficulty: z.enum(BOT_DIFFICULTIES) }).strict(),
+  }),
+  z.object({
+    type: z.literal('host:removeBot'),
     payload: z.object({ playerId: z.string().min(1) }).strict(),
   }),
   z.object({

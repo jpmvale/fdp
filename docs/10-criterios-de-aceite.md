@@ -177,6 +177,24 @@ nem um evento esquecido nem um log de debug entregam a carta.
 | CA-305 | U | RJ-120 | **Dado** 2 jogadores numa rodada de 1 carta, **quando** o primeiro aposta, **então** a aposta do segundo é forçada a um único valor legal — e a rodada resolve normalmente |
 | CA-306 | U | RJ-125, RJ-043 | **Dado** qualquer estado alcançável, **então** a asserção de suficiência do sabot nunca dispara |
 
+### 4.9 Bots (RF-018)
+
+O que estes critérios protegem, antes de tudo, é a **honestidade**: um bot que
+enxergasse a mão alheia deixaria de ser adversário e viraria juiz desonesto —
+e o jogo inteiro depende de a mesa confiar no que está acontecendo.
+
+| ID | Nível | Regras | Critério |
+|---|---|---|---|
+| CA-320 | U | RJ-054 | **Dado** qualquer dificuldade e qualquer valor proibido, **quando** o bot aposta, **então** ele nunca escolhe o valor que fecharia a mesa |
+| CA-321 | U | RF-018 | **Dado** o bot médio, **quando** a mão é de ases, **então** ele aposta mais do que apostaria com cartas baixas — e a mesma mão dá sempre a mesma aposta |
+| CA-322 | U | RJ-100, RJ-101 | **Dado** o bot médio numa rodada de testa, **quando** o que está à vista é baixo, **então** ele aposta que ganha; com um ás à vista, que perde |
+| CA-323 | U | RJ-023 | **Dado** o bot médio precisando de vaza, **então** ele usa a menor carta que ainda ganha; já tendo o que apostou, a maior que ainda perde |
+| CA-324 | U | RJ-063 | **Dado** qualquer dificuldade e qualquer semente, **quando** o bot joga, **então** a carta escolhida está na mão dele |
+| CA-325 | U | RJ-101, INV-13 | **Dado** o bot na rodada de testa, **então** a projeção que ele recebe não contém a própria carta — a informação não existe do lado dele |
+| CA-326 | I | RF-018 | **Dado** o host no lobby, **quando** senta bots, **então** cada um tem id, nome e avatar próprios, o teto é 7, só o host mexe, e `host:removeBot` recusa jogador humano |
+| CA-327 | I | RF-018 | **Dado** uma partida de humano + bots, **quando** é a vez de um bot, **então** ele joga dentro de `botThinkMs` sem `move:autoPlayed`, e a partida termina sem violar invariante |
+| CA-328 | I | RF-018 | **Dado** uma sala onde só restam bots, **quando** o ócio vence, **então** ela encerra como qualquer outra |
+
 ### 4.8 Propriedade e ponta a ponta
 
 | ID | Nível | Critério |

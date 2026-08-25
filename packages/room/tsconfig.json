@@ -1,6 +1,26 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "outDir": "dist", "rootDir": ".", "baseUrl": "../.." },
-  "include": ["src/**/*.ts", "test/**/*.ts"],
-  "references": [{ "path": "../rules" }, { "path": "../protocol" }, { "path": "../store" }]
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "baseUrl": "../.."
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts"
+  ],
+  "references": [
+    {
+      "path": "../rules"
+    },
+    {
+      "path": "../protocol"
+    },
+    {
+      "path": "../store"
+    },
+    {
+      "path": "../bot"
+    }
+  ]
 }

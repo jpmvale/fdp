@@ -1,13 +1,20 @@
 import { Avatar } from '../components/Avatar';
 import { Vidas } from '../components/Vidas';
+import type { EndReason } from '@fdp/rules';
 import type { Retrato, PlayerView } from '../state/tipos';
 
-const MOTIVOS: Record<string, string> = {
-  LAST_STANDING: 'Último de pé.',
-  ALL_ELIMINATED: 'Todo mundo caiu na mesma rodada — vence quem tinha mais vidas antes.',
-  ROUNDS_EXHAUSTED: 'As rodadas acabaram.',
-  HOST_ENDED: 'O host encerrou a partida.',
-  ABANDONED: 'A mesa esvaziou.',
+/**
+ * `EndReason` de `02`, em português de gente. Eu tinha escrito esta tabela de
+ * cabeça, com nomes em inglês que NÃO existem no motor — o resultado é que a
+ * tela de fim mostrava a constante crua (`VITORIA`) em vez da frase. Só
+ * apareceu jogando até o fim.
+ */
+const MOTIVOS: Record<EndReason, string> = {
+  VITORIA: 'Último de pé.',
+  VITORIA_POR_ABANDONO: 'Os outros abandonaram a mesa.',
+  JOGADORES_INSUFICIENTES: 'Ficou gente de menos para continuar.',
+  ENCERRADA_PELO_HOST: 'O host encerrou a partida.',
+  ENCERRADA_POR_AUSENCIA: 'A pausa passou do limite esperando quem caiu.',
 };
 
 export function Fim({ retrato, eu, partida, aoRevanche }: {
@@ -36,7 +43,7 @@ export function Fim({ retrato, eu, partida, aoRevanche }: {
             ? 'Sem vencedor'
             : vencedores.map((id) => retrato.players.find((p) => p.id === id)?.nickname ?? '?').join(' e ')}
         </div>
-        <p className="fraco">{MOTIVOS[partida.endReason ?? ''] ?? partida.endReason}</p>
+        <p className="fraco">{partida.endReason ? MOTIVOS[partida.endReason] : ''}</p>
       </div>
 
       <div className="cartao pilha" style={{ gap: 4 }}>

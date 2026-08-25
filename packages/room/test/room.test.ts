@@ -504,3 +504,145 @@ describe('INV-05: a sala fecha quando a partida termina', () => {
     expect(revanche.ok).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Bots (RF-018)
+// ---------------------------------------------------------------------------
+
+describe('CA-326: o host senta e tira bots no lobby', () => {
+  const addBot = (difficulty: 'FACIL' | 'MEDIO'): Command =>
+    ({ type: 'host:addBot', payload: { difficulty } });
+
+  it('o bot entra como jogador sentado, conectado e marcado como bot', () => {
+    const { room } = ok(applyCommand(roomWith(1), 'p1', addBot('MEDIO'), ctxAt(10)));
+    const bot = room.players.find((p) => p.bot !== null);
+
+    expect(bot).toBeDefined();
+    expect(bot!.bot).toEqual({ difficulty: 'MEDIO' });
+    expect(bot!.isSpectator).toBe(false);
+    expect(bot!.connection).toBe('CONECTADO');
+    expect(room.players).toHaveLength(2);
+  });
+
+  it('cada bot recebe id, nome e avatar próprios', () => {
+    let room = roomWith(1);
+    // Um contador só para os três: `ctxAt` cria um novo a cada chamada, e o
+    // que se quer testar aqui é a sala, não o gerador de id do teste.
+    let n = 0;
+    const ctxSeq = (now: number): RoomCtx => ({ now, randomSeed: () => 'seed', newId: () => `bot-${++n}` });
+    for (let i = 0; i < 3; i++) {
+      room = ok(applyCommand(room, 'p1', addBot('FACIL'), ctxSeq(10 + i))).room;
+    }
+    const bots = room.players.filter((p) => p.bot !== null);
+
+    expect(new Set(bots.map((b) => b.id)).size).toBe(3);
+    expect(new Set(bots.map((b) => b.nickname)).size).toBe(3);
+    expect(new Set(bots.map((b) => `${b.avatar.emoji}|${b.avatar.color}`)).size).toBe(3);
+  });
+
+  it('para em 7 bots: mesa só de bot não é jogo', () => {
+    let room = roomWith(1);
+    for (let i = 0; i < LIMITS.maxBots; i++) {
+      room = ok(applyCommand(room, 'p1', addBot('FACIL'), ctxAt(10 + i))).room;
+    }
+    const excedente = applyCommand(room, 'p1', addBot('FACIL'), ctxAt(100));
+
+    expect(excedente.ok).toBe(false);
+    expect(room.players).toHaveLength(LIMITS.maxPlayers);
+  });
+
+  it('só o host mexe nos bots', () => {
+    const room = roomWith(2);
+    const recusado = applyCommand(room, 'p2', addBot('FACIL'), ctxAt(10));
+    expect(recusado.ok).toBe(false);
+  });
+
+  it('`host:removeBot` não serve para expulsar gente', () => {
+    const room = roomWith(2);
+    const recusado = applyCommand(
+      room, 'p1', { type: 'host:removeBot', payload: { playerId: 'p2' } }, ctxAt(10),
+    );
+    expect(recusado.ok).toBe(false);
+    if (!recusado.ok) expect(recusado.motivo).toBe('NAO_E_BOT');
+  });
+
+  it('o bot removido some da sala, sem deixar assento vazio', () => {
+    const comBot = ok(applyCommand(roomWith(1), 'p1', addBot('FACIL'), ctxAt(10))).room;
+    const bot = comBot.players.find((p) => p.bot !== null)!;
+    const { room } = ok(applyCommand(
+      comBot, 'p1', { type: 'host:removeBot', payload: { playerId: bot.id } }, ctxAt(20),
+    ));
+    expect(room.players.some((p) => p.id === bot.id)).toBe(false);
+  });
+
+  it('com a partida em andamento, não se mexe em bot', () => {
+    let room = ok(applyCommand(roomWith(1), 'p1', addBot('FACIL'), ctxAt(10))).room;
+    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
+    const recusado = applyCommand(room, 'p1', addBot('FACIL'), ctxAt(30));
+    expect(recusado.ok).toBe(false);
+  });
+});
+
+describe('CA-327: o bot joga sozinho quando é a vez dele', () => {
+  it('uma partida de humano + 2 bots caminha só com o relógio', () => {
+    let room = roomWith(1);
+    room = ok(applyCommand(room, 'p1', { type: 'host:addBot', payload: { difficulty: 'MEDIO' } }, ctxAt(10))).room;
+    room = ok(applyCommand(room, 'p1', { type: 'host:addBot', payload: { difficulty: 'FACIL' } }, ctxAt(11))).room;
+    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
+
+    const humano = 'p1';
+    let agora = 20;
+    let jogadasDoBot = 0;
+
+    // O relógio avança em saltos pequenos. Quando é a vez de um bot, o prazo
+    // dele é curto (`botThinkMs`) e o tick resolve; quando é a vez do humano,
+    // nada acontece — que é exatamente o que se quer verificar.
+    for (let passo = 0; passo < 400 && room.match?.endReason === null; passo++) {
+      const ativo = room.match?.round.activePlayerId ?? null;
+      if (ativo !== null && ativo !== humano) {
+        agora += LIMITS.botThinkMs;
+        const antes = room.match?.round.phase;
+        const r = tick(room, ctxAt(agora));
+        if (r.changed) {
+          room = r.room;
+          if (antes === 'APOSTAS' || antes === 'VAZAS') jogadasDoBot++;
+        }
+        continue;
+      }
+      // Vez do humano (ou fase automática): empurra o relógio até o prazo.
+      agora = (room.phaseDeadline ?? agora + 1000) + 1;
+      const r = tick(room, ctxAt(agora));
+      room = r.changed ? r.room : room;
+    }
+
+    expect(jogadasDoBot).toBeGreaterThan(0);
+    expect(checkRoomInvariants(room)).toEqual([]);
+  });
+
+  it('o prazo de um bot é o de pensar, não o do relógio humano', () => {
+    let room = roomWith(1);
+    room = ok(applyCommand(room, 'p1', { type: 'host:addBot', payload: { difficulty: 'MEDIO' } }, ctxAt(10))).room;
+    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
+
+    // Avança até que a vez seja do bot.
+    let agora = 20;
+    for (let i = 0; i < 50 && room.match?.round.activePlayerId === 'p1'; i++) {
+      agora = (room.phaseDeadline ?? agora) + 1;
+      room = tick(room, ctxAt(agora)).room;
+    }
+
+    if (room.match?.round.activePlayerId !== 'p1' && room.phaseDeadline !== null) {
+      expect(room.phaseDeadline - agora).toBeLessThanOrEqual(LIMITS.botThinkMs);
+    }
+  });
+});
+
+describe('CA-328: sala só com bots não vive para sempre', () => {
+  it('o humano saindo, a sala expira pelo ócio como qualquer outra', () => {
+    let room = ok(applyCommand(roomWith(1), 'p1', { type: 'host:addBot', payload: { difficulty: 'FACIL' } }, ctxAt(10))).room;
+    room = ok(leave(room, 'p1', ctxAt(20))).room;
+
+    const depois = tick(room, ctxAt(20 + LIMITS.lobbyIdleMs + 1));
+    expect(depois.room.status).toBe('ENCERRADA');
+  });
+});

@@ -12,6 +12,7 @@ export default defineConfig({
       '@fdp/protocol/validate': at('./packages/protocol/src/validate.ts'),
       '@fdp/protocol': at('./packages/protocol/src/index.ts'),
       '@fdp/room': at('./packages/room/src/index.ts'),
+      '@fdp/bot': at('./packages/bot/src/index.ts'),
     },
   },
 });

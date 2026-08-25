@@ -1,6 +1,11 @@
+import type { BotDifficulty } from '@fdp/protocol';
 import { Avatar } from './Avatar';
 import { Vidas } from './Vidas';
 import type { PlayerView, PublicPlayer } from '../state/tipos';
+
+const ROTULO_BOT: Record<BotDifficulty, string> = {
+  FACIL: 'fácil', MEDIO: 'médio', DIFICIL: 'difícil', REALISTA: 'realista',
+};
 
 /**
  * O elemento mais consultado do jogo. Tudo que ele diz precisa ser legível de
@@ -47,6 +52,9 @@ export function CartaoJogador({ jogador, partida, souEu, ehHost, ausente }: {
             {jogador.nickname}{souEu ? ' · você' : ''}
           </span>
           {ehHost && <Etiqueta>host</Etiqueta>}
+          {/* Quem é bot fica à vista, com a dificuldade junto: uma mesa que
+              não sabe o que está enfrentando não sabe o que está jogando. */}
+          {jogador.bot && <Etiqueta>bot · {ROTULO_BOT[jogador.bot.difficulty]}</Etiqueta>}
           {ausente && <Etiqueta tom="alerta">✕ caiu</Etiqueta>}
         </div>
 

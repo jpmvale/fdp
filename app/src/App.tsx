@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { Avatar as AvatarProto } from '@fdp/protocol';
 import { conectar, type Conexao } from './net/socket';
 import * as sessao from './net/sessao';
+import { frase } from './net/mensagens';
 import { useEstado, definir, ler, avisar, errar } from './state/loja';
 import type { Retrato } from './state/tipos';
 import { FaixaConexao } from './components/Conexao';
@@ -107,6 +108,8 @@ export function App() {
           eu={eu}
           aoIniciar={() => enviar('host:startMatch')}
           aoExpulsar={(playerId) => enviar('host:kick', { playerId })}
+          aoAdicionarBot={(difficulty) => enviar('host:addBot', { difficulty })}
+          aoRemoverBot={(playerId) => enviar('host:removeBot', { playerId })}
         />
       )}
 
@@ -182,7 +185,7 @@ function receber(msg: { type: string; payload: unknown }, conexao: () => Conexao
   }
   if (msg.type === 'error') {
     const p = msg.payload as { code: string; params?: { motivo?: string } };
-    errar(p.params?.motivo ?? p.code);
+    errar(frase(p.params?.motivo, p.code));
     return;
   }
   narrar(msg);

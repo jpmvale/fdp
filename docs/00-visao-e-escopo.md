@@ -61,6 +61,7 @@ O produto vive ou morre por três atributos, nesta ordem de prioridade:
 | RF-015 | Tela de regras acessível a qualquer momento, sem sair da partida |
 | RF-016 | Log de rodada: histórico do que aconteceu na partida atual |
 | RF-017 | Chat de texto da sala, disponível no lobby e durante a partida, com histórico vivendo enquanto a sala viver |
+| RF-018 | Bots: o host senta até 7 no lobby, com dificuldade por bot, e a partida começa com eles |
 
 ### 4.2 Fora do escopo da v1
 
@@ -70,7 +71,7 @@ Registrado explicitamente para não haver ambiguidade — **não implementar**:
 - Matchmaking público, salas abertas ou lista de partidas.
 - Chat de **voz**. (O grupo já está em chamada ou na mesma sala.) O chat de **texto** entrou no escopo em 25/08/2026 — ver RF-017 e a decisão P9.
 - Ranking global, conquistas, progressão, moeda ou cosméticos.
-- Bots / jogadores controlados por IA.
+- ~~Bots~~ — entraram no escopo em 25/08/2026, ver RF-018 e a decisão P10. Fora continua o que seria **IA de verdade**: nada de modelo de linguagem decidindo jogada.
 - Modo local pass-and-play no mesmo dispositivo.
 - Aplicativo nativo, PWA instalável ou modo offline.
 - Baralhos customizados criados pelo usuário.
@@ -96,6 +97,7 @@ completar mesa, e persistência de histórico de partidas.
 | P8 | O baralho escala em número de baralhos, não em teto de cartas | `02` RJ-024 |
 | P6 | Português do Brasil é o único idioma da v1 | Textos centralizados mesmo assim, ver `08` |
 | P9 | Chat de texto entra na v1 (decisão de 25/08/2026, revertendo a exclusão original) | RF-017; na Mesa não pode roubar altura das cartas nem do cartão de adversário (`07`) |
+| P10 | Bots entram na v1, com dificuldade declarada (decisão de 25/08/2026) | RF-018; decisão em `packages/bot`, pura e determinística, alimentada pela MESMA projeção de um humano |
 
 ## 6. Riscos
 
@@ -108,6 +110,7 @@ completar mesa, e persistência de histórico de partidas.
 | Escopo inflar | Não entrega a v1 | §4.2 é vinculante; mudanças exigem editar este doc — foi o que se fez com o chat de texto em 25/08/2026 (P9) |
 | Chat comer a tela mais apertada do produto | Mesa fica ilegível em 360 px com 8 jogadores | O chat na Mesa é subordinado às cartas e aos cartões de adversário; requisito de espaço em `07` |
 | Trapaça inspecionando a rede | Quebra a confiança do grupo | Servidor nunca envia estado oculto ao cliente (`09`) |
+| Bot enxergando o que jogador não vê | Deixa de ser adversário e vira juiz desonesto | `packages/bot` recebe `PlayerView`, a mesma projeção do humano — a informação não existe naquele lado (CA-325) |
 | Vazar a própria carta na rodada de testa | Destrói a mecânica central do jogo | Projeção invertida por destinatário + INV-13, CA-281 e CA-285 |
 
 ## 7. Métricas de sucesso da v1
