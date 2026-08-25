@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { LIMITS, type BotDifficulty } from '@fdp/protocol';
 import { CartaoJogador } from '../components/CartaoJogador';
+import { Chat } from '../components/Chat';
 import type { Retrato } from '../state/tipos';
 
 /** Só as que hoje jogam diferente. As outras duas ainda não existem. */
@@ -122,6 +123,8 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
           )}
         </div>
       )}
+
+      <Chat />
 
       {souHost ? (
         <div className="pilha" style={{ gap: 8 }}>

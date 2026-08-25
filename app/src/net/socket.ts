@@ -14,7 +14,9 @@ export type EstadoConexao =
   | 'CONECTADO'
   | 'RECONECTANDO'
   | 'SESSAO_ASSUMIDA'
-  | 'ENCERRADA';
+  | 'ENCERRADA'
+  /** O servidor fala outra versão do protocolo: recarregar é obrigatório. */
+  | 'DESATUALIZADO';
 
 export interface Ouvintes {
   aoReceber(mensagem: { type: string; payload: unknown }): void;

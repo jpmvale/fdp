@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react';
-import type { Avatar as AvatarProto } from '@fdp/protocol';
+import { PROTOCOL_VERSION, type Avatar as AvatarProto } from '@fdp/protocol';
 import { conectar, type Conexao } from './net/socket';
 import * as sessao from './net/sessao';
 import { frase } from './net/mensagens';
 import { useEstado, definir, ler, avisar, errar } from './state/loja';
 import type { Retrato } from './state/tipos';
-import { FaixaConexao } from './components/Conexao';
+import { BloqueioConexao, FaixaConexao, bloqueia } from './components/Conexao';
 import { Home } from './screens/Home';
 import { Lobby } from './screens/Lobby';
 import { Mesa, Resolucao } from './screens/Mesa';
@@ -35,13 +35,60 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Versão do PROTOCOLO, não do build: um deploy comum atravessa a partida sem
+  // incomodar ninguém (CA-046), e só uma incompatibilidade de verdade obriga a
+  // recarregar. Conferido na entrada e a cada volta de foco — que é quando a
+  // pessoa larga o celular no meio da partida e volta depois do deploy.
+  useEffect(() => {
+    const conferir = async () => {
+      try {
+        const r = await fetch('/api/health');
+        const d = (await r.json()) as { protocolVersion?: number };
+        if (typeof d.protocolVersion === 'number' && d.protocolVersion !== PROTOCOL_VERSION) {
+          definir({ conexao: 'DESATUALIZADO' });
+        }
+      } catch {
+        // Sem rede a checagem não diz nada; quem cuida disso é a reconexão.
+      }
+    };
+    void conferir();
+    const aoVoltar = () => { if (document.visibilityState === 'visible') void conferir(); };
+    document.addEventListener('visibilitychange', aoVoltar);
+    return () => document.removeEventListener('visibilitychange', aoVoltar);
+  }, []);
+
+  const voltarAoInicio = () => {
+    if (estado.codigo) sessao.esquecer(estado.codigo);
+    localStorage.removeItem('fdp.ultima');
+    conexao.current?.fechar();
+    definir({ tela: 'home', retrato: null, codigo: null, eu: null, conexao: 'CONECTADO' });
+  };
+
+  // "Jogar aqui": reabre o socket desta aba, que assume a sessão de volta.
+  const jogarAqui = () => {
+    const codigo = estado.codigo;
+    if (!codigo) return voltarAoInicio();
+    const token = sessao.guardado(codigo);
+    if (!token) return voltarAoInicio();
+    void sessao.retomarSessao(codigo, token).then(entrar).catch(voltarAoInicio);
+  };
+
+  const bloqueioAtual = (
+    <BloqueioConexao
+      estado={estado.conexao}
+      codigo={estado.codigo}
+      aoJogarAqui={jogarAqui}
+      aoVoltar={voltarAoInicio}
+    />
+  );
+
   const enviar = (tipo: string, payload?: unknown) =>
     conexao.current?.enviar(tipo as never, payload);
 
   if (estado.tela === 'home' || !estado.retrato) {
     return (
       <Casca>
-        <FaixaConexao estado={estado.tela === 'home' ? 'CONECTADO' : estado.conexao} />
+        <FaixaConexao estado={estado.tela === 'home' && !bloqueia(estado.conexao) ? 'CONECTADO' : estado.conexao} />
         {estado.tela === 'home' ? (
           <Home
             codigoInicial={new URLSearchParams(location.search).get('sala') ?? ''}
@@ -52,6 +99,7 @@ export function App() {
           <p className="fraco">Entrando na sala…</p>
         )}
         <Erro texto={estado.erro} />
+        {bloqueioAtual}
       </Casca>
     );
   }
@@ -115,6 +163,7 @@ export function App() {
 
       <Avisos avisos={estado.avisos} />
       <Erro texto={estado.erro} />
+      {bloqueioAtual}
     </Casca>
   );
 }

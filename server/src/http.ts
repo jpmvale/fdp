@@ -12,6 +12,7 @@ import { extname, join as caminhoDe } from 'node:path';
 import { Hono } from 'hono';
 import type { HttpBindings } from '@hono/node-server';
 import {
+  PROTOCOL_VERSION,
   AVATAR_COLORS,
   AVATAR_EMOJIS,
   LIMITS,
@@ -289,7 +290,12 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
     });
   });
 
-  app.get('/api/health', (c) => c.json({ ok: true, version, rooms: hub.roomCount }));
+    // `protocolVersion` e não só `version`: é a diferença entre "saiu versão
+  // nova" e "o seu cliente não fala mais a mesma língua". Só a segunda obriga
+  // o jogador a recarregar — um deploy comum atravessa a partida sem que
+  // ninguém precise fazer nada (CA-046).
+  app.get('/api/health', (c) =>
+    c.json({ ok: true, version, protocolVersion: PROTOCOL_VERSION, rooms: hub.roomCount }));
 
   // Cliente: o build do Vite. `clientPath` aponta para o diretório, e o
   // `index.html` dele é o mesmo para toda rota — é uma SPA, o roteamento é do

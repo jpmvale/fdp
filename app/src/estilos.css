@@ -1,3 +1,29 @@
+/* Inter, o tipo do design (`design/Main.dc.html`).
+ *
+ * Hospedada aqui, e não no Google Fonts, por duas razões: a CSP do servidor é
+ * fechada em `'self'` e abri-la para dois domínios de terceiro para buscar
+ * fonte é preço alto; e uma requisição externa no caminho crítico é uma coisa
+ * a mais que pode estar lenta entre o link e a primeira rodada.
+ *
+ * Só o subconjunto LATINO: é um arquivo variável que cobre os pesos 100–900, e
+ * os acentos do português (á é í ó ú ã õ ç â ê ô à) cabem todos em U+0000–00FF.
+ * Os outros seis subconjuntos do design — cirílico, grego, vietnamita — seriam
+ * 180 KB para servir idioma que a v1 não tem (RF-006 de `08`: só pt-BR).
+ *
+ * `swap`: o texto aparece na hora com a fonte do sistema e troca quando a
+ * Inter chega. Nunca uma tela em branco esperando tipo.
+ */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./fontes/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 /* Nocturne — o design system do FDP.
  *
  * Os valores vêm do canvas do Claude Design (`design/Main.dc.html`), lidos da

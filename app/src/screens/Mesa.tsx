@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react';
+import { LIMITS } from '@fdp/protocol';
 import { Carta } from '../components/Carta';
-import { CartaoJogador } from '../components/CartaoJogador';
+import { Chat } from '../components/Chat';
+import { Feltro } from '../components/Feltro';
 import { Vidas } from '../components/Vidas';
 import type { Retrato, PlayerView } from '../state/tipos';
 
@@ -19,30 +22,13 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
 
   return (
     <div className="pilha">
-      <Cabecalho partida={partida} />
+      <Cabecalho partida={partida} retrato={retrato} />
 
       {partida.isForeheadRound && <FaixaTesta />}
 
-      <div className="cartao pilha" style={{ gap: 3 }}>
-        {partida.playerOrder.map((id) => {
-          const jogador = retrato.players.find((p) => p.id === id);
-          if (!jogador) return null;
-          return (
-            <CartaoJogador
-              key={id}
-              jogador={jogador}
-              partida={partida}
-              souEu={id === eu}
-              ehHost={retrato.hostId === id}
-              ausente={ausentes.has(id)}
-            />
-          );
-        })}
-      </div>
+      <Feltro retrato={retrato} eu={eu} partida={partida} />
 
-      {partida.isForeheadRound
-        ? <Testa partida={partida} eu={eu} nome={nome} />
-        : <Vaza partida={partida} nome={nome} />}
+      {!partida.isForeheadRound && <EmpateNaVaza partida={partida} />}
 
       {!pausada && minhaVez && (
         partida.phase === 'APOSTAS'
@@ -62,23 +48,80 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
       {!partida.isForeheadRound && partida.hand.length > 0 && (
         <Mao partida={partida} selecionada={selecionada} aoSelecionar={aoSelecionar} podeJogar={minhaVez && partida.phase === 'VAZAS'} />
       )}
+
+      <Chat />
     </div>
   );
 }
 
-function Cabecalho({ partida }: { partida: PlayerView }) {
+function Cabecalho({ partida, retrato }: { partida: PlayerView; retrato: Retrato }) {
   const fase = partida.phase === 'APOSTAS' ? 'Fase de apostas' : 'Fase de vazas';
+  const daVez = partida.activePlayerId === retrato.match?.viewerId;
+  const estavel = retrato.status !== 'PAUSADA';
+
   return (
-    <div className="cartao" style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 14px' }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600 }}>
-          Rodada {partida.roundNumber} · {partida.cardsThisRound} {partida.cardsThisRound === 1 ? 'carta' : 'cartas'}
+    <div className="cartao" style={{ padding: '10px 0 0' }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '0 14px' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600 }}>
+            Rodada {partida.roundNumber} · {partida.cardsThisRound} {partida.cardsThisRound === 1 ? 'carta' : 'cartas'}
+          </div>
+          <div className="fraco">{fase}{daVez ? ' · vez de você' : ''}</div>
         </div>
-        <div className="fraco">{fase}</div>
+
+        {/* Ponto E palavra: cor sozinha não comunica estado (RF-026). */}
+        <span style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, color: 'var(--texto-fraco)' }}>
+          <span aria-hidden style={{
+            width: 7, height: 7, borderRadius: '50%',
+            background: estavel ? '#3fb98a' : 'var(--vidas)',
+          }} />
+          {estavel ? 'estável' : 'pausada'}
+        </span>
+
+        <button
+          className="fantasma"
+          aria-label="Regras e log da rodada"
+          style={{ minWidth: 44, width: 44, padding: 0 }}
+        >
+          ☰
+        </button>
       </div>
-      {partida.deckCount > 1 && (
-        <span className="rotulo" style={{ whiteSpace: 'nowrap' }}>{partida.deckCount} baralhos</span>
-      )}
+
+      <BarraDoTurno retrato={retrato} />
+    </div>
+  );
+}
+
+/**
+ * Timer como barra, nunca número em contagem (RF-027): mesma informação, muito
+ * menos ansiedade. Some quando não há prazo — barra parada mente sobre o que
+ * está acontecendo.
+ */
+function BarraDoTurno({ retrato }: { retrato: Retrato }) {
+  const [agora, setAgora] = useState(Date.now());
+  const prazo = retrato.phaseDeadline;
+
+  useEffect(() => {
+    if (prazo === null) return;
+    const t = setInterval(() => setAgora(Date.now()), 250);
+    return () => clearInterval(t);
+  }, [prazo]);
+
+  if (prazo === null || retrato.status === 'PAUSADA') {
+    return <div style={{ height: 4, margin: '10px 14px 14px' }} />;
+  }
+
+  const restante = Math.max(0, prazo - agora);
+  // A fração é do prazo mais longo do jogo (a aposta). Não é precisão de
+  // cronômetro — é a sensação de tempo passando, que é o que a barra entrega.
+  const fracao = Math.min(1, restante / LIMITS.betTimeoutMs);
+
+  return (
+    <div style={{ height: 4, borderRadius: 2, background: 'var(--superficie-2)', margin: '10px 14px 14px', overflow: 'hidden' }}>
+      <span style={{
+        display: 'block', height: '100%', width: `${fracao * 100}%`,
+        background: 'var(--acento)', transition: 'width 250ms linear',
+      }} />
     </div>
   );
 }
@@ -99,51 +142,15 @@ function FaixaTesta() {
   );
 }
 
-function Testa({ partida, eu, nome }: { partida: PlayerView; eu: string; nome: (id: string) => string }) {
+function EmpateNaVaza({ partida }: { partida: PlayerView }) {
+  const valor = partida.currentTrick?.annulledValue;
+  if (valor === null || valor === undefined) return null;
   return (
-    <div className="cartao pilha" style={{ gap: 10 }}>
-      <span className="rotulo">as cartas da mesa</span>
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-        {partida.playerOrder.map((id) => {
-          const souEu = id === eu;
-          // RJ-101: a própria carta NUNCA vem no payload. O verso aqui não é
-          // decisão de interface — é o que o servidor mandou.
-          const carta = souEu ? null : partida.foreheadCards[id] ?? null;
-          return (
-            <div key={id} style={{ textAlign: 'center', flex: '0 0 auto' }}>
-              <Carta carta={carta} rotulo={souEu ? 'a sua carta, que você não vê' : `carta de ${nome(id)}`} />
-              <div style={{ fontSize: 11, color: souEu ? 'var(--acento-claro)' : 'var(--texto-apagado)', marginTop: 4 }}>
-                {souEu ? 'você' : nome(id).slice(0, 8)}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function Vaza({ partida, nome }: { partida: PlayerView; nome: (id: string) => string }) {
-  const vaza = partida.currentTrick;
-  if (!vaza || vaza.plays.length === 0) return null;
-
-  return (
-    <div className="cartao pilha" style={{ gap: 10, background: 'var(--feltro-escuro)' }}>
-      <span className="rotulo">vaza {partida.trickNumber}</span>
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-        {vaza.plays.map((jogada) => (
-          <div key={jogada.playerId} style={{ textAlign: 'center', flex: '0 0 auto' }}>
-            <Carta carta={jogada.card} />
-            <div style={{ fontSize: 11, color: 'var(--texto-apagado)', marginTop: 4 }}>
-              {nome(jogada.playerId).slice(0, 8)}
-            </div>
-          </div>
-        ))}
-      </div>
-      {vaza.annulledValue !== null && (
-        // Empate silencioso parece defeito. Dizer é obrigação.
-        <p className="fraco">Empate em {vaza.annulledValue} — ninguém leva a vaza.</p>
-      )}
+    <div style={{
+      padding: '8px 12px', borderRadius: 'var(--r-md)', fontSize: 13,
+      background: 'rgba(255,255,255,0.05)', textAlign: 'center',
+    }}>
+      Empate em {valor} — ninguém leva a vaza.
     </div>
   );
 }
@@ -221,26 +228,63 @@ function Mao({ partida, selecionada, aoSelecionar, podeJogar }: {
   );
 }
 
+/**
+ * O acerto de contas da rodada, com a conta à vista.
+ *
+ * `livesLost` vem do servidor e NÃO é recalculado aqui. Eu tinha escrito
+ * `|fez − aposta|`, que acerta na rodada comum e erra na abortada (RJ-155),
+ * onde ninguém perde vida — a tela mostraria débito que não houve.
+ */
 export function Resolucao({ partida, nome }: { partida: PlayerView; nome: (id: string) => string }) {
   const ultima = partida.history[partida.history.length - 1];
   if (!ultima) return null;
+
+  const caiu = new Set(ultima.eliminatedThisRound);
+
   return (
     <div className="cartao pilha" style={{ gap: 8 }}>
-      <span className="rotulo">rodada {ultima.roundNumber} fechou</span>
-      {Object.entries(ultima.bets ?? {}).map(([id, aposta]) => {
-        const fez = ultima.tricksWon?.[id] ?? 0;
-        const erro = Math.abs(fez - (aposta as number));
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <span className="rotulo">rodada {ultima.roundNumber} · acerto de contas</span>
+        {ultima.aborted && <span className="fraco">rodada abortada</span>}
+      </div>
+
+      {partida.playerOrder.map((id) => {
+        const aposta = ultima.bets[id];
+        if (aposta === undefined) return null;
+        const fez = ultima.tricksWon[id] ?? 0;
+        const perdeu = ultima.livesLost[id] ?? 0;
+
         return (
-          <div key={id} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
-            <span style={{ flex: 1, minWidth: 0 }}>{nome(id)}</span>
-            {/* A conta à vista: um número que só muda não conta história. */}
-            <span style={{ color: 'var(--texto-fraco)' }}>
-              apostou {aposta as number} · fez {fez}
-            </span>
-            <span style={{ color: erro ? 'var(--vidas)' : 'var(--texto-medio)', fontWeight: 600 }}>
-              {erro ? `−${erro}` : 'certo'}
-            </span>
-            <Vidas quantas={partida.lives[id] ?? 0} />
+          <div key={id} className="pilha" style={{ gap: 4 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+              <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {nome(id)}
+              </span>
+              <span style={{ color: 'var(--texto-fraco)' }}>
+                apostou {aposta} · fez {fez}
+              </span>
+              <span style={{
+                color: perdeu > 0 ? 'var(--vidas)' : 'var(--texto-medio)',
+                fontWeight: 600, minWidth: 44, textAlign: 'right',
+              }}>
+                {perdeu > 0 ? `−${perdeu} ${perdeu === 1 ? 'vida' : 'vidas'}` : '✓ acertou'}
+              </span>
+            </div>
+
+            {/* Eliminação tem peso próprio: alguém saiu do jogo, e isso não pode
+                passar como mais uma linha de tabela. */}
+            {caiu.has(id) && (
+              <div style={{
+                display: 'flex', gap: 6, alignItems: 'center',
+                padding: '6px 10px', borderRadius: 'var(--r-sm)',
+                background: 'rgba(239,77,90,0.12)',
+                boxShadow: 'inset 0 0 0 1px var(--vidas)',
+                fontSize: 12,
+              }}>
+                <span aria-hidden>☠</span>
+                <span><b>{nome(id)}</b> zerou as vidas e está fora.</span>
+              </div>
+            )}
           </div>
         );
       })}
