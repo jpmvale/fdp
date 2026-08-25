@@ -139,6 +139,18 @@ input:focus { border-color: var(--acento); }
 .pilha { display: flex; flex-direction: column; gap: 12px; }
 .linha { display: flex; gap: 8px; align-items: center; }
 
+/* Texto só para leitor de tela. Um "2–8" sozinho não diz de quê; o ícone
+   resolve para quem enxerga e esta classe resolve para quem não enxerga. */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* O aviso de quem levou a vaza: entra e sai deslizando de leve. Some sozinho —
    é informação de passagem, e um banner que fica vira ruído em cima da mesa. */
 @keyframes aviso-vaza-entra {
@@ -150,6 +162,31 @@ input:focus { border-color: var(--acento); }
   opacity: 0;
   transform: translateY(-8px);
   transition: opacity 220ms ease-in, transform 220ms ease-in;
+}
+
+/* Balões: sobem do assento, ficam, e somem. Curto de propósito — a mesa é a
+   informação, e o balão é o aviso de que ela mudou. */
+@keyframes balao-entra {
+  from { opacity: 0; transform: translateX(-50%) translateY(6px) scale(0.94); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+.balao { animation: balao-entra 180ms ease-out; }
+.balao.saindo {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-8px);
+  transition: opacity 240ms ease-in, transform 240ms ease-in;
+}
+
+/* O coração que cai: o débito de vida é o momento de maior carga da partida
+   (`07` §2.4) e não pode ser um número que muda sozinho. */
+@keyframes coracao-cai {
+  0%   { opacity: 1; transform: translateY(0) rotate(0deg); }
+  70%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(18px) rotate(28deg); }
+}
+.coracao-caindo {
+  display: inline-block;
+  animation: coracao-cai 900ms ease-in forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {

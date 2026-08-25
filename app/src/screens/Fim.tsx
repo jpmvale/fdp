@@ -72,6 +72,9 @@ export function Fim({ retrato, eu, partida, aoRevanche, aoSair }: {
         })}
       </div>
 
+      <Numeros partida={partida} retrato={retrato} eu={eu} />
+      <Queda partida={partida} retrato={retrato} />
+
       {/* Toda tela precisa de uma ação de saída explícita (RF-025). Aqui
           faltava: quem não era host não tinha botão nenhum, e o host só tinha
           revanche — quem quisesse parar de jogar ficava preso na tela de fim,
@@ -85,6 +88,117 @@ export function Fim({ retrato, eu, partida, aoRevanche, aoSair }: {
           Se ficar, o host ainda pode pedir revanche com o mesmo grupo.
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Aposta contra mão feita, na partida inteira.
+ *
+ * É a pergunta que a mesa faz no fim — "você errou mais do que eu?" — e ela não
+ * estava em lugar nenhum: a tela mostrava só as vidas que sobraram, que é o
+ * resultado, não a história. Sai de `history`, somando rodada a rodada, e não
+ * de um contador acumulado: rodada abortada (RJ-155) não debita vida de
+ * ninguém, e um contador próprio erraria exatamente aí.
+ */
+function Numeros({ partida, retrato, eu }: {
+  partida: PlayerView; retrato: Retrato; eu: string;
+}) {
+  if (partida.history.length === 0) return null;
+
+  const linhas = partida.playerOrder.map((id) => {
+    let apostou = 0;
+    let fez = 0;
+    let acertos = 0;
+    let jogadas = 0;
+    for (const r of partida.history) {
+      const aposta = r.bets[id];
+      if (aposta === undefined) continue;
+      jogadas++;
+      apostou += aposta;
+      const feitas = r.tricksWon[id] ?? 0;
+      fez += feitas;
+      if (aposta === feitas) acertos++;
+    }
+    return { id, apostou, fez, acertos, jogadas };
+  }).filter((l) => l.jogadas > 0);
+
+  return (
+    <div className="cartao pilha" style={{ gap: 6 }}>
+      <span className="rotulo">aposta contra mãos feitas</span>
+      <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'var(--texto-apagado)', padding: '0 2px' }}>
+        <span style={{ flex: 1 }} />
+        <span style={{ width: 58, textAlign: 'right' }}>apostou</span>
+        <span style={{ width: 42, textAlign: 'right' }}>fez</span>
+        <span style={{ width: 54, textAlign: 'right' }}>acertou</span>
+      </div>
+      {linhas.map(({ id, apostou, fez, acertos, jogadas }) => {
+        const jogador = retrato.players.find((p) => p.id === id);
+        return (
+          <div key={id} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+            <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {jogador?.nickname ?? '?'}{id === eu ? ' · você' : ''}
+            </span>
+            <span style={{ width: 58, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{apostou}</span>
+            <span style={{ width: 42, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fez}</span>
+            <span style={{
+              width: 54, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+              color: acertos > 0 ? 'var(--texto)' : 'var(--texto-apagado)',
+            }}>
+              {acertos} de {jogadas}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Quem caiu, rodada a rodada.
+ *
+ * A classificação diz a ordem; isto diz a HISTÓRIA, que é do que a mesa
+ * lembra. Retirada por ausência entra junto, marcada como o que é — RJ-129 a
+ * separa da eliminação, e misturar as duas na mesma frase apagaria a diferença.
+ */
+function Queda({ partida, retrato }: { partida: PlayerView; retrato: Retrato }) {
+  const nome = (id: string) => retrato.players.find((p) => p.id === id)?.nickname ?? '?';
+
+  const saidasPorRodada = new Map<number, { id: string; abandonou: boolean }[]>();
+  for (const r of partida.history) {
+    for (const id of r.eliminatedThisRound) {
+      const lista = saidasPorRodada.get(r.roundNumber) ?? [];
+      lista.push({ id, abandonou: false });
+      saidasPorRodada.set(r.roundNumber, lista);
+    }
+  }
+  for (const w of partida.withdrawn) {
+    const lista = saidasPorRodada.get(w.roundNumber) ?? [];
+    lista.push({ id: w.playerId, abandonou: true });
+    saidasPorRodada.set(w.roundNumber, lista);
+  }
+
+  if (saidasPorRodada.size === 0) return null;
+
+  const rodadas = [...saidasPorRodada.keys()].sort((a, b) => a - b);
+
+  return (
+    <div className="cartao pilha" style={{ gap: 6 }}>
+      <span className="rotulo">quem saiu, e quando</span>
+      {rodadas.map((numero) => (
+        <div key={numero} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 13 }}>
+          <span style={{ color: 'var(--texto-apagado)', minWidth: 62 }}>rodada {numero}</span>
+          <span style={{ flex: 1 }}>
+            {saidasPorRodada.get(numero)!.map((s, i) => (
+              <span key={s.id}>
+                {i > 0 && ', '}
+                <b>{nome(s.id)}</b>
+                {s.abandonou ? ' (abandonou)' : ''}
+              </span>
+            ))}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

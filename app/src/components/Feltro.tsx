@@ -1,6 +1,7 @@
 import { Avatar } from './Avatar';
 import { Carta } from './Carta';
 import { Vaza, useRecolhimento, type JogadaNaMesa } from './Vaza';
+import { Balao, useBaloes } from './Balao';
 import type { PlayerView, PublicPlayer, Retrato } from '../state/tipos';
 
 /**
@@ -56,6 +57,7 @@ export function Feltro({ retrato, eu, partida }: {
       ? fechada?.plays ?? []
       : partida.currentTrick?.plays ?? [];
   const viajando = useRecolhimento(recolhendo, retrato.phaseDeadline);
+  const { baloes, descartar, perdasRecentes } = useBaloes(retrato.chat, partida);
 
   // O contador do meio cede o lugar às cartas: era ele que as cartas cobriam.
   const centroLivre = naMesa.length === 0;
@@ -108,6 +110,24 @@ export function Feltro({ retrato, eu, partida }: {
         eu={eu}
       />
 
+      {/* Balões por cima de tudo: são transitórios e não disputam espaço com
+          nada — some em segundos e a mesa continua legível por baixo. */}
+      {baloes.map((balao, i) => {
+        const { x, y } = ondeSenta(balao.playerId);
+        // Quantos balões do mesmo jogador vieram antes deste.
+        const empilhado = baloes.slice(0, i).filter((b) => b.playerId === balao.playerId).length;
+        return (
+          <Balao
+            key={balao.id}
+            balao={balao}
+            x={x}
+            y={y}
+            empilhado={empilhado}
+            aoSumir={descartar}
+          />
+        );
+      })}
+
       {daMinha.map((id, i) => {
         const jogador = retrato.players.find((p) => p.id === id);
         if (!jogador) return null;
@@ -125,6 +145,7 @@ export function Feltro({ retrato, eu, partida }: {
               x={x}
               y={y}
               carta={cartaDoAssento(partida, id, souEu)}
+              perdeu={perdasRecentes[id] ?? 0}
             />
           </div>
         );
@@ -196,7 +217,7 @@ function cartaDoAssento(partida: PlayerView, id: string, souEu: boolean) {
   return { mostra: true, carta: souEu ? null : partida.foreheadCards[id] ?? null };
 }
 
-function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta }: {
+function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta, perdeu }: {
   jogador: PublicPlayer;
   partida: PlayerView;
   souEu: boolean;
@@ -205,6 +226,8 @@ function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta }: {
   x: number;
   y: number;
   carta: { mostra: boolean; carta: import('@fdp/rules').Card | null };
+  /** Vidas que acabaram de ser debitadas: caem do próprio contador. */
+  perdeu: number;
 }) {
   const vez = partida.activePlayerId === jogador.id;
   const condenado = partida.mortoEmVaza?.[jogador.id] != null;
@@ -263,6 +286,14 @@ function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta }: {
           aria-label={`${vidas} ${vidas === 1 ? 'vida' : 'vidas'}`}
         >
           {vidas > 0 ? (vidas > 5 ? `♥×${vidas}` : '♥'.repeat(vidas)) : '☠'}
+          {/* Os corações debitados caem de onde estavam. O número novo já está
+              certo ao lado; estes são os que saíram, e existem só para a queda
+              ser vista em vez de deduzida. */}
+          {perdeu > 0 && (
+            <span aria-hidden className="coracao-caindo" style={{ opacity: 0.85 }}>
+              {'♥'.repeat(Math.min(perdeu, 3))}
+            </span>
+          )}
         </span>
         <span style={{ fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
           {aposta === undefined

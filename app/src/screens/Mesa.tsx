@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { LIMITS } from '@fdp/protocol';
 import { Carta } from '../components/Carta';
 import { Chat } from '../components/Chat';
+import { Historico } from '../components/Historico';
 import { Feltro } from '../components/Feltro';
 import { Vidas } from '../components/Vidas';
 import type { Retrato, PlayerView } from '../state/tipos';
@@ -54,6 +55,8 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
       )}
 
       <Chat mensagens={retrato.chat} eu={eu} aoEnviar={aoEnviarChat} />
+
+      <Historico partida={partida} jogadores={retrato.players} eu={eu} />
     </div>
   );
 }

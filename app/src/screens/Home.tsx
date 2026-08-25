@@ -20,14 +20,25 @@ export function Home({ aoCriar, aoEntrar, aoAbrirRegras, codigoInicial }: {
 
   return (
     <div className="pilha" style={{ gap: 16 }}>
-      <header className="pilha" style={{ gap: 6, paddingTop: 24 }}>
-        <span className="rotulo">jogo de mãos, aposta e blefe</span>
+      <header className="pilha" style={{ gap: 10, paddingTop: 24, alignItems: 'flex-start' }}>
         <h1 style={{ fontSize: 44, fontWeight: 500, letterSpacing: '-0.03em', lineHeight: 1 }}>
           FDP
         </h1>
-        <p style={{ color: 'var(--texto-medio)', fontSize: 15, textWrap: 'pretty' }}>
-          Mãos, aposta e blefe. De 2 a 8 pessoas, cada uma no seu celular.
-        </p>
+        {/* O que sobrou das duas linhas de texto: quantas pessoas cabem. É a
+            única coisa dali que alguém precisa saber antes de decidir entrar,
+            e cabe num símbolo. */}
+        <span
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '4px 10px', borderRadius: 999,
+            background: 'var(--superficie)', boxShadow: 'inset 0 0 0 1px var(--linha)',
+            color: 'var(--texto-medio)', fontSize: 14, fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          <IconeJogadores />
+          2–8
+          <span className="sr-only">jogadores</span>
+        </span>
       </header>
 
       <button onClick={aoCriar} style={{ height: 52 }}>Criar sala</button>
@@ -110,5 +121,17 @@ function CaixasDeCodigo({ valor, aoMudar }: { valor: string; aoMudar: (v: string
         }}
       />
     </div>
+  );
+}
+
+/** Duas silhuetas. Desenho, não emoji: emoji muda de forma a cada plataforma. */
+function IconeJogadores() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden focusable="false">
+      <circle cx="9" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="17" cy="9" r="2.4" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M15.5 15.2c2.6-.5 5 1.3 5 3.8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
   );
 }
