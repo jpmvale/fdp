@@ -42,11 +42,33 @@ function failWith(
 
 /** Toda mudança de estado passa por aqui: `stateVersion` nunca é esquecido. */
 function commit(room: Room, ctx: RoomCtx, emissions: Emission[]): RoomResult {
+  const sealed = sealMatchEnd(room, emissions);
   return {
     ok: true,
-    room: { ...room, stateVersion: room.stateVersion + 1, lastActivityAt: ctx.now },
+    room: { ...sealed, stateVersion: sealed.stateVersion + 1, lastActivityAt: ctx.now },
     emissions,
   };
+}
+
+/**
+ * Fecha a sala quando o motor encerra a partida.
+ *
+ * As saídas anormais — host encerrou, ausência, retirada — ajustam o status na
+ * mão, porque são decisões da sala. A vitória normal não: ela vem do motor, que
+ * por projeto não conhece sala nenhuma (RJ-143). Sem esta costura a partida
+ * acaba, `match:ended` sai, e a sala fica presa em `EM_PARTIDA` — com
+ * `host:rematch` recusado por status errado e quem chega virando espectador de
+ * uma mesa que já terminou.
+ *
+ * INV-05 exige partida **ativa** em `EM_PARTIDA`; é exatamente esta transição
+ * que a mantém verdadeira.
+ */
+export function sealMatchEnd(room: Room, emissions: Emission[]): Room {
+  if (room.status !== 'EM_PARTIDA') return room;
+  if (!room.match || room.match.endReason === null) return room;
+
+  emissions.push(all({ type: 'room:statusChanged', payload: { status: 'FIM_DE_PARTIDA' } }));
+  return { ...room, status: 'FIM_DE_PARTIDA', phaseDeadline: null, pause: null };
 }
 
 const all = (event: Emission['event']): Emission => ({ audience: 'ALL', event });

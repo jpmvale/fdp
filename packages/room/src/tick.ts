@@ -14,6 +14,7 @@ import {
   absentMatchPlayers,
   deadlineFor,
   dealNow,
+  sealMatchEnd,
   seatedPlayers,
   translate,
 } from './room.js';
@@ -81,6 +82,14 @@ export function tick(room: Room, ctx: RoomCtx): TickResult {
   step(advancePause(current, ctx));
   step(advanceMatchClock(current, ctx));
   step(expireRoom(current, ctx));
+
+  // O relógio tem ponto de escrita próprio: a costura de fim de partida
+  // precisa acontecer aqui também, e não só em `commit`.
+  const sealed = sealMatchEnd(current, emissions);
+  if (sealed !== current) {
+    current = sealed;
+    changed = true;
+  }
 
   return {
     room: changed ? { ...current, stateVersion: current.stateVersion + 1 } : current,

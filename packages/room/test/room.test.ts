@@ -451,3 +451,56 @@ describe('CA-043: resync', () => {
     }
   });
 });
+
+// --- fim de partida --------------------------------------------------------
+
+describe('INV-05: a sala fecha quando a partida termina', () => {
+  it('vitória normal leva a sala a FIM_DE_PARTIDA, não só a partida', () => {
+    let room = started(roomWith(3));
+    let now = 100;
+
+    // O relógio leva a partida ao fim por auto-play, sem ninguém jogar.
+    for (let i = 0; i < 4000 && room.match?.endReason === null; i++) {
+      now += 1000;
+      const result = tick(room, ctxAt(now));
+      if (result.changed) room = result.room;
+    }
+
+    expect(room.match?.endReason).toBe('VITORIA');
+    // A saída anormal já ajustava o status; a vitória normal vem do motor, que
+    // não conhece sala — sem a costura, `host:rematch` fica inalcançável.
+    expect(room.status).toBe('FIM_DE_PARTIDA');
+    expect(room.phaseDeadline).toBeNull();
+    expect(checkRoomInvariants(room)).toEqual([]);
+  });
+
+  it('o fim é anunciado: room:statusChanged acompanha match:ended', () => {
+    let room = started(roomWith(3));
+    let now = 100;
+    const vistos: string[] = [];
+
+    for (let i = 0; i < 4000 && room.match?.endReason === null; i++) {
+      now += 1000;
+      const result = tick(room, ctxAt(now));
+      if (!result.changed) continue;
+      room = result.room;
+      vistos.push(...types(result.emissions));
+    }
+
+    expect(vistos).toContain('match:ended');
+    expect(vistos.filter((t) => t === 'room:statusChanged').length).toBeGreaterThan(0);
+  });
+
+  it('depois da vitória a revanche é aceita', () => {
+    let room = started(roomWith(3));
+    let now = 100;
+    for (let i = 0; i < 4000 && room.match?.endReason === null; i++) {
+      now += 1000;
+      const result = tick(room, ctxAt(now));
+      if (result.changed) room = result.room;
+    }
+
+    const revanche = send(room, room.hostId!, { type: 'host:rematch', payload: {} }, now + 1000);
+    expect(revanche.ok).toBe(true);
+  });
+});

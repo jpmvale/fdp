@@ -22,10 +22,15 @@ export function checkRoomInvariants(room: Room): string[] {
     }
   }
 
-  // INV-05
+  // INV-05: "exatamente uma partida **ativa**". Partida encerrada não é ativa —
+  // a verificação antiga só olhava se existia partida, e por isso deixava
+  // passar uma sala presa em EM_PARTIDA com a partida já ganha.
   const shouldHaveMatch = room.status === 'EM_PARTIDA' || room.status === 'PAUSADA';
   if (shouldHaveMatch && room.match === null) {
     violations.push(`INV-05: status ${room.status} sem partida ativa`);
+  }
+  if (shouldHaveMatch && room.match !== null && room.match.endReason !== null) {
+    violations.push(`INV-05: status ${room.status} com partida já encerrada (${room.match.endReason})`);
   }
 
   // INV-14: pausada ⇔ existe jogador da partida ausente.
