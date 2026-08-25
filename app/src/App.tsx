@@ -8,7 +8,7 @@ import type { Retrato } from './state/tipos';
 import { BloqueioConexao, FaixaConexao, bloqueia } from './components/Conexao';
 import { Home } from './screens/Home';
 import { Perfil } from './screens/Perfil';
-import { Regras } from './screens/Regras';
+import { Menu } from './screens/Menu';
 import { Lobby } from './screens/Lobby';
 import { Mesa, Resolucao } from './screens/Mesa';
 import { Pausa } from './screens/Pausa';
@@ -121,7 +121,9 @@ export function App() {
 
         <Erro texto={estado.erro} />
         {bloqueioAtual}
-        {regrasAbertas && <Regras aoFechar={() => setRegrasAbertas(false)} />}
+        {regrasAbertas && estado.retrato && (
+          <Menu retrato={estado.retrato} partida={estado.retrato.match} aoFechar={() => setRegrasAbertas(false)} />
+        )}
       </Casca>
     );
   }
@@ -206,7 +208,9 @@ export function App() {
       <Avisos avisos={estado.avisos} />
       <Erro texto={estado.erro} />
       {bloqueioAtual}
-      {regrasAbertas && <Regras aoFechar={() => setRegrasAbertas(false)} />}
+      {regrasAbertas && (
+        <Menu retrato={retrato} partida={partida} aoFechar={() => setRegrasAbertas(false)} />
+      )}
     </Casca>
   );
 }
