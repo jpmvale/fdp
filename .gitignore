@@ -18,3 +18,8 @@ server/src/*.js
 server/src/*.d.ts
 app/src/*.js
 app/src/*.d.ts
+
+# Canvas semeado para publicação: 2,3 MB de editor empacotado, gerado a partir
+# de design/Main.dc.html, que é a fonte. Versionar o gerado convida alguém a
+# editá-lo por engano — e a edição se perde na próxima publicação.
+design/*-nocturne.html

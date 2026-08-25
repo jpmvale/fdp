@@ -121,13 +121,18 @@ observabilidade e o que ainda falta nela, em [`deploy/README.md`](deploy/README.
 
 ## O design
 
-Canvas do Claude Design, tema escuro, design system **Nocturne**:
-<https://claude.ai/code/artifact/555d5b00-2d30-42e7-aada-a2b2143e48d7>
+Canvas do Claude Design, tema escuro, design system **Nocturne**, com a paleta
+já corrigida: <https://claude.ai/code/artifact/f5dffc3b-96b6-405d-a8aa-bca500cf6ddb>
 
 A fonte editável vive em [`design/Main.dc.html`](design/Main.dc.html) — é dela
-que sai qualquer atualização do canvas. O artifact original é público e de outra
-conta; esta cópia foi recuperada extraindo o `.dc.html` de dentro da página
-publicada.
+que sai qualquer atualização do canvas. Para republicar, semeie e publique pelo
+`/design`; o arquivo gerado é saída de build e está no `.gitignore`.
+
+**Dois links antigos continuam circulando e nenhum dos dois se atualiza daqui**,
+porque são renders estáticos e não canvas editáveis:
+`555d5b00-…` (original, de outra conta) e `1f515ea6-…` (cópia publicada, ainda
+com a paleta velha e com o título errado, "Poker site elegante e moderno").
+Use o link de cima.
 
 **A interface implementada é fiel ao canvas**, com duas divergências
 deliberadas, ambas comentadas no código:
@@ -244,8 +249,6 @@ Nada obrigatório. O que sobrou é escolha, não dívida:
 - **Alertas de saturação** (CPU, memória, disco) ficaram de fora de propósito:
   numa VPS com quatro apps eles sobem por motivo legítimo e treinam a pessoa a
   ignorar notificação.
-- **Publicar o canvas atualizado.** `design/Main.dc.html` já tem a paleta e os
-  números corrigidos; o artifact publicado ainda mostra os antigos.
 - **A mesa inteira sob daltonismo**, que CA-344 não cobre — ele valida a paleta
   de avatares isolada, não feltro contra carta contra texto de estado. Continua
   como checagem manual em `08` §5.
