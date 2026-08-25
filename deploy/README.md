@@ -227,9 +227,21 @@ Parei a sonda e deixei `fdp-sonda-parada` disparar sozinha:
 | 17:26 | `inactive` — sonda restaurada, alerta resolveu sozinho |
 
 O alertmanager registrou o alerta com **`receivers: ['email-infra']`**, sem
-silenciamento nem inibição. Ou seja: regra → política → ponto de contato, os
-três elos verificados. O único trecho que não dá para observar daqui é o último
-salto, do SMTP do Grafana Cloud até a caixa de entrada.
+silenciamento nem inibição, e **os dois e-mails chegaram** — o de disparo e o de
+resolução. Métrica → regra → política → contato → caixa de entrada, sem nenhum
+elo por suposição.
+
+**O e-mail de resolução demora, e isso não é defeito.** Ele fica retido pelo
+`group_interval` de 5 min: depois de notificar um grupo, o Alertmanager só volta
+a notificar aquele grupo passados cinco minutos. O alerta disparou às 17:24 e
+resolveu às 17:26, então o "resolved" saiu por volta das 17:29. Quem não souber
+disso vai concluir que o aviso de resolução não funciona.
+
+**As regras têm três nós, não dois** — consulta → **redução** → limiar. A
+primeira versão que apliquei tinha só consulta e limiar, e funcionava: disparava
+na hora certa. Mas o e-mail chegava com a seção *Values* vazia, ou seja, "a
+sonda parou" sem dizer há quanto tempo. O nó de redução é o que dá valor ao
+aviso.
 
 Para repetir o teste:
 
