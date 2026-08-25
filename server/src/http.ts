@@ -8,6 +8,7 @@
 
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { extname, join as caminhoDe } from 'node:path';
 import { Hono } from 'hono';
 import type { HttpBindings } from '@hono/node-server';
 import {
@@ -290,12 +291,43 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
 
   app.get('/api/health', (c) => c.json({ ok: true, version, rooms: hub.roomCount }));
 
-  // Cliente: um arquivo, servido do disco. Recarrega a cada request para que
-  // editar o HTML não exija reiniciar o servidor.
+  // Cliente: o build do Vite. `clientPath` aponta para o diretório, e o
+  // `index.html` dele é o mesmo para toda rota — é uma SPA, o roteamento é do
+  // lado de lá.
+  const TIPOS: Record<string, string> = {
+    '.js': 'text/javascript; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.svg': 'image/svg+xml',
+    '.woff2': 'font/woff2',
+    '.png': 'image/png',
+    '.ico': 'image/x-icon',
+    '.webmanifest': 'application/manifest+json',
+  };
+
   app.get('*', (c) => {
+    const caminho = new URL(c.req.url).pathname;
+
+    // Ativos com hash no nome: imutáveis por definição, e o navegador pode
+    // guardá-los para sempre. `..` fica de fora — o cliente escolhe o caminho,
+    // e sem isto ele escolheria qualquer arquivo da máquina.
+    const ext = extname(caminho);
+    if (caminho.startsWith('/assets/') && !caminho.includes('..') && TIPOS[ext]) {
+      try {
+        const arquivo = readFileSync(caminhoDe(clientPath, caminho));
+        return c.body(arquivo, 200, {
+          'content-type': TIPOS[ext],
+          'cache-control': 'public, max-age=31536000, immutable',
+        });
+      } catch {
+        return c.notFound();
+      }
+    }
+
     const nonce = c.get('nonce' as never) as unknown as string;
-    const html = readFileSync(clientPath, 'utf8')
-      .replaceAll('<script type="module">', `<script type="module" nonce="${nonce}">`);
+    // O nonce entra nos scripts do build também: sem ele o CSP recusa o
+    // bundle, e a tela fica branca sem erro visível no servidor.
+    const html = readFileSync(caminhoDe(clientPath, 'index.html'), 'utf8')
+      .replaceAll('<script type="module"', `<script type="module" nonce="${nonce}"`);
     return c.html(html);
   });
 

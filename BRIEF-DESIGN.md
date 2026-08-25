@@ -39,6 +39,33 @@ fora, na sua testa, à vista de todos os outros. Você aposta olhando a cara dos
 adversários e as cartas deles. Essa é a tela mais distintiva do jogo e a que eu
 mais quero ver bem resolvida.
 
+### O que o FDP **não** tem — erros que já aconteceram
+
+O jogo se parece com Fodinha/Truco, e é fácil importar de lá coisas que aqui não
+existem. Nenhuma destas aparece na interface:
+
+- **Não existe trunfo, nem manilha, nem carta virada de trunfo.** Nada disso está
+  nas regras. Não escreva "TRUNFO ♠" em canto nenhum da tela.
+- **Naipe não tem efeito algum** (RJ-022): é só ilustração da carta. Portanto
+  **não existe "naipe da vaza"** e não há obrigação de seguir naipe (RJ-023) —
+  qualquer carta da mão é sempre jogável.
+- A vaza é decidida **só por valor**, na ordem `2 3 4 5 6 7 8 9 10 J Q K A`, com
+  `A` no topo. Empate em valor é empate de verdade e ninguém leva a vaza.
+
+**O chat de mesa ENTRA na v1.** Decisão do dono do produto em 25/08/2026,
+revertendo `docs/00` §4.2. Ele já aparece na Mesa, na rodada de testa, na pausa e
+no lobby, e continua. O cuidado que fica de pé é de espaço: a Mesa é a tela mais
+apertada do produto, então o chat não pode roubar altura das cartas nem do cartão
+de adversário.
+
+E o que está **fora do escopo da v1** (`docs/00` §4.2) — não desenhe, mesmo que
+pareça natural na tela:
+
+- Login, conta ou perfil que persista entre sessões.
+- Ranking global, conquistas, progressão, moeda ou cosméticos.
+- Salas públicas, matchmaking ou lista de partidas.
+- Bots, replays e modo pass-and-play.
+
 Público: grupos de amigos, adultos, jogando juntos. Não é um jogo para jogar
 sozinho contra estranhos, e não há salas públicas. A pessoa entra por um link que
 alguém mandou no grupo, e a métrica que importa é **do link até jogando em menos
@@ -242,6 +269,7 @@ Não são telas inteiras, mas preciso deles definidos:
 - **Não desenhe carta desabilitada** na fase de vazas: todas são sempre jogáveis.
 - **Não mostre a carta do próprio jogador** na rodada de testa, em hipótese
   alguma — nem "só para o mockup ficar mais bonito". É a regra central do jogo.
+- **Não invente trunfo, manilha ou "naipe da vaza".** Não existem no FDP.
 - **Nada de som como único canal** de qualquer informação.
 
 ## O que eu quero de volta

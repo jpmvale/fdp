@@ -1,0 +1,87 @@
+# Produção na VPS srv1876937, que hospeda coda, kindred e expense-analyzer.
+#
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Nenhum serviço publica porta no host: quem escuta de fora é o Caddy
+# compartilhado, que alcança a API pela rede `edge`. O Redis fica só na
+# `internal` — nem o Caddy o enxerga.
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: fdp-redis
+    restart: unless-stopped
+    # Redis PRÓPRIO do FDP, e não o `coda-redis-1` que já roda na máquina:
+    # compartilhar significaria que um `FLUSHALL` de um projeto derruba as
+    # partidas do outro, e que a memória de um é orçamento do outro.
+    #
+    # Sem `requirepass` porque a porta não sai da rede interna do compose. Se
+    # um dia este Redis for publicado, a senha deixa de ser opcional.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    # Sem persistência em disco de propósito (RNF-063): salas têm TTL de 4 h e
+    # perder tudo encerra as partidas em curso e nada mais. O que precisa
+    # sobreviver a reinício de PROCESSO já sobrevive — o Redis só cai junto com
+    # a máquina, e aí a partida acabou de qualquer jeito.
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  api:
+    # `image` + `build` juntos, como nos outros apps da máquina: local,
+    # `docker compose build` constrói e marca com este nome; na VPS,
+    # `docker compose pull` baixa do GHCR sem compilar nada. IMAGE_TAG é o sha
+    # do commit, injetado pela esteira.
+    image: ghcr.io/jpmvale/fdp:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fdp-api
+    restart: unless-stopped
+    environment:
+      # Obrigatório em produção: sem ele o processo recusa subir (RNF-075).
+      # Estável entre reinícios — trocá-lo invalida toda sessão viva e derruba
+      # as partidas em curso.
+      FDP_SESSION_SECRET: ${FDP_SESSION_SECRET:?defina FDP_SESSION_SECRET no .env.prod}
+      REDIS_URL: redis://redis:6379
+      ALLOWED_ORIGIN: https://fdp.imp-software.cloud
+      # Só é seguro PORQUE o Caddy está na frente e sobrescreve
+      # X-Forwarded-For. Nenhuma porta deste stack sai da máquina; se um dia
+      # sair, qualquer um forja o cabeçalho e contorna o rate limit (RNF-003).
+      TRUST_PROXY: "1"
+      PORT: "3000"
+      FDP_VERSION: ${IMAGE_TAG:-dev}
+    networks:
+      - internal
+      - edge
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    # `SIGTERM` e 20 s de janela: `main.ts` fecha as conexões avisando os
+    # clientes e persiste as salas sujas antes de sair. É o caminho que CA-046
+    # exercita — a partida atravessa o deploy.
+    stop_signal: SIGTERM
+    stop_grace_period: 20s
+    depends_on:
+      redis:
+        condition: service_healthy
+
+networks:
+  internal:
+    driver: bridge
+  # Criada fora do compose: `docker network create edge`. É por ela que o Caddy
+  # compartilhado alcança os projetos sem que eles se enxerguem entre si.
+  edge:
+    external: true

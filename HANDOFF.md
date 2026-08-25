@@ -113,28 +113,135 @@ Ao montar o cliente React, dois pontos já resolvidos que economizam trabalho:
 - `CLOSE_CODES` e `shouldReconnect` em `@fdp/protocol` dizem quando reconectar e
   quando parar de tentar.
 
-O brief para colar no claude.ai/design está em [`BRIEF-DESIGN.md`](BRIEF-DESIGN.md),
-com duas decisões deixadas em aberto de propósito — tema (escuro ou claro) e
-personalidade (acompanhar o deboche do nome ou contrastar com ele).
+O brief usado está em [`BRIEF-DESIGN.md`](BRIEF-DESIGN.md). **O design já foi
+feito** — ver a seção seguinte.
 
 Requisitos normativos completos em [`docs/07-requisitos-ui.md`](docs/07-requisitos-ui.md).
 
+## O design (revisão parcial — 25/08/2026)
+
+Artifact: <https://claude.ai/code/artifact/1f515ea6-794a-43c5-8a49-8964bf5f4407>
+
+Canvas único, tema escuro azul-marinho, design system batizado de **"Nocturne"**.
+As duas decisões que o brief deixou em aberto foram resolvidas como recomendado:
+escuro, e interface sóbria contrastando com o nome ("o deboche fica por conta dos
+jogadores").
+
+**O título do artifact está errado: "Poker site elegante e moderno".** O conteúdo
+é o FDP; só o nome ficou de outro trabalho. Vale renomear antes de compartilhar
+com alguém.
+
+### Entregue
+
+As 8 telas do brief, todas presentes. Atenção: Home, Perfil e Lobby estão
+agrupados **dentro da seção 5**, não como seção própria — ler só os cabeçalhos
+dá a impressão errada de que faltam.
+
+| Seção | Estados |
+|---|---|
+| 1. Fundamentos | tokens, paleta de 8 avatares, componentes |
+| 2. Mesa | apostas · meio de vaza · resolução da rodada |
+| 3. Rodada de testa | apostando às cegas · revelação |
+| 4. Partida pausada | antes da decisão · visão do host · visão de quem não é host |
+| 5. Fim de partida | + Lobby (host e host sozinho), Home, Perfil |
+| 6. Estados de conexão | os 5 de `07` §2.6 |
+
+### O que eu verifiquei e está certo
+
+- **RF-035 — a própria carta não vaza.** Conferi o HTML do bloco do jogador na
+  rodada de testa: é um verso puro com `?`, sem valor em atributo, sem elemento
+  escondido por CSS, sem `data-*`. O erro mais fácil de cometer não foi cometido.
+- **RF-030 a RF-034**: cartas dos outros de face para cima, texto explícito
+  ("você não vê a sua carta — todos os outros veem"), botões **Ganho**/**Perco**
+  em vez de 1/0, e na revelação a carta vira antes de o resultado aparecer.
+- **Aposta proibida** desabilitada, marcada `PROIBIDO`, com a razão escrita ao
+  lado. Ninguém descobre a regra errando.
+- **`2/1`** (vazas contra aposta), **vidas como ♥ repetido**, e o estado
+  condenado como **"☠ JÁ ERA — CAI NESTA RODADA"**.
+- **Débito de vidas com a conta à vista**: "apostou 2 · fez 1 → errou por 1".
+- **Auto-play anunciado**; **eliminação** com destaque próprio.
+- **Pausa**: nomeia quem caiu, mesa visível atrás, nenhum botão antes de a
+  decisão liberar, botões dizendo a consequência, contagem de 3 s ao retomar, e
+  a visão de quem não é host (RF-044) — que eu nem tinha pedido explicitamente.
+- **Fim de partida**: a vitória de RJ-005 explicada em texto, e quem abandonou
+  abaixo de todos (RJ-129).
+- **Paleta** entregue com tabela de três colunas: visão normal, deuteranopia e
+  protanopia.
+
+### Problemas encontrados — conferidos contra `docs/`
+
+**1. Trunfo não existe no FDP.** A tela da Mesa mostra `NAIPE DA VAZA ♦ · TRUNFO
+♠`. Não há uma única menção a trunfo ou manilha em `docs/`. Foi importado do
+Fodinha/Truco por hábito.
+
+**2. "Naipe da vaza" contradiz RJ-023**, que é explícito: "Não existe obrigação
+de seguir naipe. Qualquer carta da mão é sempre jogável." Pior: a **mesma tela**
+diz "toda carta é jogável" logo abaixo. As duas coisas não podem estar certas.
+
+**3. ~~Chat de mesa~~ — NÃO é problema. O chat entra na v1.** Decisão do dono do
+produto em 25/08/2026. Eu tinha marcado como fora de escopo porque `docs/00`
+§4.2 lista "chat de texto ou voz" entre o que não entra na v1, com razão
+registrada, e a tabela de riscos tem a linha "escopo inflar com chat/ranking →
+não entrega a v1". A decisão reverte isso: o chat fica na Mesa, na rodada de
+testa, na pausa e no lobby, como o design já desenhou.
+
+**`docs/00` §4.2 ainda diz o contrário e precisa ser atualizado** — `docs/` é a
+fonte da verdade deste projeto, então enquanto ele não mudar existe uma
+contradição registrada. Mexer nele significa tirar o chat da lista de exclusões,
+criar o RF do chat em §4.1 e rever aquela linha da tabela de riscos. Não fiz
+sozinho: é documento normativo.
+
+Sobram dois erros de brief, não do design: `BRIEF-DESIGN.md` não dizia que não há
+trunfo nem citava RJ-023. Isso já está corrigido.
+
+### O que eu NÃO verifiquei
+
+A revisão parou no meio. Ficou de fora:
+
+- **A afirmação de ΔE 21,8.** O design diz que a menor distância perceptual entre
+  dois avatares é ΔE 21,8 **nas três condições ao mesmo tempo**, por simulação
+  Viénot 1999, e que todas passam de 5,4:1 contra o feltro. Eu ia recalcular e
+  não cheguei a rodar. **Trate como não verificado** — é justamente o tipo de
+  número que soa autoritativo e passa sem conferência. Os 8 valores de "visão
+  normal" estão na seção 1 do canvas.
+- **Contraste de texto (RNF-030)** nas telas, medido de verdade.
+- **Comportamento em 360 px reais**: o canvas é uma página larga com as telas
+  lado a lado; ninguém abriu isso num viewport de 360.
+- Alvos de toque medidos (o canvas *afirma* 44×44 e cartas de 48×68).
+
+### Próximo passo sugerido
+
+1. Renomear o artifact.
+2. ~~Corrigir `BRIEF-DESIGN.md`~~ — **feito em 25/08/2026**: o brief agora tem a
+   seção "O que o FDP **não** tem" (sem trunfo, naipe sem efeito por RJ-022, sem
+   seguir naipe por RJ-023) e a lista do que está fora de escopo na v1
+   (`docs/00` §4.2), mais dois itens em "O que não fazer".
+3. Pedir a correção das telas afetadas — só trunfo e naipe da vaza; o chat fica.
+   Decidir o que fazer com `docs/00` §4.2, que ainda proíbe o chat.
+4. Retomar a verificação: ΔE, contraste e 360 px.
+
 ## Pendências fora da UI
 
-**VPS (Hostinger).** Os artefatos existem e estão commitados — `deploy/Caddyfile`,
-`deploy/fdp.service`, `deploy/deploy.sh` e o roteiro passo a passo em
-`deploy/README.md`. O servidor já está pronto: lê segredo do ambiente, confia em
-`X-Forwarded-For` sob `TRUST_PROXY` e sai limpo no `SIGTERM`.
+**VPS (Hostinger) — no ar desde 25/08/2026, faltando só o DNS.**
 
-**Nada disso foi executado.** Para rodar, falta:
+A máquina não era o que o roteiro antigo supunha: `srv1876937` já hospeda coda,
+kindred e expense-analyzer, com **Caddy em container** segurando 80/443. O
+roteiro bare-metal (apt Caddy, systemd, ufw) teria disputado a porta com o proxy
+dos outros três apps. Foi descartado; o FDP seguiu a convenção da máquina.
 
-1. Host e usuário — a chave SSH está no Mac do usuário, não nesta máquina
-2. Domínio apontando para a VPS (o Caddy precisa dele para o TLS automático)
-3. Saída de `ssh <host> "nproc; free -h; df -h /; cat /etc/os-release | head -2"`
+Estado hoje: `fdp-api` e `fdp-redis` rodando e saudáveis, sem publicar porta;
+bloco `fdp.imp-software.cloud` no Caddyfile compartilhado, validado e recarregado
+(os outros três sites seguem respondendo 200); sonda de observabilidade no cron.
 
-Com isso, o roteiro de `deploy/README.md` roda do começo ao fim, e a verificação
-final dele é CA-046: `systemctl restart` no meio de uma partida e as três abas
-continuam de onde pararam.
+**O que falta é uma coisa só, e é sua: criar o registro A de
+`fdp.imp-software.cloud` apontando para 187.77.242.128.** Hoje dá NXDOMAIN, então
+o Let's Encrypt não emite o certificado e o site não abre. Assim que o DNS
+propagar, o Caddy emite sozinho — nada a rodar do nosso lado.
+
+Depois disso, falta verificar **CA-046 pelo domínio** (três abas, `docker restart
+fdp-api`, a partida continua), registrar o app em `~/bin/deploy.sh` com workflow
+no GitHub Actions, e escrever as regras de alerta no Grafana. Detalhes em
+[`deploy/README.md`](deploy/README.md).
 
 **Vercel foi descartada** por custo do Redis gerenciado. A integração foi removida e
 o projeto desvinculado — não há nada sendo cobrado.

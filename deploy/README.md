@@ -1,179 +1,141 @@
 # Instalação na VPS
 
-Um processo Node persistente atrás do Caddy, com Redis local (`11` §1). Tudo aqui
-é feito **uma vez**; depois, subir versão nova é `./deploy/deploy.sh usuario@host`.
+**Esta VPS não é uma máquina vazia.** `srv1876937` (187.77.242.128) hospeda
+coda, kindred e expense-analyzer, com um **Caddy em container** segurando 80/443
+e roteando por subdomínio pela rede `edge`. Deploy dos outros três é por
+GitHub Actions → chave com forced command → `~/bin/deploy.sh <app> <tag>`,
+puxando imagem do GHCR.
 
-Requisitos: Debian 12 ou Ubuntu 22.04+, acesso `sudo`, e um domínio já apontando
-para o IP da VPS — o Caddy precisa dele resolvendo antes de emitir o certificado.
+A versão anterior deste roteiro instalava Caddy por apt, criava unidade systemd
+e mexia no `ufw`. Aplicada aqui, ela disputaria 80/443 com o proxy que serve os
+outros três apps. Foi descartada em 25/08/2026, e o FDP passou a seguir a
+convenção da máquina.
 
-## 1. Pacotes
+## Como está montado
 
-```bash
-sudo apt update && sudo apt install -y curl ca-certificates gnupg rsync ufw
-```
+| Peça | Onde |
+|---|---|
+| Fonte na VPS | `~/apps/fdp` (rsync a partir do repositório) |
+| Stack | `docker-compose.prod.yml` na raiz do repositório |
+| Containers | `fdp-api` e `fdp-redis`, nenhum publicando porta no host |
+| Redes | `internal` (Redis) e `edge` (só a API, para o Caddy alcançar) |
+| Segredo | `~/apps/fdp/.env.prod`, modo 600 |
+| Roteamento | bloco `fdp.imp-software.cloud` em `~/caddy/Caddyfile` (cópia em [`Caddyfile`](Caddyfile)) |
+| Sonda | `~/bin/metrica-fdp.sh` no cron de minuto (cópia em [`metrica-fdp.sh`](metrica-fdp.sh)) |
 
-**Node 24.** A distribuição traz uma versão velha demais:
+O Redis é **próprio** do FDP, e não o `coda-redis-1` que já roda na máquina:
+compartilhar significaria que um `FLUSHALL` de um projeto derruba as partidas do
+outro. Roda sem persistência em disco de propósito (RNF-063) — salas têm TTL de
+4 h, e perder tudo encerra as partidas em curso e nada mais.
 
-```bash
-curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
-sudo apt install -y nodejs
-node --version    # precisa ser v24.x
-```
+## Primeira instalação
 
-**Redis.**
-
-```bash
-sudo apt install -y redis-server
-```
-
-## 2. Redis só no loopback
-
-Nunca exposto à internet (`11` §7). Confirme os dois valores em
-`/etc/redis/redis.conf`:
-
-```
-bind 127.0.0.1 -::1
-protected-mode yes
-```
+Feita em 25/08/2026. Para refazer do zero:
 
 ```bash
-sudo systemctl enable --now redis-server
-redis-cli ping     # PONG
+ssh vps 'mkdir -p ~/apps/fdp'
+rsync -az --delete --exclude '.git' --exclude 'node_modules' --exclude '.env*' \
+  ./ vps:~/apps/fdp/
+
+# Segredo estável entre reinícios: trocá-lo invalida toda sessão viva e derruba
+# as partidas em curso (RNF-075).
+ssh vps 'cd ~/apps/fdp && umask 077 && \
+  printf "FDP_SESSION_SECRET=%s\nIMAGE_TAG=%s\n" "$(openssl rand -hex 32)" "$(git rev-parse --short HEAD)" > .env.prod'
+
+ssh vps 'cd ~/apps/fdp && docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build'
 ```
 
-Sem senha é aceitável **porque** a porta não sai da máquina. Se um dia o Redis
-passar a escutar em outra interface, `requirepass` deixa de ser opcional.
-
-## 3. Usuário e diretórios
-
-O serviço roda como usuário próprio, sem shell: se o processo for comprometido,
-o que se ganha é o mínimo.
+Depois, o bloco de [`Caddyfile`](Caddyfile) vai para o **fim** de
+`~/caddy/Caddyfile` (nunca substituindo o arquivo — ele serve os outros três
+sites), e então:
 
 ```bash
-sudo useradd --system --home /opt/fdp --shell /usr/sbin/nologin fdp
-sudo mkdir -p /opt/fdp /etc/fdp
-sudo chown fdp:fdp /opt/fdp
+ssh vps 'docker exec caddy caddy validate --config /etc/caddy/Caddyfile && \
+         docker exec caddy caddy reload --config /etc/caddy/Caddyfile'
 ```
 
-## 4. Segredos
+O TLS é emitido no primeiro acesso, e depende do DNS já estar apontando.
 
-`FDP_SESSION_SECRET` é **obrigatório em produção** — sem ele o processo recusa
-subir (RNF-075). Ele precisa ser estável entre reinícios: trocá-lo invalida toda
-sessão viva e derruba as partidas em curso.
+## Subir versão nova
+
+Enquanto não houver imagem no GHCR nem workflow de deploy, é rsync e rebuild:
 
 ```bash
-sudo tee /etc/fdp/env > /dev/null <<EOF
-FDP_SESSION_SECRET=$(openssl rand -hex 32)
-REDIS_URL=redis://127.0.0.1:6379
-ALLOWED_ORIGIN=https://SEU-DOMINIO.com
-TRUST_PROXY=1
-PORT=3000
-EOF
-
-sudo chown root:fdp /etc/fdp/env
-sudo chmod 640 /etc/fdp/env
+rsync -az --delete --exclude '.git' --exclude 'node_modules' --exclude '.env*' \
+  ./ vps:~/apps/fdp/
+ssh vps 'cd ~/apps/fdp && docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build'
 ```
 
-`TRUST_PROXY=1` só é seguro **porque** o Caddy está na frente e sobrescreve
-`X-Forwarded-For`. Se a porta 3000 ficar acessível de fora, qualquer um forja o
-cabeçalho e contorna o rate limit de RNF-003 — daí o firewall do passo 7 não ser
-opcional.
+O container tem `stop_grace_period: 20s` e recebe `SIGTERM`: `main.ts` avisa os
+clientes, persiste as salas sujas e sai. É o caminho que **CA-046** exercita — a
+partida atravessa o deploy.
 
-## 5. Primeiro envio do código
-
-Da sua máquina:
+## Verificar
 
 ```bash
-rsync -az --delete --exclude '.git' --exclude 'node_modules' \
-  ./ usuario@host:/opt/fdp/
-
-ssh usuario@host 'cd /opt/fdp && npm ci --omit=dev && sudo chown -R fdp:fdp /opt/fdp'
+curl -s https://fdp.imp-software.cloud/api/health
 ```
 
-Não há passo de build: o repositório roda dos fontes TypeScript sob `tsx`, que
-por isso está em `dependencies` e não em `devDependencies`. Os pacotes do
-workspace exportam `.ts` e os imports usam `.js` — convenção ESM do TypeScript
-que o resolvedor do Node não mapeia de volta, então `node` puro não sobe o
-processo.
-
-> Empacotar tudo num único `.js` com esbuild é a alternativa, e vale a pena
-> quando o tempo de subida começar a incomodar. Hoje não incomoda, e um passo de
-> build a menos é um jeito a menos de o que roda divergir do que está commitado.
-
-## 6. systemd
-
-```bash
-sudo cp /opt/fdp/deploy/fdp.service /etc/systemd/system/fdp.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now fdp
-
-systemctl status fdp
-curl -s localhost:3000/api/health     # {"ok":true,...}
-```
-
-Logs: `journalctl -u fdp -f`.
-
-## 7. Firewall
-
-A porta 3000 **não sai da máquina** (`11` §7). Só 80, 443 e SSH.
-
-```bash
-sudo ufw allow OpenSSH
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw --force enable
-sudo ufw status
-```
-
-## 8. Caddy
-
-```bash
-sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
-  | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
-  | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-sudo apt update && sudo apt install -y caddy
-```
-
-Edite `deploy/Caddyfile` trocando `SEU-DOMINIO.com` e `SEU-EMAIL@exemplo.com`,
-depois:
-
-```bash
-sudo cp /opt/fdp/deploy/Caddyfile /etc/caddy/Caddyfile
-sudo caddy validate --config /etc/caddy/Caddyfile
-sudo systemctl reload caddy
-```
-
-O TLS é emitido no primeiro acesso. Se falhar, quase sempre é DNS ainda não
-propagado: `journalctl -u caddy -n 50`.
-
-## 9. Verificar
-
-```bash
-curl -s https://SEU-DOMINIO.com/api/health
-```
-
-E o teste que realmente importa — **CA-046**, a partida sobrevivendo a um deploy:
+E o teste que realmente importa — **CA-046**:
 
 1. Abra o site em três abas anônimas, crie a sala, entre nas outras duas e inicie.
-2. `sudo systemctl restart fdp`
+2. `ssh vps 'docker restart fdp-api'`
 3. As três abas reconectam sozinhas e a partida continua na mesma rodada.
 
-Se a janela de restart passar de 10 s (`TRANSPORT_GRACE`), a mesa pausa nomeando
-quem caiu e retoma sozinha quando todos voltam — também correto, só mais visível.
+Se a janela passar de 10 s (`TRANSPORT_GRACE`), a mesa pausa nomeando quem caiu
+e retoma sozinha quando todos voltam — também correto, só mais visível.
+
+## Observabilidade
+
+O Alloy da máquina (`coda-alloy-1`) **não precisou de nenhuma alteração**, e isso
+é mérito de como ele foi escrito:
+
+- **Containers**: o cAdvisor descobre sozinho. `fdp-api` e `fdp-redis` já
+  aparecem com CPU, memória e rede, sem configurar nada.
+- **Aplicação**: a sonda escreve `vps_fdp_*` em `~/metricas/fdp.prom`, lido pelo
+  textfile collector do node exporter. A lista de permissão do
+  `vps-metricas.alloy` já aceita `vps_.*` — foi escrita como lista de permissão
+  justamente para que métrica nova flua sem edição.
+
+O que a sonda mede e o cAdvisor não responde: se o **caminho inteiro** funciona
+— DNS, TLS, Caddy e aplicação, na ordem que o jogador percorre. Um container
+"Up" com o Caddy roteando errado é a falha que a métrica de container não
+enxerga.
+
+| Métrica | O que é |
+|---|---|
+| `vps_fdp_disponivel` | 1 se `/api/health` respondeu 2xx pelo domínio público |
+| `vps_fdp_sonda_latencia_ms` | tempo da sonda, do DNS à resposta |
+| `vps_fdp_ultima_sonda_segundos` | timestamp da última execução — pega "o cron parou" |
+| `vps_fdp_salas` | salas vivas, de `/api/health` |
+| `vps_fdp_versao{versao}` | versão no ar |
+
+Numa queda, `vps_fdp_salas` **preserva a última contagem conhecida** em vez de
+publicar 0: zero salas e "não sei" são estados diferentes, e um gráfico que
+despenca a zero durante um incidente conta a história errada depois.
+
+Falta escrever as regras de alerta no Grafana. As duas que valem: `vps_fdp_disponivel == 0`
+por alguns minutos, e `time() - vps_fdp_ultima_sonda_segundos > 300` (a sonda
+parou, e o silêncio não pode significar "tudo bem").
 
 ## Operação
 
 | Tarefa | Comando |
 |---|---|
-| Subir versão nova | `./deploy/deploy.sh usuario@host` |
-| Ver logs | `ssh host journalctl -u fdp -f` |
-| Reiniciar | `ssh host sudo systemctl restart fdp` |
-| Salas vivas | `ssh host 'redis-cli --scan --pattern "room:*"'` |
-| Versão no ar | `curl -s https://SEU-DOMINIO.com/api/health` |
+| Ver logs | `ssh vps 'docker logs -f fdp-api'` |
+| Reiniciar | `ssh vps 'docker restart fdp-api'` |
+| Salas vivas | `ssh vps 'docker exec fdp-redis redis-cli --scan --pattern "room:*"'` |
+| Versão no ar | `curl -s https://fdp.imp-software.cloud/api/health` |
+| Rodar a sonda à mão | `ssh vps '~/bin/metrica-fdp.sh && cat ~/metricas/fdp.prom'` |
 
-**Backup não é necessário.** O Redis aqui guarda salas com TTL de 4 h; perder
-tudo encerra as partidas em curso e nada mais (RNF-063). O que precisa de backup
-é o repositório, que já vive no git, e `/etc/fdp/env` — que você consegue
-regenerar, ao custo de derrubar as sessões vivas.
+**Backup não é necessário.** O Redis guarda salas com TTL de 4 h; perder tudo
+encerra as partidas em curso e nada mais (RNF-063). O que precisa de backup é o
+repositório, que já vive no git, e `~/apps/fdp/.env.prod` — que você regenera, ao
+custo de derrubar as sessões vivas.
+
+## O que ainda falta
+
+- **Registro em `~/bin/deploy.sh`** e workflow de deploy no GitHub Actions, como
+  os outros três apps. Hoje a imagem é construída na própria VPS; o registro só
+  faz sentido quando houver imagem no GHCR, senão cria um caminho quebrado.
+- **Regras de alerta** no Grafana sobre as métricas acima.

@@ -11,17 +11,25 @@
     "typecheck": "tsc -b --pretty",
     "dev": "tsx watch server/src/main.ts",
     "start": "tsx server/src/main.ts",
-    "redis": "docker run --rm -p 6379:6379 --name fdp-redis redis:7-alpine"
+    "redis": "docker run --rm -p 6379:6379 --name fdp-redis redis:7-alpine",
+    "dev:client": "vite --config app/vite.config.ts",
+    "build:client": "vite build --config app/vite.config.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
     "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^5.2.0",
     "typescript": "^5.7.2",
+    "vite": "^7.3.6",
     "vitest": "^3.0.5"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
     "hono": "^4.13.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "tsx": "^4.23.12",
     "ws": "^8.21.3",
     "zod": "^4.4.3"

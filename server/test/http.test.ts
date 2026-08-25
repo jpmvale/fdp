@@ -13,7 +13,9 @@ import { createPersistence } from '../src/persistence.js';
 import { createSigner, type SessionSigner } from '../src/session.js';
 
 const SECRET = 'segredo-de-teste-com-32-caracteres!';
-const CLIENT = fileURLToPath(new URL('../../app/index.html', import.meta.url));
+// O diretório do build do Vite, não um arquivo: o cliente virou uma SPA com
+// ativos próprios (`11` §6), e o servidor serve o diretório inteiro.
+const CLIENT = fileURLToPath(new URL('../../app/build/', import.meta.url));
 
 let hub: Hub;
 let signer: SessionSigner;
@@ -276,7 +278,7 @@ describe('RNF-005 / RNF-078: cabeçalhos de segurança', () => {
 
     const nonce = /script-src 'nonce-([^']+)'/.exec(csp)?.[1];
     expect(nonce).toBeTruthy();
-    expect(html).toContain(`<script type="module" nonce="${nonce}">`);
+    expect(html).toContain(`<script type="module" nonce="${nonce}"`);
   });
 
   it('o nonce muda a cada resposta', async () => {

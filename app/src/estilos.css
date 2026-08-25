@@ -1,0 +1,114 @@
+/* Nocturne — o design system do FDP.
+ *
+ * Os valores vêm do canvas do Claude Design (`design/Main.dc.html`), lidos da
+ * seção 1 e não arredondados: trocar #17395a por um verde "de mesa" qualquer
+ * quebra as razões de contraste que a paleta de avatares foi otimizada para
+ * atender. */
+
+:root {
+  --fundo: #080b14;
+  --superficie: #131a26;
+  --superficie-2: #1c2432;
+  --poco: #0d121c;
+  --feltro-claro: #17395a;
+  --feltro-escuro: #0b1f33;
+  --linha: #2a3242;
+  --acento: #9184d9;
+  --acento-claro: #b5abfc;
+  --vidas: #ef4d5a;
+  --texto: #e9e9ed;
+  --texto-fraco: #9397ab;
+  --texto-apagado: #75798c;
+  --texto-medio: #b2b6ca;
+
+  /* Paleta de avatares (`07` §4). A ordem é a de AVATAR_COLORS no protocolo —
+   * o índice é o contrato entre servidor e cliente. */
+  --avatar-amber: #c7b467;
+  --avatar-teal: #0eb09e;
+  --avatar-rose: #ff4983;
+  --avatar-indigo: #6594fa;
+  --avatar-lime: #4ebf00;
+  --avatar-sky: #83d2ff;
+  --avatar-orange: #f86111;
+  --avatar-violet: #b580ca;
+
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+
+  /* Alvo de toque mínimo de RF-021. Nomeado para não virar 40 por descuido. */
+  --toque: 44px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 100dvh;
+  /* RF-020: nenhuma tela rola na horizontal em 360 px. */
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+}
+
+button, input { font: inherit; color: inherit; }
+
+button {
+  min-height: var(--toque);
+  border: 0;
+  border-radius: var(--r-md);
+  background: var(--acento);
+  color: #12101d;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0 16px;
+}
+button:disabled { opacity: 0.38; cursor: not-allowed; }
+button.fantasma {
+  background: transparent;
+  color: var(--texto);
+  box-shadow: inset 0 0 0 1px var(--linha);
+}
+button.perigo { background: transparent; color: var(--vidas); box-shadow: inset 0 0 0 1px var(--vidas); }
+
+/* Foco visível com 3:1 contra o fundo (RNF-030). O anel é o mesmo em todo
+ * elemento focável: aprender uma vez basta. */
+:focus-visible { outline: 2px solid var(--acento-claro); outline-offset: 2px; }
+
+input {
+  width: 100%;
+  min-height: var(--toque);
+  padding: 0 12px;
+  border-radius: var(--r-md);
+  background: var(--poco);
+  border: 1px solid var(--linha);
+}
+input:focus { border-color: var(--acento); }
+
+.rotulo {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--texto-apagado);
+}
+
+.fraco { color: var(--texto-fraco); font-size: 13px; }
+
+.cartao {
+  background: var(--superficie);
+  border: 1px solid var(--linha);
+  border-radius: var(--r-lg);
+  padding: 14px;
+}
+
+.pilha { display: flex; flex-direction: column; gap: 12px; }
+.linha { display: flex; gap: 8px; align-items: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

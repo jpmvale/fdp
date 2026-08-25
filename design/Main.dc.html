@@ -1,0 +1,1532 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <style>/* cyrillic-ext */
+:root {
+  --color-bg: #161826;
+  --color-surface: #232532;
+  --color-text: #e9e9ed;
+  --color-accent: #9184d9; /* review round 7 (Barron): the accent moves to
+     the product's blurple — OKLCH hue 289.2, the hue of the app's own Pro
+     accent (#9a8fe0, --om-accent-pro) — at the same lightness the steel
+     accent held (L 0.660, so the documented ratios survive) and chroma
+     in the product blurple's own range (its token sits at C 0.118; the
+     accent takes 0.125, from the old steel's 0.030):
+     the accent now reads as an accent rather than another neutral. */
+  --color-accent-2: #a7a1db; /* the machine-derived stand-in follows: same
+     hue, same L 0.734, chroma at the same 2:3 proportion it held */
+  --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
+
+  /* Tonal ramps — generated in OKLCH on one shared lightness scale, so the
+     same step of any role matches the others in visual value. */
+  --color-neutral-100: #f3f5fe;
+  --color-neutral-200: #e4e7f5;
+  --color-neutral-300: #cfd3e5;
+  --color-neutral-400: #b2b6ca;
+  --color-neutral-500: #9397ab;
+  --color-neutral-600: #75798c;
+  --color-neutral-700: #595d6c;
+  --color-neutral-800: #3f424d;
+  --color-neutral-900: #292b31;
+
+  --color-accent-100: #f5f4ff;
+  --color-accent-200: #e7e5fe;
+  --color-accent-300: #d2cefd;
+  --color-accent-400: #b5abfc;
+  --color-accent-500: #968ae0;
+  --color-accent-600: #796cbf;
+  --color-accent-700: #5d5294;
+  --color-accent-800: #423a6a;
+  --color-accent-900: #2b2741;
+
+  --color-accent-2-100: #f5f4ff;
+  --color-accent-2-200: #e7e5fe;
+  --color-accent-2-300: #d2cefd;
+  --color-accent-2-400: #b5afe8;
+  --color-accent-2-500: #9690c9;
+  --color-accent-2-600: #7972a9;
+  --color-accent-2-700: #5c5783;
+  --color-accent-2-800: #423e5d;
+  --color-accent-2-900: #2b293a;
+
+  /* Deck section-divider ground — review round 3: saturation as presence.
+     Dividers take a saturated deep indigo (hue 277, the neutral ramp's own
+     family; C 0.094 — written when the accent held C 0.030, before the
+     round-7 blurple raised it past the ground's) with a lighter bloom and
+     a ghost tint of the same hue, while the slide grounds stay
+     desaturated. Deck-scale fills only — not interface colors. */
+  --color-section: #262a60;
+  --color-section-glow: #353b80;
+  --color-section-ghost: #4c5397;
+
+  --font-heading: "Inter", system-ui, sans-serif;
+  --font-heading-weight: 500;
+  --font-body: "Inter", system-ui, sans-serif;
+
+  --space-1: 2.8px;
+  --space-2: 5.6px;
+  --space-3: 8.4px;
+  --space-4: 11.2px;
+  --space-6: 16.8px;
+  --space-8: 22.4px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+
+  /* Elevation — derived from the ground: soft ink-tinted shadows on a
+     light theme, a hairline edge + ambient darkness on a dark one. */
+  --shadow-sm: 0 0 0 1px #3f424d;
+  --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0,0,0,0.55);
+  --shadow-lg: 0 0 0 1px #9397ab, 0 16px 40px rgba(0,0,0,0.65);
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+h1, h2, h3, h4 { font-family: var(--font-heading); font-weight: var(--font-heading-weight); }
+
+.lighten{mix-blend-mode:lighten;background-color:transparent}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Components — built with the tokens above. Plain CSS
+   on plain HTML: no JavaScript, no build step. Each class is documented in
+   readme.md and demonstrated in foundations/ and components/.
+   ══════════════════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font-size: 15px; line-height: 1.55; font-weight: 400; }
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 var(--space-2);
+}
+h1 { font-size: 42px; }
+h2 { font-size: 32px; }
+h3 { font-size: 25px; }
+h4 { font-size: 20px; }
+h5 { font-size: 16px; }
+h6 { font-size: 13px; }
+h6 { letter-spacing: 0.08em; text-transform: uppercase; }
+p { margin: 0 0 var(--space-3); }
+a { color: var(--color-accent); text-underline-offset: 3px; }
+img { display: block; max-width: 100%; }
+figure { margin: 0; }
+figcaption {
+  font-size: 11px; margin-top: var(--space-1);
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.text-muted { color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+
+/* — rules — */
+/* Rules fade to transparent at both ends instead of stopping cleanly — a
+   Nocturne signature. The ramp is 48px an end (one deck baseline unit),
+   painted from the same divider token. Freestanding rules fade; box
+   outlines, in-control separators, and short accent marks stay solid. */
+.hr {
+  height: 1px; border: 0; margin: var(--space-4) 0;
+  background: linear-gradient(to right,
+    transparent, var(--color-divider) 48px,
+    var(--color-divider) calc(100% - 48px), transparent);
+}
+
+/* — buttons — */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  cursor: pointer; text-decoration: none;
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 14px; line-height: 1.2; color: var(--color-text); /* matches the .input's 14px —
+     the pair sits side by side in sign-up rows */
+  background: transparent; border: 1px solid transparent;
+  padding: var(--space-2) calc(var(--space-3) * 1.2);
+  border-radius: var(--radius-md);
+}
+.btn svg { display: block; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { color: var(--color-accent); border-color: var(--color-accent); }
+.btn-primary:hover { background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
+.btn-primary:active { background: color-mix(in srgb, var(--color-accent) 22%, transparent); }
+.btn-secondary { border-color: var(--color-divider); }
+.btn-secondary:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.btn-secondary:active { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
+.btn-ghost { color: var(--color-accent); padding-inline: var(--space-1); }
+.btn-ghost:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+.btn-ghost:active { background: color-mix(in srgb, var(--color-accent) 18%, transparent); }
+.btn-icon { width: 36px; height: 36px; padding: 0; }
+.btn-block { width: 100%; margin-top: var(--space-2); }
+
+/* — forms — */
+.field > label {
+  display: block; font-size: 12px; margin-bottom: 5px;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.input {
+  width: 100%; min-height: 36px; padding: 6px 10px; font: inherit;
+  font-size: 14px; color: var(--color-text); caret-color: var(--color-accent);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+}
+.input:hover { border-color: color-mix(in srgb, var(--color-text) 45%, transparent); }
+.input:focus-visible { border-color: var(--color-accent); outline-offset: 0; }
+textarea.input { min-height: 90px; resize: vertical; }
+.radio { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; }
+.radio input, .seg-opt input {
+  position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;
+}
+.radio .dot {
+  width: 16px; height: 16px; flex: none; border-radius: 50%;
+  border: 1.5px solid var(--color-divider);
+}
+.radio:hover .dot { border-color: var(--color-accent); }
+.radio input:checked + .dot {
+  border-color: var(--color-accent); background: var(--color-accent);
+  box-shadow: inset 0 0 0 4px var(--color-bg);
+}
+.radio input:focus-visible + .dot { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.seg {
+  display: inline-flex; overflow: hidden;
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+}
+.seg-opt {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; font-size: 13px; cursor: pointer;
+}
+.seg-opt + .seg-opt { border-left: 1px solid var(--color-divider); }
+.seg-opt:has(input:checked) { color: var(--color-accent); box-shadow: inset 0 0 0 1px var(--color-accent); }
+.seg-opt:not(:has(input:checked)):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.seg-opt:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+
+/* — cards — */
+.card {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-surface);
+}
+.card-kicker { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-accent); }
+.card-title {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 17px; line-height: 1.2;
+}
+.card-body { margin: 0; font-size: 13px; opacity: 0.8; flex: 1; }
+.card-meta {
+  display: flex; align-items: center; gap: 6px; font-size: 11px;
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+}
+.elev-sm { box-shadow: var(--shadow-sm); }
+.elev-md { box-shadow: var(--shadow-md); }
+.elev-lg { box-shadow: var(--shadow-lg); }
+
+/* — tags — */
+.tag {
+  display: inline-flex; align-items: center; font-size: 11px;
+  letter-spacing: 0.02em; padding: 3px 10px;
+  border-radius: calc(var(--radius-md) * 0.75);
+}
+.tag-accent { background: var(--color-accent-800); color: var(--color-accent-100); }
+.tag-accent-2 { background: var(--color-accent-2-800); color: var(--color-accent-2-100); }
+.tag-neutral { background: var(--color-neutral-800); color: var(--color-neutral-100); }
+.tag-outline { border: 1px solid var(--color-accent); color: var(--color-accent); }
+
+/* — navigation — */
+.nav {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: none;
+}
+.nav-brand {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 18px; margin-right: auto;
+}
+.nav a { color: inherit; text-decoration: none; font-size: 14px; }
+.nav a:hover, .nav a[aria-current='page'] { color: var(--color-accent); }
+
+/* — tables — */
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th {
+  text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  padding: var(--space-2); border-bottom: 1px solid transparent; /* keeps layout; the row paints the fading rule */
+}
+.table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid transparent;
+}
+/* Row rules as row-level strips so the end-fade spans the row, not each cell. */
+.table thead tr {
+  background: linear-gradient(to right,
+    transparent, var(--color-divider) 48px,
+    var(--color-divider) calc(100% - 48px), transparent) no-repeat bottom / 100% 1px;
+}
+.table tbody tr {
+  background: linear-gradient(to right,
+    transparent, color-mix(in srgb, var(--color-text) 8%, transparent) 48px,
+    color-mix(in srgb, var(--color-text) 8%, transparent) calc(100% - 48px), transparent) no-repeat bottom / 100% 1px;
+}
+.table tbody tr:hover {
+  /* the hover tint layers over the row rule, which keeps painting */
+  background:
+    linear-gradient(color-mix(in srgb, var(--color-text) 4%, transparent),
+                    color-mix(in srgb, var(--color-text) 4%, transparent)) no-repeat 0 0 / 100% 100%,
+    linear-gradient(to right,
+      transparent, color-mix(in srgb, var(--color-text) 8%, transparent) 48px,
+      color-mix(in srgb, var(--color-text) 8%, transparent) calc(100% - 48px), transparent) no-repeat bottom / 100% 1px;
+}
+
+/* — dialog — */
+.dialog-backdrop {
+  position: fixed; inset: 0; display: grid; place-items: center;
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--color-neutral-900) 50%, transparent);
+}
+.dialog {
+  width: min(440px, 100%); display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-4); border-radius: var(--radius-lg);
+  background: var(--color-surface); box-shadow: var(--shadow-lg);
+}
+.dialog-title {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 20px;
+}
+.dialog-body { font-size: 14px; opacity: 0.85; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-2); }
+
+</style>
+  <style>
+    body { margin:0; background:#05070d; }
+    a { color:#b5abfc; text-decoration:none; }
+    a:hover { color:#d2cefd; }
+    @keyframes fdpPulse { 0%,100% { box-shadow:0 0 0 0 rgba(145,132,217,.55); } 50% { box-shadow:0 0 0 6px rgba(145,132,217,0); } }
+    @keyframes fdpRise { from { transform:translateY(6px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+    ::-webkit-scrollbar { height:6px; width:6px; }
+    ::-webkit-scrollbar-thumb { background:#2a3648; border-radius:3px; }
+  </style>
+</helmet>
+
+<div style="background:#05070d;color:#e9e9ed;font-family:Inter,system-ui,sans-serif;padding:56px 48px 96px;display:flex;flex-direction:column;gap:72px;min-width:1400px">
+
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:820px">
+    <span style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#9184d9">FDP · jogo de vazas, aposta e blefe</span>
+    <h1 style="margin:0;font-size:40px;font-weight:500;letter-spacing:-.02em;line-height:1.05">Mesa azul-marinho, interface séria</h1>
+    <p style="margin:0;font-size:15px;line-height:1.6;color:#b2b6ca;text-wrap:pretty">Celular em pé, 360&nbsp;px, uma mão. Mesa oval com os jogadores distribuídos em círculo, ajustando os assentos pela quantidade de gente. O deboche fica por conta dos jogadores — a interface fica sóbria, e cada estado tem ícone, forma e texto além da cor.</p>
+  </div>
+
+  <!-- ============ 1. FUNDAMENTOS ============ -->
+  <section style="display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;align-items:baseline;gap:14px;border-bottom:1px solid #1c2432;padding-bottom:10px">
+      <span style="font-size:12px;letter-spacing:.2em;color:#75798c">01</span>
+      <h2 style="margin:0;font-size:24px;font-weight:500">Fundamentos</h2>
+      <span style="font-size:13px;color:#75798c">tokens, paleta de avatares e componentes</span>
+    </div>
+
+    <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start">
+
+      <!-- tokens -->
+      <div style="width:392px;background:#0d121c;border:1px solid #1c2432;border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:18px">
+        <h3 style="margin:0;font-size:14px;font-weight:500;letter-spacing:.02em">Cor</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:26px;height:26px;border-radius:6px;background:#080b14;border:1px solid #2a3242"></span><span style="font-size:11px;color:#b2b6ca">fundo <span style="color:#75798c">#080b14</span></span></div>
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:26px;height:26px;border-radius:6px;background:#131a26;border:1px solid #2a3242"></span><span style="font-size:11px;color:#b2b6ca">superfície <span style="color:#75798c">#131a26</span></span></div>
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:26px;height:26px;border-radius:6px;background:#17395a"></span><span style="font-size:11px;color:#b2b6ca">feltro claro <span style="color:#75798c">#17395a</span></span></div>
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:26px;height:26px;border-radius:6px;background:#0b1f33"></span><span style="font-size:11px;color:#b2b6ca">feltro escuro <span style="color:#75798c">#0b1f33</span></span></div>
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:26px;height:26px;border-radius:6px;background:#9184d9"></span><span style="font-size:11px;color:#b2b6ca">acento <span style="color:#75798c">#9184d9</span></span></div>
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:26px;height:26px;border-radius:6px;background:#ef4d5a"></span><span style="font-size:11px;color:#b2b6ca">vidas <span style="color:#75798c">#ef4d5a</span></span></div>
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:26px;height:26px;border-radius:6px;background:#e9e9ed"></span><span style="font-size:11px;color:#b2b6ca">texto <span style="color:#75798c">#e9e9ed</span></span></div>
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:26px;height:26px;border-radius:6px;background:#9397ab"></span><span style="font-size:11px;color:#b2b6ca">texto fraco <span style="color:#75798c">#9397ab</span></span></div>
+        </div>
+        <div style="height:1px;background:#1c2432"></div>
+        <h3 style="margin:0;font-size:14px;font-weight:500">Tipografia · Inter</h3>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:22px;font-weight:500;letter-spacing:-.01em;line-height:1.1">22/500 título de tela</span>
+          <span style="font-size:15px;font-weight:500">15/500 rótulo e botão</span>
+          <span style="font-size:13px;color:#b2b6ca">13/400 corpo e explicação de regra</span>
+          <span style="font-size:11px;color:#9397ab;letter-spacing:.04em">11/400 metadados do cartão de jogador</span>
+          <span style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#75798c">11/500 · 0.2em rótulo de seção</span>
+        </div>
+        <div style="height:1px;background:#1c2432"></div>
+        <div style="display:flex;gap:26px">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <h3 style="margin:0;font-size:14px;font-weight:500">Espaço</h3>
+            <div style="display:flex;align-items:flex-end;gap:5px">
+              <span style="width:3px;height:12px;background:#5d5294"></span><span style="width:6px;height:16px;background:#5d5294"></span><span style="width:8px;height:20px;background:#796cbf"></span><span style="width:11px;height:24px;background:#796cbf"></span><span style="width:17px;height:28px;background:#968ae0"></span><span style="width:22px;height:32px;background:#968ae0"></span>
+            </div>
+            <span style="font-size:10px;color:#75798c">3 · 6 · 8 · 11 · 17 · 22 px</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <h3 style="margin:0;font-size:14px;font-weight:500">Raio e sombra</h3>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="width:30px;height:30px;border-radius:4px;background:#131a26;box-shadow:0 0 0 1px #3f424d"></span>
+              <span style="width:30px;height:30px;border-radius:8px;background:#131a26;box-shadow:0 0 0 1px #595d6c,0 6px 18px rgba(0,0,0,.55)"></span>
+              <span style="width:30px;height:30px;border-radius:14px;background:#131a26;box-shadow:0 0 0 1px #9397ab,0 16px 40px rgba(0,0,0,.65)"></span>
+            </div>
+            <span style="font-size:10px;color:#75798c">4 / 8 / 14 px · sm md lg</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- paleta de avatares com simulação -->
+      <div style="width:596px;background:#0d121c;border:1px solid #1c2432;border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <h3 style="margin:0;font-size:14px;font-weight:500">Paleta de avatares — 8 cores, uma por jogador</h3>
+          <p style="margin:0;font-size:12px;line-height:1.5;color:#9397ab;text-wrap:pretty">Escolhidas por otimização: a menor distância perceptual entre dois avatares quaisquer é ΔE&nbsp;21,8 <b style="color:#b2b6ca;font-weight:500">nas três condições ao mesmo tempo</b> (visão normal, deuteranopia e protanopia, simulação Viénot 1999). Todas passam de 5,4:1 contra o feltro. O emoji é o segundo canal.</p>
+        </div>
+        <div style="display:grid;grid-template-columns:96px 1fr 1fr 1fr;gap:0 10px;align-items:center;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#75798c;padding-bottom:6px;border-bottom:1px solid #1c2432">
+          <span>cor</span><span>visão normal</span><span>deuteranopia</span><span>protanopia</span>
+        </div>
+        <div style="display:grid;grid-template-columns:96px 1fr 1fr 1fr;gap:8px 10px;align-items:center">
+          <span style="font-size:12px;color:#b2b6ca">amber 🦊</span>
+          <span style="height:34px;border-radius:8px;background:#c7b467;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#c7b467</span>
+          <span style="height:34px;border-radius:8px;background:#c0c285;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#c0c285</span>
+          <span style="height:34px;border-radius:8px;background:#b7b767;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#b7b767</span>
+
+          <span style="font-size:12px;color:#b2b6ca">orange 🦁</span>
+          <span style="height:34px;border-radius:8px;background:#f86111;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#f86111</span>
+          <span style="height:34px;border-radius:8px;background:#d0d938;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#d0d938</span>
+          <span style="height:34px;border-radius:8px;background:#808011;display:flex;align-items:center;justify-content:center;font-size:11px;color:#f3f5fe">#808011</span>
+
+          <span style="font-size:12px;color:#b2b6ca">rose 🦉</span>
+          <span style="height:34px;border-radius:8px;background:#ff4983;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#ff4983</span>
+          <span style="height:34px;border-radius:8px;background:#d3dd76;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#d3dd76</span>
+          <span style="height:34px;border-radius:8px;background:#747483;display:flex;align-items:center;justify-content:center;font-size:11px;color:#f3f5fe">#747483</span>
+
+          <span style="font-size:12px;color:#b2b6ca">violet 🦄</span>
+          <span style="height:34px;border-radius:8px;background:#b580ca;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#b580ca</span>
+          <span style="height:34px;border-radius:8px;background:#a4a7b8;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#a4a7b8</span>
+          <span style="height:34px;border-radius:8px;background:#8888ca;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#8888ca</span>
+
+          <span style="font-size:12px;color:#b2b6ca">indigo 🐺</span>
+          <span style="height:34px;border-radius:8px;background:#6594fa;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#6594fa</span>
+          <span style="height:34px;border-radius:8px;background:#7975e2;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#7975e2</span>
+          <span style="height:34px;border-radius:8px;background:#8f8ffa;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#8f8ffa</span>
+
+          <span style="font-size:12px;color:#b2b6ca">sky 🐧</span>
+          <span style="height:34px;border-radius:8px;background:#83d2ff;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#83d2ff</span>
+          <span style="height:34px;border-radius:8px;background:#a7a0f2;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#a7a0f2</span>
+          <span style="height:34px;border-radius:8px;background:#cbcbff;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#cbcbff</span>
+
+          <span style="font-size:12px;color:#b2b6ca">teal 🐙</span>
+          <span style="height:34px;border-radius:8px;background:#0eb09e;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#0eb09e</span>
+          <span style="height:34px;border-radius:8px;background:#7166a4;display:flex;align-items:center;justify-content:center;font-size:11px;color:#f3f5fe">#7166a4</span>
+          <span style="height:34px;border-radius:8px;background:#a7a79e;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#a7a79e</span>
+
+          <span style="font-size:12px;color:#b2b6ca">lime 🐸</span>
+          <span style="height:34px;border-radius:8px;background:#4ebf00;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#4ebf00</span>
+          <span style="height:34px;border-radius:8px;background:#877e6e;display:flex;align-items:center;justify-content:center;font-size:11px;color:#f3f5fe">#877e6e</span>
+          <span style="height:34px;border-radius:8px;background:#b6b600;display:flex;align-items:center;justify-content:center;font-size:11px;color:#141824">#b6b600</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:6px;border-top:1px solid #1c2432">
+          <span style="font-size:11px;color:#75798c;width:100%">Emojis disponíveis — o par cor+emoji é único na sala</span>
+          <span style="font-size:17px;letter-spacing:4px;line-height:1.5">🦊🐙🐸🦁🐼🦉🐺🦝🐨🐯🦄🐢🦈🐝🦋🐌🦖🐳🦩🦔🐧🦜🐴🦥</span>
+        </div>
+      </div>
+
+      <!-- componentes -->
+      <div style="width:336px;background:#0d121c;border:1px solid #1c2432;border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:16px">
+        <h3 style="margin:0;font-size:14px;font-weight:500">Componentes</h3>
+
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#75798c">Botão</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <span style="min-height:44px;display:flex;align-items:center;padding:0 18px;border-radius:8px;border:1px solid #9184d9;color:#d2cefd;font-size:14px;font-weight:500">Entrar na sala</span>
+            <span style="min-height:44px;display:flex;align-items:center;padding:0 18px;border-radius:8px;border:1px solid #3f424d;color:#b2b6ca;font-size:14px">Cancelar</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="min-height:44px;display:flex;align-items:center;padding:0 18px;border-radius:8px;border:1px solid #3f424d;color:#b2b6ca;font-size:14px;opacity:.45">Iniciar partida</span>
+            <span style="font-size:11px;color:#9397ab;line-height:1.4">motivo sempre visível ao lado</span>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#75798c">CampoTexto · ContadorDeVidas · BarraDeTempo</span>
+          <span style="min-height:44px;display:flex;align-items:center;padding:0 12px;border-radius:8px;background:#131a26;border:1px solid #2a3648;color:#e9e9ed;font-size:15px">Ana Carolina<span style="width:1px;height:18px;background:#9184d9;margin-left:2px"></span></span>
+          <div style="display:flex;gap:12px;align-items:center">
+            <span style="color:#ef4d5a;font-size:14px;letter-spacing:2px">♥♥♥<span style="color:#3f424d">♡♡</span></span>
+            <span style="font-size:11px;color:#9397ab">3 de 5 vidas</span>
+          </div>
+          <div style="height:4px;border-radius:2px;background:#1c2432;overflow:hidden"><span style="display:block;width:62%;height:100%;background:#9184d9"></span></div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#75798c">Carta · CartaNaTesta · Avatar</span>
+          <div style="display:flex;gap:8px;align-items:flex-end">
+            <span style="width:48px;height:68px;border-radius:6px;background:linear-gradient(#f6f7fb,#e2e6f0);color:#141824;display:flex;flex-direction:column;justify-content:space-between;padding:5px 6px;box-shadow:0 3px 8px rgba(0,0,0,.5)"><b style="font-size:16px;font-weight:600;line-height:1">K</b><b style="font-size:18px;line-height:1;text-align:right;font-weight:400">♠</b></span>
+            <span style="width:48px;height:68px;border-radius:6px;background:linear-gradient(#f6f7fb,#e2e6f0);color:#d13a4a;display:flex;flex-direction:column;justify-content:space-between;padding:5px 6px;box-shadow:0 3px 8px rgba(0,0,0,.5)"><b style="font-size:16px;font-weight:600;line-height:1">7</b><b style="font-size:18px;line-height:1;text-align:right;font-weight:400">♥</b></span>
+            <span style="width:48px;height:68px;border-radius:6px;background:repeating-linear-gradient(135deg,#16304d 0 5px,#0f2440 5px 10px);border:1px solid #2c4a6e;box-shadow:0 3px 8px rgba(0,0,0,.5)"></span>
+            <span style="width:40px;height:40px;border-radius:50%;background:#0eb09e;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 0 0 2px #0d121c">🐙</span>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#75798c">Toast · IndicadorDeConexão</span>
+          <span style="display:flex;gap:8px;align-items:center;padding:10px 12px;border-radius:8px;background:#131a26;border:1px solid #2a3648;font-size:12px;color:#e9e9ed">⏱ Beto ficou sem tempo: apostou 0</span>
+          <div style="display:flex;gap:14px;align-items:center;font-size:11px;color:#9397ab">
+            <span style="display:flex;gap:5px;align-items:center"><span style="width:8px;height:8px;border-radius:50%;background:#0eb09e"></span>estável</span>
+            <span style="display:flex;gap:5px;align-items:center"><span style="width:8px;height:8px;border-radius:50%;background:#c7b467"></span>◐ instável</span>
+            <span style="display:flex;gap:5px;align-items:center"><span style="width:8px;height:8px;border-radius:50%;background:#75798c"></span>✕ ausente</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2. MESA ============ -->
+  <section style="display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;align-items:baseline;gap:14px;border-bottom:1px solid #1c2432;padding-bottom:10px">
+      <span style="font-size:12px;letter-spacing:.2em;color:#75798c">02</span>
+      <h2 style="margin:0;font-size:24px;font-weight:500">Mesa</h2>
+      <span style="font-size:13px;color:#75798c">8 jogadores em círculo, 360&nbsp;px, sem rolagem horizontal</span>
+    </div>
+
+    <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">
+
+      <!-- ---------- MESA A · APOSTANDO ---------- -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:13px;font-weight:500">A · Fase de apostas</span>
+          <span style="font-size:11px;color:#75798c">sou o último a apostar — um valor é proibido</span>
+        </div>
+        <div style="width:360px;height:800px;background:#080b14;border-radius:22px;border:1px solid #2a3242;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px">
+            <div style="display:flex;flex-direction:column;gap:1px">
+              <span style="font-size:14px;font-weight:500">Rodada 6 · 5 cartas</span>
+              <span style="font-size:11px;color:#9397ab">Fase de apostas · vez de você</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="display:flex;gap:4px;align-items:center;font-size:11px;color:#9397ab"><span style="width:7px;height:7px;border-radius:50%;background:#0eb09e"></span>estável</span>
+              <span style="width:44px;height:44px;border-radius:8px;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center;font-size:15px;color:#b2b6ca">☰</span>
+            </div>
+          </div>
+          <div style="margin:0 14px;height:4px;border-radius:2px;background:#1c2432;overflow:hidden"><span style="display:block;width:72%;height:100%;background:#9184d9"></span></div>
+
+          <!-- feltro -->
+          <div style="position:relative;height:352px;margin-top:8px">
+            <div style="position:absolute;left:58px;right:58px;top:10px;bottom:34px;border-radius:50%/32%;background:radial-gradient(ellipse at 50% 38%,#1b4269 0%,#123253 45%,#0a1c30 100%);box-shadow:inset 0 0 0 6px #0b1420,inset 0 0 0 7px #24405c,inset 0 22px 44px rgba(0,0,0,.45)"></div>
+            <div style="position:absolute;left:0;right:0;top:150px;display:flex;flex-direction:column;align-items:center;gap:4px">
+              <span style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#7f9ab5">apostas da mesa</span>
+              <span style="font-size:26px;font-weight:500;color:#e9e9ed;line-height:1">4<span style="color:#7f9ab5;font-size:16px"> de 5 vazas</span></span>
+              <span style="font-size:11px;color:#9dbad4">7 de 8 já apostaram</span>
+            </div>
+
+            <!-- assentos: 3 em cima, 2+2 nas laterais, eu na base -->
+            <div style="position:absolute;left:76px;top:14px;width:104px;padding:5px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#c7b467;display:flex;align-items:center;justify-content:center;font-size:14px">🦊</span><span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Beto</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#ef4d5a;font-size:10px;letter-spacing:1px">♥♥♥</span><span style="font-size:12px;font-weight:600;letter-spacing:.02em">2</span></div>
+            </div>
+
+            <div style="position:absolute;left:181px;top:0;width:104px;padding:5px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#ff4983;display:flex;align-items:center;justify-content:center;font-size:14px">🦉</span><span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Ana Carolina</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#ef4d5a;font-size:10px;letter-spacing:1px">♥♥</span><span style="font-size:12px;font-weight:600">1</span></div>
+            </div>
+
+            <div style="position:absolute;right:4px;top:52px;width:104px;padding:5px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#6594fa;display:flex;align-items:center;justify-content:center;font-size:14px">🐺</span><span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Caio</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#ef4d5a;font-size:10px;letter-spacing:1px">♥♥♥♥</span><span style="font-size:12px;font-weight:600">0</span></div>
+            </div>
+
+            <div style="position:absolute;right:4px;top:152px;width:104px;padding:5px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#b580ca;display:flex;align-items:center;justify-content:center;font-size:14px">🦄</span><span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Thiago</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#ef4d5a;font-size:10px;letter-spacing:1px">♥♥♥</span><span style="font-size:12px;font-weight:600">0</span></div>
+            </div>
+
+            <div style="position:absolute;right:24px;top:248px;width:104px;padding:5px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#83d2ff;display:flex;align-items:center;justify-content:center;font-size:14px">🐧</span><span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Zé</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#ef4d5a;font-size:10px;letter-spacing:1px">♥♥</span><span style="font-size:12px;font-weight:600">0</span></div>
+            </div>
+
+            <div style="position:absolute;left:24px;top:248px;width:104px;padding:5px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#4ebf00;display:flex;align-items:center;justify-content:center;font-size:14px">🐸</span><span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Mari</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#ef4d5a;font-size:10px;letter-spacing:1px">♥</span><span style="font-size:12px;font-weight:600">0</span></div>
+            </div>
+
+            <div style="position:absolute;left:4px;top:152px;width:104px;padding:5px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#f86111;display:flex;align-items:center;justify-content:center;font-size:14px">🦁</span><span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Rodrigão</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#ef4d5a;font-size:10px;letter-spacing:1px">♥♥♥</span><span style="font-size:12px;font-weight:600">1</span></div>
+            </div>
+
+            <div style="position:absolute;left:4px;top:52px;width:104px;padding:5px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;flex-direction:column;gap:3px;opacity:.62">
+              <div style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#0eb09e;display:flex;align-items:center;justify-content:center;font-size:14px;filter:grayscale(.7)">🦝</span><span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Duda</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:9px;color:#9397ab">✕ ausente</span><span style="font-size:12px;font-weight:600">0</span></div>
+            </div>
+
+            <!-- eu, na base do círculo -->
+            <div style="position:absolute;left:104px;right:104px;bottom:0;padding:6px 8px;border-radius:12px;background:#0e1725;border:1px solid #9184d9;animation:fdpPulse 2.4s ease-out infinite;display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;gap:6px;align-items:center;justify-content:center"><span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#0eb09e;display:flex;align-items:center;justify-content:center;font-size:15px">🐙</span><span style="font-size:11px;font-weight:500">Você</span><span style="color:#ef4d5a;font-size:10px;letter-spacing:1px">♥♥♥</span></div>
+              <span style="font-size:10px;text-align:center;color:#d2cefd;letter-spacing:.06em">▶ SUA VEZ DE APOSTAR</span>
+            </div>
+          </div>
+
+          <!-- seletor de aposta -->
+          <div style="margin-top:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:#0b1220;border-top:1px solid #1c2432">
+            <div style="display:flex;justify-content:space-between;align-items:baseline">
+              <span style="font-size:13px;font-weight:500">Quantas vazas você faz?</span>
+              <span style="font-size:11px;color:#9397ab">apostas da mesa: 4 de 5</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              <span style="flex:1;height:48px;border-radius:8px;border:1px solid #2a3648;background:#131a26;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500">0</span>
+              <span style="flex:1;height:48px;border-radius:8px;border:1px dashed #3f424d;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#595d6c"><b style="font-size:17px;font-weight:500;text-decoration:line-through">1</b><span style="font-size:8px;letter-spacing:.06em">PROIBIDO</span></span>
+              <span style="flex:1;height:48px;border-radius:8px;border:1px solid #2a3648;background:#131a26;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500">2</span>
+              <span style="flex:1;height:48px;border-radius:8px;border:1px solid #2a3648;background:#131a26;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500">3</span>
+              <span style="flex:1;height:48px;border-radius:8px;border:1px solid #2a3648;background:#131a26;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500">4</span>
+              <span style="flex:1;height:48px;border-radius:8px;border:1px solid #2a3648;background:#131a26;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500">5</span>
+            </div>
+            <div style="display:flex;gap:8px;padding:9px 10px;border-radius:8px;background:#131a26;border:1px solid #2a3648">
+              <span style="font-size:12px;color:#c7b467;line-height:1.35">⚠</span>
+              <span style="font-size:11px;color:#b2b6ca;line-height:1.45;text-wrap:pretty">Você é o último a apostar: <b style="color:#e9e9ed;font-weight:500">1 está proibido</b> porque a soma da mesa não pode fechar em 5. Alguém vai errar — a regra é essa.</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="flex:1;height:44px;border-radius:8px;border:1px solid #9184d9;color:#d2cefd;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:500">Apostar 2</span>
+              <span style="width:44px;height:44px;border-radius:8px;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center;font-size:16px;color:#b2b6ca">💬</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- MESA B · VAZA + CHAT ---------- -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:13px;font-weight:500">B · No meio de uma vaza</span>
+          <span style="font-size:11px;color:#75798c">cartas ancoradas em quem jogou · chat aberto · um condenado na mesa</span>
+        </div>
+        <div style="width:360px;height:800px;background:#080b14;border-radius:22px;border:1px solid #2a3242;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px">
+            <div style="display:flex;flex-direction:column;gap:1px">
+              <span style="font-size:14px;font-weight:500">Rodada 6 · 5 cartas</span>
+              <span style="font-size:11px;color:#9397ab">Vaza 4 de 5 · vez de Caio</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="display:flex;gap:4px;align-items:center;font-size:11px;color:#9397ab"><span style="width:7px;height:7px;border-radius:50%;background:#0eb09e"></span>estável</span>
+              <span style="width:44px;height:44px;border-radius:8px;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center;font-size:15px;color:#b2b6ca">☰</span>
+            </div>
+          </div>
+          <div style="margin:0 14px;height:4px;border-radius:2px;background:#1c2432;overflow:hidden"><span style="display:block;width:34%;height:100%;background:#6594fa"></span></div>
+
+          <div style="position:relative;height:352px;margin-top:8px">
+            <div style="position:absolute;left:58px;right:58px;top:10px;bottom:34px;border-radius:50%/32%;background:radial-gradient(ellipse at 50% 38%,#1b4269 0%,#123253 45%,#0a1c30 100%);box-shadow:inset 0 0 0 6px #0b1420,inset 0 0 0 7px #24405c,inset 0 22px 44px rgba(0,0,0,.45)"></div>
+
+            <!-- cartas jogadas, cada uma junto de quem jogou -->
+            <div style="position:absolute;left:132px;top:92px;display:flex;flex-direction:column;align-items:center;gap:2px">
+              <span style="width:38px;height:54px;border-radius:5px;background:linear-gradient(#f6f7fb,#e2e6f0);color:#141824;display:flex;flex-direction:column;justify-content:space-between;padding:3px 4px;box-shadow:0 3px 10px rgba(0,0,0,.55);border-bottom:3px solid #c7b467"><b style="font-size:13px;font-weight:600;line-height:1">9</b><b style="font-size:13px;line-height:1;text-align:right;font-weight:400">♠</b></span>
+              <span style="display:flex;gap:3px;align-items:center;font-size:8px;color:#c7d6e5"><span style="width:12px;height:12px;border-radius:50%;background:#c7b467;display:flex;align-items:center;justify-content:center;font-size:7px">🦊</span>Beto</span>
+            </div>
+            <div style="position:absolute;left:188px;top:88px;display:flex;flex-direction:column;align-items:center;gap:2px">
+              <span style="width:38px;height:54px;border-radius:5px;background:linear-gradient(#f6f7fb,#e2e6f0);color:#d13a4a;display:flex;flex-direction:column;justify-content:space-between;padding:3px 4px;box-shadow:0 0 0 2px #9184d9,0 4px 12px rgba(0,0,0,.6);border-bottom:3px solid #ff4983"><b style="font-size:13px;font-weight:600;line-height:1">A</b><b style="font-size:13px;line-height:1;text-align:right;font-weight:400">♦</b></span>
+              <span style="display:flex;gap:3px;align-items:center;font-size:8px;color:#e9e9ed"><span style="width:12px;height:12px;border-radius:50%;background:#ff4983;display:flex;align-items:center;justify-content:center;font-size:7px">🦉</span>Ana C. · ganhando</span>
+            </div>
+            <div style="position:absolute;left:150px;top:166px;display:flex;flex-direction:column;align-items:center;gap:2px">
+              <span style="width:38px;height:54px;border-radius:5px;background:linear-gradient(#f6f7fb,#e2e6f0);color:#141824;display:flex;flex-direction:column;justify-content:space-between;padding:3px 4px;box-shadow:0 3px 10px rgba(0,0,0,.55);border-bottom:3px solid #4ebf00"><b style="font-size:13px;font-weight:600;line-height:1">4</b><b style="font-size:13px;line-height:1;text-align:right;font-weight:400">♣</b></span>
+              <span style="display:flex;gap:3px;align-items:center;font-size:8px;color:#c7d6e5"><span style="width:12px;height:12px;border-radius:50%;background:#4ebf00;display:flex;align-items:center;justify-content:center;font-size:7px">🐸</span>Mari</span>
+            </div>
+            <div style="position:absolute;left:0;right:0;top:228px;display:flex;justify-content:center"><span style="font-size:9px;color:#9dbad4;letter-spacing:.1em">NAIPE DA VAZA ♦ · TRUNFO ♠</span></div>
+
+            <div style="position:absolute;left:76px;top:14px;width:104px;padding:5px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#c7b467;display:flex;align-items:center;justify-content:center;font-size:14px">🦊</span><span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Beto</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#ef4d5a;font-size:10px;letter-spacing:1px">♥♥♥</span><span style="font-size:12px;font-weight:600">1<span style="color:#9397ab;font-weight:400">/2</span></span></div>
+            </div>
+
+            <!-- condenada -->
+            <div style="position:absolute;left:181px;top:0;width:104px;padding:5px;border-radius:10px;background:rgba(38,12,18,.92);border:1px solid #ef4d5a;display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#ff4983;display:flex;align-items:center;justify-content:center;font-size:14px">🦉</span><span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Ana Carolina</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#ef4d5a;font-size:10px;letter-spacing:1px">♥</span><span style="font-size:12px;font-weight:600">2<span style="color:#9397ab;font-weight:400">/1</span></span></div>
+              <span style="font-size:8px;letter-spacing:.1em;color:#ffb3c4;text-align:center;border-top:1px solid rgba(239,77,90,.45);padding-top:2px">☠ JÁ ERA — CAI NESTA RODADA</span>
+            </div>
+
+            <div style="position:absolute;right:4px;top:82px;width:104px;padding:5px;border-radius:10px;background:rgba(8,14,23,.92);border:1px solid #6594fa;display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#6594fa;display:flex;align-items:center;justify-content:center;font-size:14px">🐺</span><span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Caio</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#ef4d5a;font-size:10px;letter-spacing:1px">♥♥♥♥</span><span style="font-size:12px;font-weight:600">0<span style="color:#9397ab;font-weight:400">/0</span></span></div>
+              <span style="font-size:8px;letter-spacing:.08em;color:#cfe0ff;text-align:center">▶ JOGANDO</span>
+              <span style="height:3px;border-radius:2px;background:#1c2432;overflow:hidden"><span style="display:block;width:48%;height:100%;background:#6594fa"></span></span>
+            </div>
+
+            <div style="position:absolute;right:4px;top:166px;width:104px;padding:5px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#b580ca;display:flex;align-items:center;justify-content:center;font-size:14px">🦄</span><span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Thiago</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#ef4d5a;font-size:10px;letter-spacing:1px">♥♥♥</span><span style="font-size:12px;font-weight:600">0<span style="color:#9397ab;font-weight:400">/0</span></span></div>
+            </div>
+
+            <div style="position:absolute;right:24px;top:256px;width:104px;padding:5px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#83d2ff;display:flex;align-items:center;justify-content:center;font-size:14px">🐧</span><span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Zé</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#ef4d5a;font-size:10px;letter-spacing:1px">♥♥</span><span style="font-size:12px;font-weight:600">0<span style="color:#9397ab;font-weight:400">/0</span></span></div>
+            </div>
+
+            <div style="position:absolute;left:24px;top:264px;width:104px;padding:5px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#4ebf00;display:flex;align-items:center;justify-content:center;font-size:14px">🐸</span><span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Mari</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#ef4d5a;font-size:10px;letter-spacing:1px">♥</span><span style="font-size:12px;font-weight:600">0<span style="color:#9397ab;font-weight:400">/0</span></span></div>
+            </div>
+
+            <div style="position:absolute;left:4px;top:166px;width:104px;padding:5px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#f86111;display:flex;align-items:center;justify-content:center;font-size:14px">🦁</span><span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Rodrigão</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#ef4d5a;font-size:10px;letter-spacing:1px">♥♥♥</span><span style="font-size:12px;font-weight:600">0<span style="color:#9397ab;font-weight:400">/1</span></span></div>
+            </div>
+
+            <div style="position:absolute;left:4px;top:52px;width:104px;padding:5px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;flex-direction:column;gap:3px;opacity:.62">
+              <div style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#0eb09e;display:flex;align-items:center;justify-content:center;font-size:14px;filter:grayscale(.7)">🦝</span><span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Duda</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:9px;color:#9397ab">✕ ausente</span><span style="font-size:12px;font-weight:600">0<span style="color:#9397ab;font-weight:400">/0</span></span></div>
+            </div>
+
+            <div style="position:absolute;left:110px;right:110px;bottom:0;padding:5px 8px;border-radius:12px;background:#0e1725;border:1px solid #2a3648;display:flex;flex-direction:column;gap:2px;align-items:center">
+              <div style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#0eb09e;display:flex;align-items:center;justify-content:center;font-size:15px">🐙</span><span style="font-size:11px;font-weight:500">Você</span><span style="color:#ef4d5a;font-size:10px;letter-spacing:1px">♥♥♥</span></div>
+              <span style="font-size:11px;font-weight:600">0<span style="color:#9397ab;font-weight:400">/1 vazas</span></span>
+            </div>
+          </div>
+
+          <!-- chat rodando -->
+          <div style="margin-top:auto;display:flex;flex-direction:column;background:#0b1220;border-top:1px solid #1c2432">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 4px">
+              <span style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#75798c">Chat da mesa</span>
+              <span style="font-size:14px;color:#75798c">⌄</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px;padding:0 14px 8px;max-height:88px;overflow-y:auto">
+              <div style="display:flex;gap:6px;align-items:flex-start"><span style="flex:0 0 auto;width:18px;height:18px;border-radius:50%;background:#f86111;display:flex;align-items:center;justify-content:center;font-size:10px">🦁</span><span style="font-size:11px;line-height:1.4;color:#b2b6ca"><b style="color:#e9e9ed;font-weight:500">Rodrigão</b> guardei o trunfo, relaxa</span></div>
+              <div style="display:flex;gap:6px;align-items:flex-start"><span style="flex:0 0 auto;width:18px;height:18px;border-radius:50%;background:#ff4983;display:flex;align-items:center;justify-content:center;font-size:10px">🦉</span><span style="font-size:11px;line-height:1.4;color:#b2b6ca"><b style="color:#e9e9ed;font-weight:500">Ana Carolina</b> eu já era, vou levar todas por esporte</span></div>
+              <div style="display:flex;gap:6px;align-items:flex-start"><span style="flex:0 0 auto;width:18px;height:18px;border-radius:50%;background:#c7b467;display:flex;align-items:center;justify-content:center;font-size:10px">🦊</span><span style="font-size:11px;line-height:1.4;color:#b2b6ca"><b style="color:#e9e9ed;font-weight:500">Beto</b> Caio, joga logo</span></div>
+            </div>
+            <div style="display:flex;gap:6px;padding:0 14px 10px">
+              <span style="flex:1;min-height:40px;display:flex;align-items:center;padding:0 10px;border-radius:8px;background:#131a26;border:1px solid #2a3648;font-size:12px;color:#75798c">Escrever para a mesa…</span>
+              <span style="width:40px;height:40px;border-radius:8px;border:1px solid #9184d9;color:#d2cefd;display:flex;align-items:center;justify-content:center;font-size:14px">➤</span>
+            </div>
+
+            <!-- leque de mão -->
+            <div style="padding:8px 0 12px;background:#080e18;border-top:1px solid #1c2432">
+              <div style="display:flex;justify-content:space-between;padding:0 14px 6px"><span style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#75798c">Sua mão · 2 cartas</span><span style="font-size:10px;color:#9397ab">toda carta é jogável</span></div>
+              <div style="display:flex;gap:8px;padding:6px 14px 0;overflow-x:auto;align-items:flex-end">
+                <span style="flex:0 0 auto;width:48px;height:68px;border-radius:6px;background:linear-gradient(#f6f7fb,#e2e6f0);color:#d13a4a;display:flex;flex-direction:column;justify-content:space-between;padding:5px 6px;box-shadow:0 3px 8px rgba(0,0,0,.5)"><b style="font-size:16px;font-weight:600;line-height:1">Q</b><b style="font-size:18px;line-height:1;text-align:right;font-weight:400">♦</b></span>
+                <div style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:4px;transform:translateY(-10px)">
+                  <span style="width:48px;height:68px;border-radius:6px;background:linear-gradient(#ffffff,#eaeef8);color:#141824;display:flex;flex-direction:column;justify-content:space-between;padding:5px 6px;box-shadow:0 0 0 2px #9184d9,0 8px 18px rgba(0,0,0,.6)"><b style="font-size:16px;font-weight:600;line-height:1">2</b><b style="font-size:18px;line-height:1;text-align:right;font-weight:400">♠</b></span>
+                  <span style="min-height:26px;padding:0 12px;border-radius:6px;border:1px solid #9184d9;color:#d2cefd;font-size:11px;font-weight:500;display:flex;align-items:center">Jogar</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- MESA C · RESOLUÇÃO ---------- -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:13px;font-weight:500">C · Resolução da rodada</span>
+          <span style="font-size:11px;color:#75798c">débito de vidas com a conta à vista, e uma eliminação</span>
+        </div>
+        <div style="width:360px;height:800px;background:#080b14;border-radius:22px;border:1px solid #2a3242;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px">
+            <div style="display:flex;flex-direction:column;gap:1px">
+              <span style="font-size:14px;font-weight:500">Rodada 6 · encerrada</span>
+              <span style="font-size:11px;color:#9397ab">Acerto de contas</span>
+            </div>
+            <span style="width:44px;height:44px;border-radius:8px;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center;font-size:15px;color:#b2b6ca">☰</span>
+          </div>
+
+          <div style="position:relative;height:150px;margin:8px 0 0;overflow:hidden">
+            <div style="position:absolute;left:58px;right:58px;top:10px;height:290px;border-radius:50%/32%;background:radial-gradient(ellipse at 50% 38%,#1b4269 0%,#123253 45%,#0a1c30 100%);opacity:.5;filter:blur(1px)"></div>
+            <div style="position:absolute;left:0;right:0;top:52px;text-align:center">
+              <span style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#9dbad4">a mesa fechou em 4 de 5</span>
+            </div>
+          </div>
+
+          <div style="padding:0 14px;display:flex;flex-direction:column;gap:7px;overflow-y:auto">
+            <div style="display:flex;gap:9px;align-items:center;padding:9px 10px;border-radius:10px;background:#101827;border:1px solid #2a3648">
+              <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#6594fa;display:flex;align-items:center;justify-content:center;font-size:15px">🐺</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <div style="display:flex;justify-content:space-between"><span style="font-size:12px;font-weight:500">Caio</span><span style="font-size:11px;color:#0eb09e">✓ acertou</span></div>
+                <span style="font-size:10px;color:#9397ab">apostou 0 · fez 0 → mantém as vidas</span>
+              </div>
+              <span style="color:#ef4d5a;font-size:11px;letter-spacing:1px">♥♥♥♥</span>
+            </div>
+
+            <div style="display:flex;gap:9px;align-items:center;padding:9px 10px;border-radius:10px;background:#141018;border:1px solid #3f2b33">
+              <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#c7b467;display:flex;align-items:center;justify-content:center;font-size:15px">🦊</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <div style="display:flex;justify-content:space-between"><span style="font-size:12px;font-weight:500">Beto</span><span style="font-size:11px;font-weight:500;color:#ef4d5a">−1 vida</span></div>
+                <span style="font-size:10px;color:#b2b6ca">apostou 2 · fez 1 → errou por 1</span>
+              </div>
+              <span style="font-size:11px;letter-spacing:1px"><span style="color:#ef4d5a">♥♥</span><span style="color:#5a2b33;text-decoration:line-through">♥</span></span>
+            </div>
+
+            <div style="display:flex;gap:9px;align-items:center;padding:9px 10px;border-radius:10px;background:#141018;border:1px solid #3f2b33">
+              <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#f86111;display:flex;align-items:center;justify-content:center;font-size:15px">🦁</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <div style="display:flex;justify-content:space-between"><span style="font-size:12px;font-weight:500">Rodrigão</span><span style="font-size:11px;font-weight:500;color:#ef4d5a">−1 vida</span></div>
+                <span style="font-size:10px;color:#b2b6ca">apostou 1 · fez 0 → errou por 1</span>
+              </div>
+              <span style="font-size:11px;letter-spacing:1px"><span style="color:#ef4d5a">♥♥</span><span style="color:#5a2b33;text-decoration:line-through">♥</span></span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:6px;padding:11px 10px;border-radius:10px;background:linear-gradient(#26101a,#180b12);border:1px solid #ef4d5a;animation:fdpRise .4s ease-out">
+              <div style="display:flex;gap:9px;align-items:center">
+                <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#ff4983;display:flex;align-items:center;justify-content:center;font-size:15px">🦉</span>
+                <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                  <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13px;font-weight:500">Ana Carolina</span><span style="font-size:13px;font-weight:600;color:#ff8fab">−2 vidas</span></div>
+                  <span style="font-size:10px;color:#e9c9d3">apostou 1 · fez 3 → errou por 2</span>
+                </div>
+              </div>
+              <div style="display:flex;gap:7px;align-items:center;border-top:1px solid rgba(239,77,90,.35);padding-top:7px">
+                <span style="font-size:13px">☠</span>
+                <span style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#ffd0da">ELIMINADA NA RODADA 6</span>
+                <span style="margin-left:auto;font-size:11px;letter-spacing:1px;color:#5a2b33;text-decoration:line-through">♥</span>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:9px;align-items:center;padding:9px 10px;border-radius:10px;background:#141018;border:1px solid #3f2b33">
+              <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#0eb09e;display:flex;align-items:center;justify-content:center;font-size:15px">🐙</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <div style="display:flex;justify-content:space-between"><span style="font-size:12px;font-weight:500">Você</span><span style="font-size:11px;font-weight:500;color:#ef4d5a">−1 vida</span></div>
+                <span style="font-size:10px;color:#b2b6ca">apostou 1 · fez 0 → errou por 1</span>
+              </div>
+              <span style="font-size:11px;letter-spacing:1px"><span style="color:#ef4d5a">♥♥</span><span style="color:#5a2b33;text-decoration:line-through">♥</span></span>
+            </div>
+
+            <div style="display:flex;gap:9px;align-items:center;padding:9px 10px;border-radius:10px;background:#0e1420;border:1px solid #1c2432">
+              <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#83d2ff;display:flex;align-items:center;justify-content:center;font-size:15px">🐧</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <div style="display:flex;justify-content:space-between"><span style="font-size:12px;font-weight:500">Zé</span><span style="font-size:11px;color:#0eb09e">✓ acertou</span></div>
+                <span style="font-size:10px;color:#9397ab">apostou 0 · fez 0 → mantém as vidas</span>
+              </div>
+              <span style="color:#ef4d5a;font-size:11px;letter-spacing:1px">♥♥</span>
+            </div>
+          </div>
+
+          <div style="margin-top:auto;padding:12px 14px 14px;display:flex;flex-direction:column;gap:9px;background:#0b1220;border-top:1px solid #1c2432">
+            <div style="display:flex;gap:8px;align-items:flex-start;padding:9px 10px;border-radius:8px;background:#131a26;border:1px solid #2a3648">
+              <span style="font-size:12px">⏱</span>
+              <span style="font-size:11px;color:#b2b6ca;line-height:1.45">Duda ficou sem tempo: apostou 0 automaticamente e não jogou 2 cartas.</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <span style="font-size:11px;color:#9397ab">Rodada 7 começa em instantes · 6 jogadores</span>
+              <span style="height:4px;border-radius:2px;background:#1c2432;overflow:hidden;display:block"><span style="display:block;width:40%;height:100%;background:#9184d9"></span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3. RODADA DE TESTA ============ -->
+  <section style="display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;align-items:baseline;gap:14px;border-bottom:1px solid #1c2432;padding-bottom:10px">
+      <span style="font-size:12px;letter-spacing:.2em;color:#75798c">03</span>
+      <h2 style="margin:0;font-size:24px;font-weight:500">Rodada de testa</h2>
+      <span style="font-size:13px;color:#75798c">1 carta · você é o único que não vê a própria carta</span>
+    </div>
+
+    <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:13px;font-weight:500">A · Apostando às cegas</span>
+          <span style="font-size:11px;color:#75798c">6 jogadores — o círculo se ajusta ao número de gente na mesa</span>
+        </div>
+        <div style="width:360px;height:800px;background:#080b14;border-radius:22px;border:1px solid #2a3242;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px">
+            <div style="display:flex;flex-direction:column;gap:1px">
+              <span style="font-size:14px;font-weight:500">Rodada 9 · 1 carta</span>
+              <span style="font-size:11px;color:#9397ab">Rodada de testa · sua vez de apostar</span>
+            </div>
+            <span style="width:44px;height:44px;border-radius:8px;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center;font-size:15px;color:#b2b6ca">☰</span>
+          </div>
+          <div style="margin:0 14px;height:4px;border-radius:2px;background:#1c2432;overflow:hidden"><span style="display:block;width:81%;height:100%;background:#9184d9"></span></div>
+
+          <div style="margin:10px 14px 0;display:flex;gap:9px;align-items:flex-start;padding:10px 11px;border-radius:10px;background:#131a26;border:1px solid #5d5294">
+            <span style="font-size:14px;line-height:1.1">👁</span>
+            <span style="font-size:12px;line-height:1.45;color:#e9e9ed;text-wrap:pretty"><b style="font-weight:500">Você não vê a sua carta — todos os outros veem.</b> <span style="color:#b2b6ca">Ela está na sua testa, virada para fora. Aposte olhando a carta e a cara dos outros.</span></span>
+          </div>
+
+          <!-- mesa de 6 -->
+          <div style="position:relative;height:394px;margin-top:10px">
+            <div style="position:absolute;left:50px;right:50px;top:16px;bottom:24px;border-radius:50%/30%;background:radial-gradient(ellipse at 50% 38%,#1b4269 0%,#123253 45%,#0a1c30 100%);box-shadow:inset 0 0 0 6px #0b1420,inset 0 0 0 7px #24405c,inset 0 22px 44px rgba(0,0,0,.45)"></div>
+
+            <!-- assento topo-esquerda -->
+            <div style="position:absolute;left:10px;top:0;width:104px;display:flex;flex-direction:column;align-items:center;gap:4px">
+              <div style="width:100%;padding:4px 5px;border-radius:10px;background:rgba(8,14,23,.9);border:1px solid #2a3648;display:flex;gap:6px;align-items:center">
+                <span style="flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:#c7b467;display:flex;align-items:center;justify-content:center;font-size:13px">🦊</span>
+                <span style="flex:1;font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Beto</span>
+                <span style="color:#ef4d5a;font-size:9px;letter-spacing:1px">♥♥</span>
+              </div>
+              <span style="width:52px;height:74px;border-radius:6px;background:linear-gradient(#f9fafd,#e6eaf3);color:#141824;display:flex;flex-direction:column;justify-content:space-between;padding:5px 6px;box-shadow:0 0 0 2px #c7b467,0 6px 14px rgba(0,0,0,.6)"><b style="font-size:19px;font-weight:600;line-height:1">K</b><b style="font-size:20px;line-height:1;text-align:right;font-weight:400">♠</b></span>
+              <span style="font-size:9px;padding:2px 7px;border-radius:20px;background:#1b2333;color:#d2cefd;letter-spacing:.04em">apostou GANHO</span>
+            </div>
+
+            <!-- assento topo-direita -->
+            <div style="position:absolute;right:10px;top:0;width:104px;display:flex;flex-direction:column;align-items:center;gap:4px">
+              <div style="width:100%;padding:4px 5px;border-radius:10px;background:rgba(8,14,23,.9);border:1px solid #2a3648;display:flex;gap:6px;align-items:center">
+                <span style="flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:#6594fa;display:flex;align-items:center;justify-content:center;font-size:13px">🐺</span>
+                <span style="flex:1;font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Caio</span>
+                <span style="color:#ef4d5a;font-size:9px;letter-spacing:1px">♥♥♥</span>
+              </div>
+              <span style="width:52px;height:74px;border-radius:6px;background:linear-gradient(#f9fafd,#e6eaf3);color:#d13a4a;display:flex;flex-direction:column;justify-content:space-between;padding:5px 6px;box-shadow:0 0 0 2px #6594fa,0 6px 14px rgba(0,0,0,.6)"><b style="font-size:19px;font-weight:600;line-height:1">5</b><b style="font-size:20px;line-height:1;text-align:right;font-weight:400">♦</b></span>
+              <span style="font-size:9px;padding:2px 7px;border-radius:20px;background:#1b2333;color:#d2cefd;letter-spacing:.04em">apostou PERCO</span>
+            </div>
+
+            <!-- assento centro-topo -->
+            <div style="position:absolute;left:128px;top:104px;width:104px;display:flex;flex-direction:column;align-items:center;gap:4px">
+              <span style="width:52px;height:74px;border-radius:6px;background:linear-gradient(#f9fafd,#e6eaf3);color:#141824;display:flex;flex-direction:column;justify-content:space-between;padding:5px 6px;box-shadow:0 0 0 2px #b580ca,0 6px 14px rgba(0,0,0,.6)"><b style="font-size:19px;font-weight:600;line-height:1">3</b><b style="font-size:20px;line-height:1;text-align:right;font-weight:400">♠</b></span>
+              <div style="width:100%;padding:4px 5px;border-radius:10px;background:rgba(8,14,23,.9);border:1px solid #2a3648;display:flex;gap:6px;align-items:center">
+                <span style="flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:#b580ca;display:flex;align-items:center;justify-content:center;font-size:13px">🦄</span>
+                <span style="flex:1;font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Thiago</span>
+                <span style="color:#ef4d5a;font-size:9px;letter-spacing:1px">♥♥♥</span>
+              </div>
+              <span style="font-size:9px;color:#9dbad4">ainda não apostou —</span>
+            </div>
+
+            <!-- assento esquerda -->
+            <div style="position:absolute;left:0;top:186px;width:104px;display:flex;flex-direction:column;align-items:center;gap:4px">
+              <span style="width:52px;height:74px;border-radius:6px;background:linear-gradient(#f9fafd,#e6eaf3);color:#141824;display:flex;flex-direction:column;justify-content:space-between;padding:5px 6px;box-shadow:0 0 0 2px #f86111,0 6px 14px rgba(0,0,0,.6)"><b style="font-size:19px;font-weight:600;line-height:1">9</b><b style="font-size:20px;line-height:1;text-align:right;font-weight:400">♣</b></span>
+              <div style="width:100%;padding:4px 5px;border-radius:10px;background:rgba(8,14,23,.9);border:1px solid #2a3648;display:flex;gap:6px;align-items:center">
+                <span style="flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:#f86111;display:flex;align-items:center;justify-content:center;font-size:13px">🦁</span>
+                <span style="flex:1;font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Rodrigão</span>
+                <span style="color:#ef4d5a;font-size:9px;letter-spacing:1px">♥♥</span>
+              </div>
+              <span style="font-size:9px;padding:2px 7px;border-radius:20px;background:#1b2333;color:#d2cefd;letter-spacing:.04em">apostou PERCO</span>
+            </div>
+
+            <!-- assento direita -->
+            <div style="position:absolute;right:0;top:186px;width:104px;display:flex;flex-direction:column;align-items:center;gap:4px">
+              <span style="width:52px;height:74px;border-radius:6px;background:linear-gradient(#f9fafd,#e6eaf3);color:#d13a4a;display:flex;flex-direction:column;justify-content:space-between;padding:5px 6px;box-shadow:0 0 0 2px #83d2ff,0 6px 14px rgba(0,0,0,.6)"><b style="font-size:19px;font-weight:600;line-height:1">A</b><b style="font-size:20px;line-height:1;text-align:right;font-weight:400">♥</b></span>
+              <div style="width:100%;padding:4px 5px;border-radius:10px;background:rgba(8,14,23,.9);border:1px solid #2a3648;display:flex;gap:6px;align-items:center">
+                <span style="flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:#83d2ff;display:flex;align-items:center;justify-content:center;font-size:13px">🐧</span>
+                <span style="flex:1;font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Zé</span>
+                <span style="color:#ef4d5a;font-size:9px;letter-spacing:1px">♥</span>
+              </div>
+              <span style="font-size:9px;color:#9dbad4">ainda não apostou —</span>
+            </div>
+
+            <!-- eu: verso na testa -->
+            <div style="position:absolute;left:110px;right:110px;bottom:2px;display:flex;flex-direction:column;align-items:center;gap:3px">
+              <div style="position:relative;height:78px;width:100%;display:flex;justify-content:center">
+                <span style="position:absolute;top:0;width:52px;height:74px;border-radius:6px;background:repeating-linear-gradient(135deg,#16304d 0 5px,#0f2440 5px 10px);border:1px solid #2c4a6e;box-shadow:0 6px 16px rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center"><span style="font-size:16px;color:#4d7ba8">?</span></span>
+              </div>
+              <div style="width:100%;padding:5px 8px;border-radius:12px;background:#0e1725;border:1px solid #9184d9;animation:fdpPulse 2.4s ease-out infinite;display:flex;flex-direction:column;align-items:center;gap:2px;margin-top:-16px">
+                <div style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#0eb09e;display:flex;align-items:center;justify-content:center;font-size:14px">🐙</span><span style="font-size:11px;font-weight:500">Você</span><span style="color:#ef4d5a;font-size:9px;letter-spacing:1px">♥♥♥</span></div>
+                <span style="font-size:9px;color:#d2cefd;letter-spacing:.06em">▶ SUA VEZ · CARTA OCULTA PARA VOCÊ</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:auto;padding:12px 14px 14px;display:flex;flex-direction:column;gap:9px;background:#0b1220;border-top:1px solid #1c2432">
+            <div style="display:flex;justify-content:space-between;align-items:baseline">
+              <span style="font-size:13px;font-weight:500">Você ganha esta vaza?</span>
+              <span style="font-size:11px;color:#9397ab">apostas da mesa: 3 de 6</span>
+            </div>
+            <div style="display:flex;gap:9px">
+              <span style="flex:1;height:56px;border-radius:8px;border:1px solid #9184d9;background:#131a26;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px"><b style="font-size:16px;font-weight:500;color:#d2cefd">Ganho</b><span style="font-size:9px;color:#9397ab">aposto 1 vaza</span></span>
+              <span style="flex:1;height:56px;border-radius:8px;border:1px solid #2a3648;background:#131a26;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px"><b style="font-size:16px;font-weight:500">Perco</b><span style="font-size:9px;color:#9397ab">aposto 0 vaza</span></span>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <span style="flex:1;min-height:40px;display:flex;align-items:center;padding:0 10px;border-radius:8px;background:#131a26;border:1px solid #2a3648;font-size:12px;color:#75798c">Escrever para a mesa…</span>
+              <span style="width:40px;height:40px;border-radius:8px;border:1px solid #2a3648;color:#b2b6ca;display:flex;align-items:center;justify-content:center;font-size:14px">💬</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:13px;font-weight:500">B · A revelação</span>
+          <span style="font-size:11px;color:#75798c">a carta vira primeiro; o resultado só aparece depois</span>
+        </div>
+        <div style="width:360px;height:800px;background:#080b14;border-radius:22px;border:1px solid #2a3242;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px">
+            <div style="display:flex;flex-direction:column;gap:1px">
+              <span style="font-size:14px;font-weight:500">Rodada 9 · 1 carta</span>
+              <span style="font-size:11px;color:#9397ab">Revelando</span>
+            </div>
+            <span style="width:44px;height:44px;border-radius:8px;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center;font-size:15px;color:#b2b6ca">☰</span>
+          </div>
+
+          <div style="position:relative;height:250px;margin-top:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px">
+            <div style="position:absolute;left:50px;right:50px;top:0;bottom:0;border-radius:50%/30%;background:radial-gradient(ellipse at 50% 38%,#1b4269 0%,#123253 45%,#0a1c30 100%);box-shadow:inset 0 0 0 6px #0b1420,inset 0 0 0 7px #24405c"></div>
+            <span style="position:relative;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#9dbad4">sua carta era</span>
+            <span style="position:relative;width:86px;height:122px;border-radius:9px;background:linear-gradient(#ffffff,#e9edf6);color:#141824;display:flex;flex-direction:column;justify-content:space-between;padding:9px 11px;box-shadow:0 0 0 2px #0eb09e,0 14px 34px rgba(0,0,0,.7);animation:fdpRise .5s ease-out"><b style="font-size:30px;font-weight:600;line-height:1">10</b><b style="font-size:32px;line-height:1;text-align:right;font-weight:400">♣</b></span>
+            <span style="position:relative;font-size:11px;color:#c7d6e5">Você apostou <b style="font-weight:500;color:#e9e9ed">Ganho</b></span>
+          </div>
+
+          <div style="padding:16px 14px 0;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;flex-direction:column;gap:5px;padding:12px;border-radius:12px;background:linear-gradient(#26101a,#180b12);border:1px solid #ef4d5a">
+              <div style="display:flex;justify-content:space-between;align-items:baseline">
+                <span style="font-size:15px;font-weight:500">A vaza foi do Beto</span>
+                <span style="font-size:14px;font-weight:600;color:#ff8fab">−1 vida</span>
+              </div>
+              <span style="font-size:11px;color:#e9c9d3">K♠ mata 10♣ · você apostou Ganho e perdeu</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;padding:11px 12px;border-radius:12px;background:#0e1420;border:1px solid #1c2432">
+              <span style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#75798c">Acerto de contas</span>
+              <div style="display:flex;justify-content:space-between;font-size:11px"><span style="display:flex;gap:6px;align-items:center"><span style="width:20px;height:20px;border-radius:50%;background:#c7b467;display:flex;align-items:center;justify-content:center;font-size:11px">🦊</span>Beto · Ganho, fez 1</span><span style="color:#0eb09e">✓ mantém ♥♥</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:11px"><span style="display:flex;gap:6px;align-items:center"><span style="width:20px;height:20px;border-radius:50%;background:#6594fa;display:flex;align-items:center;justify-content:center;font-size:11px">🐺</span>Caio · Perco, fez 0</span><span style="color:#0eb09e">✓ mantém ♥♥♥</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:11px"><span style="display:flex;gap:6px;align-items:center"><span style="width:20px;height:20px;border-radius:50%;background:#83d2ff;display:flex;align-items:center;justify-content:center;font-size:11px">🐧</span>Zé · Ganho, fez 0</span><span style="color:#ef4d5a">☠ eliminado</span></div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-start;padding:9px 10px;border-radius:8px;background:#131a26;border:1px solid #2a3648">
+              <span style="font-size:12px">💬</span>
+              <span style="font-size:11px;color:#b2b6ca;line-height:1.45"><b style="color:#e9e9ed;font-weight:500">Rodrigão</b> dava para ver na sua cara que era carta baixa</span>
+            </div>
+          </div>
+
+          <div style="margin-top:auto;padding:12px 14px 14px;display:flex;flex-direction:column;gap:6px;background:#0b1220;border-top:1px solid #1c2432">
+            <span style="font-size:11px;color:#9397ab">Rodada 10 começa em instantes · 5 jogadores</span>
+            <span style="height:4px;border-radius:2px;background:#1c2432;overflow:hidden;display:block"><span style="display:block;width:66%;height:100%;background:#9184d9"></span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4. PARTIDA PAUSADA ============ -->
+  <section style="display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;align-items:baseline;gap:14px;border-bottom:1px solid #1c2432;padding-bottom:10px">
+      <span style="font-size:12px;letter-spacing:.2em;color:#75798c">04</span>
+      <h2 style="margin:0;font-size:24px;font-weight:500">Partida pausada</h2>
+      <span style="font-size:13px;color:#75798c">overlay translúcido e não-modal · a mesa continua visível atrás</span>
+    </div>
+
+    <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:13px;font-weight:500">A · Antes de a decisão liberar</span>
+          <span style="font-size:11px;color:#75798c">nenhum botão de decisão na tela, nem desabilitado</span>
+        </div>
+        <div style="width:360px;height:800px;background:#080b14;border-radius:22px;border:1px solid #2a3242;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+          <div style="filter:blur(1.5px);opacity:.5;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px">
+              <div style="display:flex;flex-direction:column;gap:1px"><span style="font-size:14px;font-weight:500">Rodada 6 · 5 cartas</span><span style="font-size:11px;color:#9397ab">Vaza 4 de 5</span></div>
+              <span style="width:44px;height:44px;border-radius:8px;border:1px solid #2a3648"></span>
+            </div>
+            <div style="position:relative;height:352px;margin-top:8px">
+              <div style="position:absolute;left:58px;right:58px;top:10px;bottom:34px;border-radius:50%/32%;background:radial-gradient(ellipse at 50% 38%,#1b4269 0%,#123253 45%,#0a1c30 100%);box-shadow:inset 0 0 0 6px #0b1420,inset 0 0 0 7px #24405c"></div>
+              <div style="position:absolute;left:76px;top:14px;width:104px;height:44px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;gap:6px;align-items:center;padding:0 6px"><span style="width:24px;height:24px;border-radius:50%;background:#c7b467;display:flex;align-items:center;justify-content:center;font-size:13px">🦊</span><span style="font-size:11px">Beto</span></div>
+              <div style="position:absolute;right:4px;top:52px;width:104px;height:44px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;gap:6px;align-items:center;padding:0 6px"><span style="width:24px;height:24px;border-radius:50%;background:#6594fa;display:flex;align-items:center;justify-content:center;font-size:13px">🐺</span><span style="font-size:11px">Caio</span></div>
+              <div style="position:absolute;left:4px;top:152px;width:104px;height:44px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;gap:6px;align-items:center;padding:0 6px"><span style="width:24px;height:24px;border-radius:50%;background:#f86111;display:flex;align-items:center;justify-content:center;font-size:13px">🦁</span><span style="font-size:11px">Rodrigão</span></div>
+              <div style="position:absolute;right:4px;top:152px;width:104px;height:44px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;gap:6px;align-items:center;padding:0 6px"><span style="width:24px;height:24px;border-radius:50%;background:#b580ca;display:flex;align-items:center;justify-content:center;font-size:13px">🦄</span><span style="font-size:11px">Thiago</span></div>
+              <div style="position:absolute;left:110px;right:110px;bottom:0;height:44px;border-radius:12px;background:#0e1725;border:1px solid #2a3648;display:flex;gap:6px;align-items:center;justify-content:center"><span style="width:24px;height:24px;border-radius:50%;background:#0eb09e;display:flex;align-items:center;justify-content:center;font-size:13px">🐙</span><span style="font-size:11px">Você</span></div>
+            </div>
+          </div>
+
+          <div style="position:absolute;left:0;right:0;bottom:0;top:404px;background:linear-gradient(rgba(8,11,20,.72),rgba(8,11,20,.96) 22%);backdrop-filter:blur(3px);border-top:1px solid #2a3648;padding:18px 16px;display:flex;flex-direction:column;gap:16px">
+            <div style="display:flex;gap:11px;align-items:center">
+              <span style="flex:0 0 auto;width:46px;height:46px;border-radius:50%;background:#c7b467;display:flex;align-items:center;justify-content:center;font-size:24px;filter:grayscale(.55);box-shadow:0 0 0 2px #2a3648">🦊</span>
+              <div style="display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:17px;font-weight:500">Beto caiu da rede</span>
+                <span style="font-size:12px;color:#9397ab">✕ desconectado · a partida está parada</span>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:7px">
+              <span style="font-size:12px;color:#b2b6ca">Esperando ele voltar</span>
+              <span style="height:6px;border-radius:3px;background:#1c2432;overflow:hidden;display:block"><span style="display:block;width:38%;height:100%;background:#9184d9"></span></span>
+              <span style="font-size:11px;color:#75798c;line-height:1.45;text-wrap:pretty">Quando a barra encher, uma decisão fica disponível para o host: seguir sem ele ou encerrar a partida.</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:7px;padding:11px 12px;border-radius:10px;background:#101827;border:1px solid #1c2432">
+              <span style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#75798c">Onde a partida parou</span>
+              <span style="font-size:12px;color:#b2b6ca;line-height:1.5">Rodada 6, vaza 4 de 5. Era a vez do Beto jogar. Sua mão e as apostas ficam como estão.</span>
+            </div>
+
+            <div style="margin-top:auto;display:flex;flex-direction:column;gap:6px">
+              <span style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#75798c">Chat continua</span>
+              <div style="display:flex;gap:6px;align-items:flex-start"><span style="flex:0 0 auto;width:18px;height:18px;border-radius:50%;background:#6594fa;display:flex;align-items:center;justify-content:center;font-size:10px">🐺</span><span style="font-size:11px;line-height:1.4;color:#b2b6ca"><b style="color:#e9e9ed;font-weight:500">Caio</b> alguém liga pra ele</span></div>
+              <div style="display:flex;gap:6px;padding-top:2px">
+                <span style="flex:1;min-height:40px;display:flex;align-items:center;padding:0 10px;border-radius:8px;background:#131a26;border:1px solid #2a3648;font-size:12px;color:#75798c">Escrever para a mesa…</span>
+                <span style="width:40px;height:40px;border-radius:8px;border:1px solid #9184d9;color:#d2cefd;display:flex;align-items:center;justify-content:center;font-size:14px">➤</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:13px;font-weight:500">B · Decisão liberada — visão do host</span>
+          <span style="font-size:11px;color:#75798c">os botões dizem a consequência, não a ação</span>
+        </div>
+        <div style="width:360px;height:800px;background:#080b14;border-radius:22px;border:1px solid #2a3242;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+          <div style="filter:blur(1.5px);opacity:.45;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px">
+              <div style="display:flex;flex-direction:column;gap:1px"><span style="font-size:14px;font-weight:500">Rodada 6 · 5 cartas</span><span style="font-size:11px;color:#9397ab">Vaza 4 de 5</span></div>
+              <span style="width:44px;height:44px;border-radius:8px;border:1px solid #2a3648"></span>
+            </div>
+            <div style="position:relative;height:300px;margin-top:8px">
+              <div style="position:absolute;left:58px;right:58px;top:10px;bottom:0;border-radius:50%/32%;background:radial-gradient(ellipse at 50% 38%,#1b4269 0%,#123253 45%,#0a1c30 100%);box-shadow:inset 0 0 0 6px #0b1420,inset 0 0 0 7px #24405c"></div>
+              <div style="position:absolute;left:76px;top:14px;width:104px;height:44px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;gap:6px;align-items:center;padding:0 6px"><span style="width:24px;height:24px;border-radius:50%;background:#c7b467;display:flex;align-items:center;justify-content:center;font-size:13px">🦊</span><span style="font-size:11px">Beto</span></div>
+              <div style="position:absolute;right:4px;top:52px;width:104px;height:44px;border-radius:10px;background:rgba(8,14,23,.88);border:1px solid #2a3648;display:flex;gap:6px;align-items:center;padding:0 6px"><span style="width:24px;height:24px;border-radius:50%;background:#6594fa;display:flex;align-items:center;justify-content:center;font-size:13px">🐺</span><span style="font-size:11px">Caio</span></div>
+            </div>
+          </div>
+
+          <div style="position:absolute;left:0;right:0;bottom:0;top:300px;background:linear-gradient(rgba(8,11,20,.72),rgba(8,11,20,.97) 18%);backdrop-filter:blur(3px);border-top:1px solid #2a3648;padding:18px 16px;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;gap:11px;align-items:center">
+              <span style="flex:0 0 auto;width:46px;height:46px;border-radius:50%;background:#c7b467;display:flex;align-items:center;justify-content:center;font-size:24px;filter:grayscale(.55);box-shadow:0 0 0 2px #2a3648">🦊</span>
+              <div style="display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:17px;font-weight:500">Beto não voltou</span>
+                <span style="font-size:12px;color:#9397ab">✕ ausente há um tempo</span>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:9px;align-items:flex-start;padding:11px 12px;border-radius:10px;background:#131a26;border:1px solid #5d5294">
+              <span style="font-size:13px">👑</span>
+              <span style="font-size:12px;line-height:1.45;color:#e9e9ed">Existe uma <b style="font-weight:500">decisão pendente</b> e ela é sua — você é o host. <span style="color:#b2b6ca">Todos na mesa estão vendo que ela existe.</span></span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:7px">
+              <span style="font-size:12px;color:#b2b6ca">Se ninguém decidir, a partida encerra sozinha</span>
+              <span style="height:6px;border-radius:3px;background:#1c2432;overflow:hidden;display:block"><span style="display:block;width:71%;height:100%;background:#ef4d5a"></span></span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:9px;padding-top:2px">
+              <span style="min-height:52px;border-radius:8px;border:1px solid #9184d9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:6px"><b style="font-size:14px;font-weight:500;color:#d2cefd">Continuar sem Beto</b><span style="font-size:10px;color:#9397ab">ele perde as vidas e sai da partida</span></span>
+              <span style="min-height:52px;border-radius:8px;border:1px solid #3f424d;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:6px"><b style="font-size:14px;font-weight:500;color:#e9e9ed">Encerrar a partida</b><span style="font-size:10px;color:#9397ab">ninguém vence, todos voltam ao lobby</span></span>
+              <span style="font-size:10px;color:#75798c;text-align:center">“Continuar sem” pede confirmação antes de valer</span>
+            </div>
+
+            <div style="margin-top:auto;display:flex;flex-direction:column;gap:6px;padding:10px 11px;border-radius:10px;background:#101827;border:1px solid #1c2432">
+              <span style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#75798c">Ao retomar</span>
+              <div style="display:flex;gap:9px;align-items:center">
+                <span style="width:38px;height:38px;border-radius:50%;border:2px solid #9184d9;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:500;color:#d2cefd">3</span>
+                <span style="font-size:11px;color:#b2b6ca;line-height:1.45">Contagem visível de 3 segundos antes de os relógios voltarem a correr.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:13px;font-weight:500">C · A mesma pausa, para quem não é host</span>
+          <span style="font-size:11px;color:#75798c">vê que existe decisão e de quem é — sem botão fantasma</span>
+        </div>
+        <div style="width:360px;height:340px;background:#080b14;border-radius:22px;border:1px solid #2a3242;overflow:hidden;position:relative;box-shadow:0 24px 60px rgba(0,0,0,.6);padding:18px 16px;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;gap:11px;align-items:center">
+            <span style="flex:0 0 auto;width:46px;height:46px;border-radius:50%;background:#c7b467;display:flex;align-items:center;justify-content:center;font-size:24px;filter:grayscale(.55);box-shadow:0 0 0 2px #2a3648">🦊</span>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:17px;font-weight:500">Beto não voltou</span>
+              <span style="font-size:12px;color:#9397ab">✕ ausente há um tempo</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:9px;align-items:center;padding:11px 12px;border-radius:10px;background:#131a26;border:1px solid #2a3648">
+            <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#4ebf00;display:flex;align-items:center;justify-content:center;font-size:15px">🐸</span>
+            <span style="font-size:12px;line-height:1.45;color:#b2b6ca"><b style="color:#e9e9ed;font-weight:500">Mari 👑</b> está decidindo se a partida segue sem o Beto.</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <span style="font-size:12px;color:#b2b6ca">Se ninguém decidir, a partida encerra sozinha</span>
+            <span style="height:6px;border-radius:3px;background:#1c2432;overflow:hidden;display:block"><span style="display:block;width:71%;height:100%;background:#ef4d5a"></span></span>
+          </div>
+          <span style="font-size:11px;color:#75798c;line-height:1.45;text-wrap:pretty">Você não precisa fazer nada. A mesa continua visível atrás e o chat segue funcionando.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 5. FIM DE PARTIDA ============ -->
+  <section style="display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;align-items:baseline;gap:14px;border-bottom:1px solid #1c2432;padding-bottom:10px">
+      <span style="font-size:12px;letter-spacing:.2em;color:#75798c">05</span>
+      <h2 style="margin:0;font-size:24px;font-weight:500">Fim de partida</h2>
+      <span style="font-size:13px;color:#75798c">a vitória explicada, não só exibida</span>
+    </div>
+
+    <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">
+      <div style="width:360px;height:800px;background:#080b14;border-radius:22px;border:1px solid #2a3242;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+        <div style="padding:20px 16px 14px;background:radial-gradient(ellipse at 50% -10%,#1b4269 0%,#0c1c2e 70%,#080b14 100%);display:flex;flex-direction:column;gap:12px;border-bottom:1px solid #1c2432">
+          <span style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#9dbad4">partida encerrada · 9 rodadas</span>
+          <div style="display:flex;gap:12px;align-items:center">
+            <span style="flex:0 0 auto;width:56px;height:56px;border-radius:50%;background:#6594fa;display:flex;align-items:center;justify-content:center;font-size:28px;box-shadow:0 0 0 2px #0b1420,0 0 24px rgba(101,148,250,.45)">🐺</span>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:22px;font-weight:500;letter-spacing:-.01em">Caio venceu</span>
+              <span style="font-size:12px;color:#9dbad4">🏆 1º lugar · sobreviveu com ♥</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:9px;align-items:flex-start;padding:11px 12px;border-radius:10px;background:rgba(9,16,26,.72);border:1px solid #24405c">
+            <span style="font-size:13px">ℹ</span>
+            <span style="font-size:12px;line-height:1.5;color:#e9e9ed;text-wrap:pretty">Todos caíram na rodada 9 — <b style="font-weight:500">Caio segurou a última vida até a vaza 7</b>, mais do que qualquer outro, e por isso venceu.</span>
+          </div>
+        </div>
+
+        <div style="padding:12px 14px;display:flex;flex-direction:column;gap:7px;overflow-y:auto;flex:1;min-height:0">
+          <div style="display:flex;gap:9px;align-items:center;padding:9px 10px;border-radius:10px;background:#101827;border:1px solid #24405c">
+            <span style="width:18px;font-size:12px;color:#9dbad4;text-align:center">1</span>
+            <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#6594fa;display:flex;align-items:center;justify-content:center;font-size:15px">🐺</span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+              <span style="font-size:12px;font-weight:500">Caio 👑</span>
+              <span style="font-size:10px;color:#9397ab">6 apostas certas · 4 vidas perdidas · venceu na rodada 9</span>
+            </div>
+            <span style="font-size:13px">🏆</span>
+          </div>
+
+          <div style="display:flex;gap:9px;align-items:center;padding:9px 10px;border-radius:10px;background:#0e1420;border:1px solid #1c2432">
+            <span style="width:18px;font-size:12px;color:#75798c;text-align:center">2</span>
+            <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#0eb09e;display:flex;align-items:center;justify-content:center;font-size:15px">🐙</span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+              <span style="font-size:12px;font-weight:500">Você</span>
+              <span style="font-size:10px;color:#9397ab">5 apostas certas · 5 vidas perdidas · caiu na rodada 9, vaza 5</span>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:9px;align-items:center;padding:9px 10px;border-radius:10px;background:#0e1420;border:1px solid #1c2432">
+            <span style="width:18px;font-size:12px;color:#75798c;text-align:center">3</span>
+            <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#c7b467;display:flex;align-items:center;justify-content:center;font-size:15px">🦊</span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+              <span style="font-size:12px;font-weight:500">Beto</span>
+              <span style="font-size:10px;color:#9397ab">4 apostas certas · 5 vidas perdidas · caiu na rodada 9, vaza 3</span>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:9px;align-items:center;padding:9px 10px;border-radius:10px;background:#0e1420;border:1px solid #1c2432">
+            <span style="width:18px;font-size:12px;color:#75798c;text-align:center">4</span>
+            <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#83d2ff;display:flex;align-items:center;justify-content:center;font-size:15px">🐧</span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+              <span style="font-size:12px;font-weight:500">Zé</span>
+              <span style="font-size:10px;color:#9397ab">3 apostas certas · 4 vidas perdidas · caiu na rodada 9, vaza 1</span>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:9px;align-items:center;padding:9px 10px;border-radius:10px;background:#0e1420;border:1px solid #1c2432">
+            <span style="width:18px;font-size:12px;color:#75798c;text-align:center">5</span>
+            <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#f86111;display:flex;align-items:center;justify-content:center;font-size:15px">🦁</span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+              <span style="font-size:12px;font-weight:500">Rodrigão</span>
+              <span style="font-size:10px;color:#9397ab">4 apostas certas · 4 vidas perdidas · caiu na rodada 8</span>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:9px;align-items:center;padding:9px 10px;border-radius:10px;background:#0e1420;border:1px solid #1c2432">
+            <span style="width:18px;font-size:12px;color:#75798c;text-align:center">6</span>
+            <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#ff4983;display:flex;align-items:center;justify-content:center;font-size:15px">🦉</span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+              <span style="font-size:12px;font-weight:500">Ana Carolina</span>
+              <span style="font-size:10px;color:#9397ab">2 apostas certas · 3 vidas perdidas · caiu na rodada 6</span>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:9px;align-items:center;padding:9px 10px;border-radius:10px;background:#0b0f18;border:1px dashed #2a3242;opacity:.8">
+            <span style="width:18px;font-size:12px;color:#75798c;text-align:center">7</span>
+            <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#4ebf00;display:flex;align-items:center;justify-content:center;font-size:15px;filter:grayscale(.7)">🐸</span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+              <span style="font-size:12px;font-weight:500">Mari</span>
+              <span style="font-size:10px;color:#9397ab">↩ abandonou na rodada 7 · fica abaixo de todos</span>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:9px;align-items:center;padding:9px 10px;border-radius:10px;background:#0b0f18;border:1px dashed #2a3242;opacity:.8">
+            <span style="width:18px;font-size:12px;color:#75798c;text-align:center">8</span>
+            <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#b580ca;display:flex;align-items:center;justify-content:center;font-size:15px;filter:grayscale(.7)">🦄</span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+              <span style="font-size:12px;font-weight:500">Thiago</span>
+              <span style="font-size:10px;color:#9397ab">↩ abandonou na rodada 4</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:auto;padding:12px 14px 14px;display:flex;flex-direction:column;gap:9px;background:#0b1220;border-top:1px solid #1c2432">
+          <div style="display:flex;gap:8px">
+            <span style="flex:1;min-height:44px;border-radius:8px;border:1px solid #9184d9;color:#d2cefd;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:500">Revanche</span>
+            <span style="flex:1;min-height:44px;border-radius:8px;border:1px solid #3f424d;color:#b2b6ca;display:flex;align-items:center;justify-content:center;font-size:15px">Voltar ao lobby</span>
+          </div>
+          <span style="font-size:10px;color:#75798c;text-align:center">quem não é host vê apenas “aguardando o host”</span>
+        </div>
+      </div>
+
+      <!-- LOBBY -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:13px;font-weight:500">Lobby · visão do host</span>
+          <span style="font-size:11px;color:#75798c">código em destaque, configuração visível a todos, chat rodando</span>
+        </div>
+        <div style="width:360px;height:800px;background:#080b14;border-radius:22px;border:1px solid #2a3242;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+          <div style="padding:16px 16px 14px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid #1c2432">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#75798c">sala</span>
+              <span style="display:flex;gap:4px;align-items:center;font-size:11px;color:#9397ab"><span style="width:7px;height:7px;border-radius:50%;background:#0eb09e"></span>estável</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="font-size:34px;font-weight:500;letter-spacing:.16em;line-height:1">KRVTZ</span>
+              <span style="margin-left:auto;min-height:44px;padding:0 12px;border-radius:8px;border:1px solid #9184d9;color:#d2cefd;font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px">⧉ Copiar link</span>
+            </div>
+            <span style="font-size:11px;color:#9397ab">Manda no grupo. Quem abrir cai direto aqui.</span>
+          </div>
+
+          <div style="padding:12px 14px;display:flex;flex-direction:column;gap:7px;overflow-y:auto;flex:1;min-height:0">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:2px">
+              <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#75798c">jogadores · 5 de 8</span>
+              <span style="font-size:10px;color:#75798c">cor + emoji únicos</span>
+            </div>
+            <div style="display:flex;gap:9px;align-items:center;padding:8px 10px;border-radius:10px;background:#101827;border:1px solid #2a3648">
+              <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#0eb09e;display:flex;align-items:center;justify-content:center;font-size:15px">🐙</span>
+              <span style="flex:1;font-size:12px;font-weight:500">Você <span style="color:#9397ab;font-weight:400">👑 host</span></span>
+              <span style="width:7px;height:7px;border-radius:50%;background:#0eb09e"></span>
+            </div>
+            <div style="display:flex;gap:9px;align-items:center;padding:8px 10px;border-radius:10px;background:#0e1420;border:1px solid #1c2432">
+              <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#c7b467;display:flex;align-items:center;justify-content:center;font-size:15px">🦊</span>
+              <span style="flex:1;font-size:12px;font-weight:500">Beto</span>
+              <span style="width:7px;height:7px;border-radius:50%;background:#0eb09e"></span>
+            </div>
+            <div style="display:flex;gap:9px;align-items:center;padding:8px 10px;border-radius:10px;background:#0e1420;border:1px solid #1c2432">
+              <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#ff4983;display:flex;align-items:center;justify-content:center;font-size:15px">🦉</span>
+              <span style="flex:1;font-size:12px;font-weight:500">Ana Carolina</span>
+              <span style="display:flex;gap:4px;align-items:center;font-size:9px;color:#c7b467">◐ instável</span>
+            </div>
+            <div style="display:flex;gap:9px;align-items:center;padding:8px 10px;border-radius:10px;background:#0e1420;border:1px solid #1c2432">
+              <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#6594fa;display:flex;align-items:center;justify-content:center;font-size:15px">🐺</span>
+              <span style="flex:1;font-size:12px;font-weight:500">Caio</span>
+              <span style="width:7px;height:7px;border-radius:50%;background:#0eb09e"></span>
+            </div>
+            <div style="display:flex;gap:9px;align-items:center;padding:8px 10px;border-radius:10px;background:#0e1420;border:1px solid #1c2432">
+              <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#f86111;display:flex;align-items:center;justify-content:center;font-size:15px">🦁</span>
+              <span style="flex:1;font-size:12px;font-weight:500">Rodrigão</span>
+              <span style="width:7px;height:7px;border-radius:50%;background:#0eb09e"></span>
+            </div>
+            <div style="display:flex;gap:9px;align-items:center;padding:6px 10px;border-radius:10px;background:#0b0f18;border:1px dashed #2a3242">
+              <span style="flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:#3f424d;display:flex;align-items:center;justify-content:center;font-size:11px">👁</span>
+              <span style="flex:1;font-size:11px;color:#9397ab">Espectadores · Duda</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:9px;margin-top:6px;padding:11px 12px;border-radius:10px;background:#0e1420;border:1px solid #1c2432">
+              <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#75798c">configuração da partida</span>
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:12px;color:#b2b6ca">Vidas iniciais</span>
+                <div style="display:flex;gap:4px">
+                  <span style="min-width:36px;height:36px;border-radius:8px;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center;font-size:13px">3</span>
+                  <span style="min-width:36px;height:36px;border-radius:8px;border:1px solid #9184d9;background:#1b2333;color:#d2cefd;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">5</span>
+                  <span style="min-width:36px;height:36px;border-radius:8px;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center;font-size:13px">7</span>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:12px;color:#b2b6ca">Máximo de cartas</span>
+                <div style="display:flex;gap:4px">
+                  <span style="min-width:36px;height:36px;border-radius:8px;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center;font-size:13px">5</span>
+                  <span style="min-width:36px;height:36px;border-radius:8px;border:1px solid #9184d9;background:#1b2333;color:#d2cefd;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">7</span>
+                  <span style="min-width:36px;height:36px;border-radius:8px;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center;font-size:13px">9</span>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span style="font-size:12px;color:#b2b6ca">Regra de empate</span>
+                <div style="display:flex;gap:8px;align-items:flex-start;padding:9px 10px;border-radius:8px;background:#131a26;border:1px solid #9184d9">
+                  <span style="flex:0 0 auto;width:14px;height:14px;border-radius:50%;border:2px solid #9184d9;margin-top:2px;display:flex;align-items:center;justify-content:center"><span style="width:6px;height:6px;border-radius:50%;background:#9184d9"></span></span>
+                  <span style="font-size:11px;line-height:1.45"><b style="font-weight:500">Ninguém leva</b><br><span style="color:#9397ab">A vaza empatada some da mesa. Ela não conta para ninguém, e quem apostou alto se queima.</span></span>
+                </div>
+                <div style="display:flex;gap:8px;align-items:flex-start;padding:9px 10px;border-radius:8px;background:#0e1420;border:1px solid #2a3648">
+                  <span style="flex:0 0 auto;width:14px;height:14px;border-radius:50%;border:2px solid #3f424d;margin-top:2px"></span>
+                  <span style="font-size:11px;line-height:1.45"><b style="font-weight:500">Primeiro a jogar leva</b><br><span style="color:#9397ab">Empate vai para quem jogou a carta primeiro. Premia sair na frente e muda a mesa toda.</span></span>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+              <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#75798c">chat do lobby</span>
+              <div style="display:flex;gap:6px;align-items:flex-start"><span style="flex:0 0 auto;width:18px;height:18px;border-radius:50%;background:#c7b467;display:flex;align-items:center;justify-content:center;font-size:10px">🦊</span><span style="font-size:11px;line-height:1.4;color:#b2b6ca"><b style="color:#e9e9ed;font-weight:500">Beto</b> bora, tô no ônibus ainda</span></div>
+              <div style="display:flex;gap:6px;align-items:flex-start"><span style="flex:0 0 auto;width:18px;height:18px;border-radius:50%;background:#6594fa;display:flex;align-items:center;justify-content:center;font-size:10px">🐺</span><span style="font-size:11px;line-height:1.4;color:#b2b6ca"><b style="color:#e9e9ed;font-weight:500">Caio</b> 5 vidas dessa vez, sem choro</span></div>
+              <div style="display:flex;gap:6px;align-items:flex-start"><span style="flex:0 0 auto;width:18px;height:18px;border-radius:50%;background:#f86111;display:flex;align-items:center;justify-content:center;font-size:10px">🦁</span><span style="font-size:11px;line-height:1.4;color:#b2b6ca"><b style="color:#e9e9ed;font-weight:500">Rodrigão</b> chamei a Mari</span></div>
+            </div>
+          </div>
+
+          <div style="padding:10px 14px 14px;display:flex;flex-direction:column;gap:9px;background:#0b1220;border-top:1px solid #1c2432">
+            <div style="display:flex;gap:6px">
+              <span style="flex:1;min-height:40px;display:flex;align-items:center;padding:0 10px;border-radius:8px;background:#131a26;border:1px solid #2a3648;font-size:12px;color:#75798c">Escrever no lobby…</span>
+              <span style="width:40px;height:40px;border-radius:8px;border:1px solid #2a3648;color:#b2b6ca;display:flex;align-items:center;justify-content:center;font-size:14px">➤</span>
+            </div>
+            <span style="min-height:48px;border-radius:8px;border:1px solid #9184d9;color:#d2cefd;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:500">Iniciar partida · 5 jogadores</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- HOST SOZINHO + HOME + PERFIL -->
+      <div style="display:flex;flex-direction:column;gap:32px">
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <span style="font-size:13px;font-weight:500">Lobby · host sozinho</span>
+            <span style="font-size:11px;color:#75798c">a tela empurra para compartilhar — é aqui que os 45 segundos se ganham</span>
+          </div>
+          <div style="width:360px;height:520px;background:#080b14;border-radius:22px;border:1px solid #2a3242;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+            <div style="padding:18px 16px;display:flex;flex-direction:column;gap:14px;flex:1">
+              <span style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#75798c">sala criada</span>
+              <div style="display:flex;flex-direction:column;gap:6px;align-items:center;padding:18px 14px;border-radius:14px;background:radial-gradient(ellipse at 50% 0%,#16375a 0%,#0d1c2e 75%);border:1px solid #24405c">
+                <span style="font-size:12px;color:#9dbad4">Sua sala está de pé e vazia</span>
+                <span style="font-size:40px;font-weight:500;letter-spacing:.18em;line-height:1.1">KRVTZ</span>
+                <span style="min-height:48px;padding:0 20px;border-radius:8px;border:1px solid #9184d9;color:#d2cefd;font-size:15px;font-weight:500;display:flex;align-items:center;gap:8px;margin-top:4px">⧉ Copiar link do convite</span>
+                <span style="font-size:11px;color:#9dbad4">cola no grupo e todo mundo entra por ele</span>
+              </div>
+              <div style="display:flex;gap:9px;align-items:flex-start;padding:11px 12px;border-radius:10px;background:#131a26;border:1px solid #2a3648">
+                <span style="font-size:13px">👥</span>
+                <span style="font-size:12px;line-height:1.45;color:#b2b6ca">Você é o único aqui. <b style="color:#e9e9ed;font-weight:500">A partida precisa de 2 pessoas</b> — chame alguém e o botão libera sozinho.</span>
+              </div>
+              <div style="display:flex;gap:9px;align-items:center;padding:8px 10px;border-radius:10px;background:#101827;border:1px solid #2a3648">
+                <span style="flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#0eb09e;display:flex;align-items:center;justify-content:center;font-size:15px">🐙</span>
+                <span style="flex:1;font-size:12px;font-weight:500">Você <span style="color:#9397ab;font-weight:400">👑 host</span></span>
+                <span style="width:7px;height:7px;border-radius:50%;background:#0eb09e"></span>
+              </div>
+            </div>
+            <div style="padding:12px 14px 14px;display:flex;flex-direction:column;gap:6px;background:#0b1220;border-top:1px solid #1c2432">
+              <span style="min-height:48px;border-radius:8px;border:1px solid #3f424d;color:#b2b6ca;display:flex;align-items:center;justify-content:center;font-size:16px;opacity:.45">Iniciar partida</span>
+              <span style="font-size:11px;color:#9397ab;text-align:center">faltam 1 jogador para poder começar</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <span style="font-size:13px;font-weight:500">Home</span>
+          <div style="width:360px;height:520px;background:#080b14;border-radius:22px;border:1px solid #2a3242;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+            <div style="padding:34px 20px 0;display:flex;flex-direction:column;gap:6px;background:radial-gradient(ellipse at 50% -20%,#16375a 0%,#080b14 70%)">
+              <span style="font-size:42px;font-weight:500;letter-spacing:.02em;line-height:1">FDP</span>
+              <span style="font-size:13px;color:#9dbad4;line-height:1.45">Vazas, aposta e blefe. De 2 a 8 pessoas, cada uma no seu celular.</span>
+            </div>
+            <div style="padding:26px 20px 0;display:flex;flex-direction:column;gap:12px">
+              <span style="min-height:52px;border-radius:8px;border:1px solid #9184d9;color:#d2cefd;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:500">Criar sala</span>
+              <div style="display:flex;align-items:center;gap:10px;padding:2px 0"><span style="flex:1;height:1px;background:#1c2432"></span><span style="font-size:11px;color:#75798c">ou</span><span style="flex:1;height:1px;background:#1c2432"></span></div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <span style="font-size:12px;color:#b2b6ca">Entrar com código</span>
+                <div style="display:flex;gap:7px">
+                  <span style="flex:1;height:56px;border-radius:8px;background:#131a26;border:1px solid #9184d9;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:500">K</span>
+                  <span style="flex:1;height:56px;border-radius:8px;background:#131a26;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:500">R</span>
+                  <span style="flex:1;height:56px;border-radius:8px;background:#131a26;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:500">V</span>
+                  <span style="flex:1;height:56px;border-radius:8px;background:#131a26;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center;font-size:22px;color:#3f424d">·</span>
+                  <span style="flex:1;height:56px;border-radius:8px;background:#131a26;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center;font-size:22px;color:#3f424d">·</span>
+                </div>
+                <span style="font-size:10px;color:#75798c">5 caracteres · maiúsculas automáticas · teclado alfanumérico</span>
+                <span style="min-height:48px;border-radius:8px;border:1px solid #3f424d;color:#b2b6ca;display:flex;align-items:center;justify-content:center;font-size:15px;opacity:.45">Entrar</span>
+              </div>
+            </div>
+            <div style="margin-top:auto;padding:16px 20px 20px;display:flex;justify-content:center">
+              <a href="#regras" style="font-size:13px;border-bottom:1px solid #5d5294;padding-bottom:2px">Como se joga</a>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <span style="font-size:13px;font-weight:500">Perfil</span>
+          <div style="width:360px;height:820px;background:#080b14;border-radius:22px;border:1px solid #2a3242;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+            <div style="padding:18px 16px 14px;display:flex;flex-direction:column;gap:14px">
+              <span style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#75798c">quem você é na mesa</span>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;border-radius:14px;background:radial-gradient(ellipse at 50% 20%,#16375a 0%,#0c1c2e 80%);border:1px solid #24405c">
+                <span style="width:104px;padding:6px 8px;border-radius:10px;background:rgba(8,14,23,.9);border:1px solid #2a3648;display:flex;flex-direction:column;gap:3px">
+                  <span style="display:flex;gap:6px;align-items:center"><span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#0eb09e;display:flex;align-items:center;justify-content:center;font-size:14px">🐙</span><span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Rafa</span></span>
+                  <span style="display:flex;justify-content:space-between;align-items:center"><span style="color:#ef4d5a;font-size:10px;letter-spacing:1px">♥♥♥</span><span style="font-size:12px;font-weight:600">2<span style="color:#9397ab;font-weight:400">/3</span></span></span>
+                </span>
+                <span style="font-size:11px;color:#9dbad4">é exatamente assim que os outros te veem</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <span style="font-size:12px;color:#b2b6ca">Apelido</span>
+                <span style="min-height:48px;display:flex;align-items:center;padding:0 12px;border-radius:8px;background:#131a26;border:1px solid #9184d9;font-size:16px">Rafa<span style="width:1px;height:20px;background:#9184d9;margin-left:2px"></span></span>
+                <span style="font-size:10px;color:#75798c">4 de 16 caracteres · mínimo 2</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <span style="font-size:12px;color:#b2b6ca">Cor</span>
+                <div style="display:flex;gap:7px;flex-wrap:wrap">
+                  <span style="width:36px;height:36px;border-radius:50%;background:#c7b467"></span>
+                  <span style="width:36px;height:36px;border-radius:50%;background:#f86111"></span>
+                  <span style="width:36px;height:36px;border-radius:50%;background:#ff4983"></span>
+                  <span style="width:36px;height:36px;border-radius:50%;background:#b580ca"></span>
+                  <span style="width:36px;height:36px;border-radius:50%;background:#6594fa"></span>
+                  <span style="width:36px;height:36px;border-radius:50%;background:#83d2ff"></span>
+                  <span style="width:36px;height:36px;border-radius:50%;background:#0eb09e;box-shadow:0 0 0 2px #080b14,0 0 0 4px #9184d9;display:flex;align-items:center;justify-content:center;font-size:14px;color:#08201d">✓</span>
+                  <span style="width:36px;height:36px;border-radius:50%;background:#4ebf00;opacity:.35;display:flex;align-items:center;justify-content:center;font-size:11px;color:#0d1a05">✕</span>
+                </div>
+                <span style="font-size:10px;color:#75798c">lime já é da Mari nesta sala</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <span style="font-size:12px;color:#b2b6ca">Emoji</span>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:20px;line-height:1.6">
+                  <span style="width:40px;height:40px;border-radius:8px;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center">🦊</span>
+                  <span style="width:40px;height:40px;border-radius:8px;border:1px solid #9184d9;background:#1b2333;display:flex;align-items:center;justify-content:center">🐙</span>
+                  <span style="width:40px;height:40px;border-radius:8px;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center">🐸</span>
+                  <span style="width:40px;height:40px;border-radius:8px;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center">🦁</span>
+                  <span style="width:40px;height:40px;border-radius:8px;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center">🐼</span>
+                  <span style="width:40px;height:40px;border-radius:8px;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center">🦉</span>
+                  <span style="width:40px;height:40px;border-radius:8px;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center">🐺</span>
+                  <span style="width:40px;height:40px;border-radius:8px;border:1px solid #2a3648;display:flex;align-items:center;justify-content:center">🦝</span>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:auto;padding:12px 14px 14px;background:#0b1220;border-top:1px solid #1c2432">
+              <span style="min-height:48px;border-radius:8px;border:1px solid #9184d9;color:#d2cefd;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:500">Entrar na sala KRVTZ</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6. ESTADOS DE CONEXÃO ============ -->
+  <section style="display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;align-items:baseline;gap:14px;border-bottom:1px solid #1c2432;padding-bottom:10px">
+      <span style="font-size:12px;letter-spacing:.2em;color:#75798c">06</span>
+      <h2 style="margin:0;font-size:24px;font-weight:500">Estados de conexão</h2>
+      <span style="font-size:13px;color:#75798c">o que bloqueia e o que não bloqueia</span>
+    </div>
+
+    <div style="display:flex;gap:20px;flex-wrap:wrap">
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:12px;color:#b2b6ca">Conectando</span>
+        <div style="width:280px;height:220px;background:#080b14;border-radius:16px;border:1px solid #2a3242;overflow:hidden;position:relative">
+          <div style="height:3px;background:linear-gradient(90deg,#9184d9 0 40%,#1c2432 40%)"></div>
+          <div style="padding:8px 12px;display:flex;gap:6px;align-items:center;font-size:11px;color:#9397ab"><span style="width:7px;height:7px;border-radius:50%;background:#c7b467"></span>conectando…</div>
+          <div style="margin:6px 12px;height:130px;border-radius:50%/34%;background:radial-gradient(ellipse at 50% 38%,#1b4269 0%,#123253 45%,#0a1c30 100%);box-shadow:inset 0 0 0 5px #0b1420,inset 0 0 0 6px #24405c"></div>
+          <span style="position:absolute;bottom:8px;left:12px;right:12px;font-size:10px;color:#75798c;line-height:1.4">Barra sutil no topo. Nada bloqueado, a mesa segue clicável.</span>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:12px;color:#b2b6ca">Reconectando · não-modal</span>
+        <div style="width:280px;height:220px;background:#080b14;border-radius:16px;border:1px solid #2a3242;overflow:hidden;position:relative">
+          <div style="margin:12px;height:140px;border-radius:50%/34%;background:radial-gradient(ellipse at 50% 38%,#1b4269 0%,#123253 45%,#0a1c30 100%);box-shadow:inset 0 0 0 5px #0b1420,inset 0 0 0 6px #24405c;opacity:.75"></div>
+          <div style="position:absolute;left:12px;right:12px;bottom:12px;padding:10px 11px;border-radius:10px;background:rgba(11,18,32,.9);border:1px solid #2a3648;display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:11px;color:#e9e9ed">↻ Reconectando você à mesa</span>
+            <span style="height:4px;border-radius:2px;background:#1c2432;overflow:hidden;display:block"><span style="display:block;width:52%;height:100%;background:#9184d9"></span></span>
+            <span style="font-size:10px;color:#9397ab">a mesa continua visível — você acompanha o que perdeu</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:12px;color:#b2b6ca">Sessão aberta em outra aba · modal</span>
+        <div style="width:280px;height:220px;background:#080b14;border-radius:16px;border:1px solid #2a3242;overflow:hidden;position:relative">
+          <div style="margin:12px;height:140px;border-radius:50%/34%;background:radial-gradient(ellipse at 50% 38%,#1b4269 0%,#123253 45%,#0a1c30 100%);opacity:.3;filter:blur(2px)"></div>
+          <div style="position:absolute;inset:0;background:rgba(6,9,16,.86);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:16px">
+            <span style="font-size:18px">⧉</span>
+            <span style="font-size:12px;text-align:center;line-height:1.45">Você abriu a partida em outra aba.<br><span style="color:#9397ab">Só uma pode jogar.</span></span>
+            <span style="min-height:40px;padding:0 16px;border-radius:8px;border:1px solid #9184d9;color:#d2cefd;font-size:13px;font-weight:500;display:flex;align-items:center">Jogar aqui</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:12px;color:#b2b6ca">Sala encerrada · tela cheia</span>
+        <div style="width:280px;height:220px;background:#080b14;border-radius:16px;border:1px solid #2a3242;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:18px">
+          <span style="font-size:20px">✕</span>
+          <span style="font-size:14px;font-weight:500">A sala KRVTZ foi encerrada</span>
+          <span style="font-size:11px;color:#9397ab;text-align:center;line-height:1.45">O host fechou a mesa. Nada mais acontece aqui.</span>
+          <span style="min-height:40px;padding:0 16px;border-radius:8px;border:1px solid #9184d9;color:#d2cefd;font-size:13px;font-weight:500;display:flex;align-items:center">Voltar ao início</span>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:12px;color:#b2b6ca">Versão desatualizada · tela cheia</span>
+        <div style="width:280px;height:220px;background:#080b14;border-radius:16px;border:1px solid #2a3242;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:18px">
+          <span style="font-size:20px">↻</span>
+          <span style="font-size:14px;font-weight:500">O jogo foi atualizado</span>
+          <span style="font-size:11px;color:#9397ab;text-align:center;line-height:1.45">Recarregue para voltar à mesa. Sua cadeira fica guardada.</span>
+          <span style="min-height:40px;padding:0 16px;border-radius:8px;border:1px solid #9184d9;color:#d2cefd;font-size:13px;font-weight:500;display:flex;align-items:center">Recarregar</span>
+        </div>
+      </div>
+
+      <div style="width:280px;padding:16px;border-radius:16px;background:#0d121c;border:1px solid #1c2432;display:flex;flex-direction:column;gap:9px">
+        <span style="font-size:12px;font-weight:500">Regras que valem em toda tela</span>
+        <span style="font-size:11px;color:#b2b6ca;line-height:1.5">Timer é sempre barra, nunca número em contagem.</span>
+        <span style="font-size:11px;color:#b2b6ca;line-height:1.5">Todo estado tem ícone ou texto além da cor: ▶ jogando, ✕ ausente, ☠ já era, ✓ acertou.</span>
+        <span style="font-size:11px;color:#b2b6ca;line-height:1.5">Alvo mínimo de 44×44, inclusive as cartas da mão (48×68).</span>
+        <span style="font-size:11px;color:#b2b6ca;line-height:1.5">Nenhuma tela rola na horizontal; o leque de mão é a única faixa rolável, e só nela.</span>
+      </div>
+    </div>
+  </section>
+</div>
+</x-dc>
+</body>
+</html>

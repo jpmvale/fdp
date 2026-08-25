@@ -35,6 +35,25 @@ jobs:
       - name: Typecheck
         run: npx tsc -b --pretty
 
+      # Antes dos testes: o servidor serve `app/build/`, e a suíte de HTTP lê
+      # o `index.html` de lá. Sem este passo ela falha por arquivo ausente, e o
+      # sintoma (500 na raiz) não parece o que é.
+      - name: Build do cliente
+        run: npm run build:client
+
+      # RNF-055: o bundle inicial não passa de 180 KB comprimido. Verificado
+      # aqui e não no code review porque é o tipo de teto que se fura sem
+      # ninguém notar, uma dependência por vez.
+      - name: Orçamento do bundle
+        run: |
+          BYTES=$(cat app/build/assets/*.js | gzip -9 | wc -c)
+          TETO=$((180 * 1024))
+          echo "bundle: $BYTES bytes comprimidos (teto $TETO)"
+          if [ "$BYTES" -gt "$TETO" ]; then
+            echo "::error::o bundle passou de 180 KB comprimidos (RNF-055)"
+            exit 1
+          fi
+
       # Inclui CA-310/CA-311: 1.000 partidas simuladas sem violar invariante,
       # e a suíte de contrato do RoomStore contra Redis de verdade.
       - name: Testes

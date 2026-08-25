@@ -79,7 +79,7 @@ async function main(): Promise<void> {
   const app = createHttpApp({
     hub,
     signer,
-    clientPath: fileURLToPath(new URL('../../app/index.html', import.meta.url)),
+    clientPath: fileURLToPath(new URL('../../app/build/', import.meta.url)),
     allowedOrigin: ALLOWED_ORIGIN,
     trustProxy: TRUST_PROXY,
     version: VERSION,

@@ -7,15 +7,25 @@
     "types": [
       "node"
     ],
-    "composite": true
+    "composite": true,
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "jsx": "react-jsx"
   },
   "include": [
     "src/**/*.ts",
+    "src/**/*.tsx",
     "test/**/*.ts"
   ],
   "references": [
     {
       "path": "../packages/protocol"
+    },
+    {
+      "path": "../packages/rules"
     }
   ]
 }

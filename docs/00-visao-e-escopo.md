@@ -60,6 +60,7 @@ O produto vive ou morre por três atributos, nesta ordem de prioridade:
 | RF-014 | Espectadores: quem entra com a partida em andamento assiste e joga na próxima |
 | RF-015 | Tela de regras acessível a qualquer momento, sem sair da partida |
 | RF-016 | Log de rodada: histórico do que aconteceu na partida atual |
+| RF-017 | Chat de texto da sala, disponível no lobby e durante a partida, com histórico vivendo enquanto a sala viver |
 
 ### 4.2 Fora do escopo da v1
 
@@ -67,7 +68,7 @@ Registrado explicitamente para não haver ambiguidade — **não implementar**:
 
 - Contas, login, senha, OAuth ou perfil persistente entre sessões.
 - Matchmaking público, salas abertas ou lista de partidas.
-- Chat de texto ou voz. (O grupo já está em chamada ou na mesma sala.)
+- Chat de **voz**. (O grupo já está em chamada ou na mesma sala.) O chat de **texto** entrou no escopo em 25/08/2026 — ver RF-017 e a decisão P9.
 - Ranking global, conquistas, progressão, moeda ou cosméticos.
 - Bots / jogadores controlados por IA.
 - Modo local pass-and-play no mesmo dispositivo.
@@ -94,6 +95,7 @@ completar mesa, e persistência de histórico de partidas.
 | P7 | Jogador **desconectado** pausa a partida; host decide após 60 s; pausa morre em 10 min | `02` §3.8.2 e §3.8.3 |
 | P8 | O baralho escala em número de baralhos, não em teto de cartas | `02` RJ-024 |
 | P6 | Português do Brasil é o único idioma da v1 | Textos centralizados mesmo assim, ver `08` |
+| P9 | Chat de texto entra na v1 (decisão de 25/08/2026, revertendo a exclusão original) | RF-017; na Mesa não pode roubar altura das cartas nem do cartão de adversário (`07`) |
 
 ## 6. Riscos
 
@@ -103,7 +105,8 @@ completar mesa, e persistência de histórico de partidas.
 | Jogador que some no meio da rodada | Partida pausa e o grupo espera | Decisão do host após 60 s + `PAUSE_MAX` de 10 min (RJ-150, RJ-157) |
 | Conexão instável pausando o jogo repetidamente | Mesa fica insuportável | Métrica de pausas por partida (`09` §5); decisão revisável registrada em `02` §3.8.3 |
 | Conexão instável em celular | Jogador perde estado e frustra | Resync completo por versão de estado (`05`) |
-| Escopo inflar com chat/ranking | Não entrega a v1 | §4.2 é vinculante; mudanças exigem editar este doc |
+| Escopo inflar | Não entrega a v1 | §4.2 é vinculante; mudanças exigem editar este doc — foi o que se fez com o chat de texto em 25/08/2026 (P9) |
+| Chat comer a tela mais apertada do produto | Mesa fica ilegível em 360 px com 8 jogadores | O chat na Mesa é subordinado às cartas e aos cartões de adversário; requisito de espaço em `07` |
 | Trapaça inspecionando a rede | Quebra a confiança do grupo | Servidor nunca envia estado oculto ao cliente (`09`) |
 | Vazar a própria carta na rodada de testa | Destrói a mecânica central do jogo | Projeção invertida por destinatário + INV-13, CA-281 e CA-285 |
 
