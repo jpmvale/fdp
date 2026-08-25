@@ -187,10 +187,9 @@ printf "\n%s\n" "$(cat chave.pub)" >> ~/.ssh/authorized_keys
 
 ## O que fazer a seguir
 
-1. **Aplicar os alertas** de [`deploy/alertas-grafana.yml`](deploy/alertas-grafana.yml)
-   no stack pessoal do Grafana. As regras estão escritas; falta o UID da fonte
-   de dados e a importação, que precisam de acesso ao Grafana — as credenciais
-   na VPS são só de escrita de métricas.
+1. **Apontar o ponto de notificação** dos alertas. Eles estão no ar e avaliando,
+   mas o aviso vai para o destino padrão do stack — e alerta que ninguém recebe
+   é o mesmo que alerta que não existe. Vale testar com um disparo real.
 2. **Completar os eventos estruturais**, se os 31% de resync incomodarem:
    `round:phaseChanged` não carrega a vaza que o motor acaba de criar, e
    `trick:resolved` não carrega a ordem de jogo da próxima. Enquanto não

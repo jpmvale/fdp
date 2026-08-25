@@ -135,14 +135,26 @@ despenca a zero durante um incidente conta a história errada depois.
 
 ### Alertas
 
-As regras estão em [`alertas-grafana.yml`](alertas-grafana.yml), no formato de
-provisionamento do Grafana (schema v1). Para aplicar:
+**Aplicadas em 25/08/2026**, na pasta `FDP` do stack pessoal, grupo `fdp`,
+avaliação de 1 min. A fonte de dados é `grafanacloud-prom`.
 
-1. Descubra o UID da fonte de dados Prometheus do stack pessoal (1749973) —
-   aparece na URL ao abrir a fonte em **Connections → Data sources**.
-2. Troque `SUBSTITUA_PELO_UID_DO_PROMETHEUS` pelo UID nas duas regras.
-3. **Alerting → Alert rules → New alert rule → Import from file**, ou pela API
-   de provisionamento com um token de serviço com escopo de alerting.
+O arquivo [`alertas-grafana.yml`](alertas-grafana.yml) fica como a versão legível
+e versionada das regras — para recriar do zero, ou para revisar em diff o que
+está no ar. Aplicar de novo, pela API:
+
+```bash
+ssh vps 'set -a; . ~/.config/grafana-api.env; set +a
+  curl -X PUT -H "Authorization: Bearer $GRAFANA_TOKEN" \
+    -H "Content-Type: application/json" -H "X-Disable-Provenance: true" \
+    --data @grupo.json "$GRAFANA_URL/api/v1/provisioning/folder/fdp/rule-groups/fdp"'
+```
+
+O `X-Disable-Provenance` é o que mantém as regras editáveis pela interface: sem
+ele o Grafana marca como provisionadas e trava a edição, o que seria uma
+armadilha para quem for ajustar um limiar às pressas durante um incidente.
+
+O token de serviço vive em `~/.config/grafana-api.env` na VPS, com permissão 600
+— o mesmo lugar e o mesmo cuidado das credenciais OTLP.
 
 São duas, e só duas:
 
@@ -163,14 +175,15 @@ CPU, memória e disco **não** viram alerta de propósito. Numa VPS com quatro a
 eles sobem por motivo legítimo o tempo todo, e alerta que dispara sem alguém
 agir treina a pessoa a ignorar a próxima notificação — inclusive a que importava.
 
-**Antes de confiar nos alertas, confirme que as séries chegam.** Consulte
-`vps_fdp_disponivel` no Explore do stack pessoal. Isto não é formalidade: o
-comentário do `vps-metricas.alloy` registra que em 04/08/2026 uma consulta
-voltou com ZERO séries enquanto o Alloy reportava centenas de pontos enviados
-sem falha — "enviado com sucesso" não diz para onde. Eu verifiquei o caminho até
-o exportador e a lista de permissão, e que o pipeline de infraestrutura não tem
-falha de envio; o que acontece dentro do Grafana eu não tenho credencial para
-ver.
+**As séries chegam — verificado em 25/08/2026**, consultando o stack pela API:
+`vps_fdp_disponivel`, `vps_fdp_ultima_sonda_segundos` e `vps_fdp_salas` retornam
+uma série cada. A verificação não é formalidade: o comentário do
+`vps-metricas.alloy` registra que em 04/08/2026 uma consulta voltou com ZERO
+séries enquanto o Alloy reportava centenas de pontos enviados sem falha —
+"enviado com sucesso" não diz para onde.
+
+Ambas as regras foram vistas avaliando com `health: ok` e estado `inactive`, que
+é o estado certo com o serviço no ar.
 
 ## Operação
 
@@ -190,6 +203,7 @@ custo de derrubar as sessões vivas.
 
 ## O que ainda falta
 
-- **Aplicar** [`alertas-grafana.yml`](alertas-grafana.yml) no stack pessoal:
-  falta o UID da fonte de dados e a importação, que precisam de acesso ao
-  Grafana.
+- **Ponto de notificação.** As regras disparam, mas o destino do aviso é o
+  padrão do stack. Vale apontar para onde você realmente olha — e testar com um
+  disparo de verdade, porque alerta que ninguém recebe é o mesmo que alerta que
+  não existe.
