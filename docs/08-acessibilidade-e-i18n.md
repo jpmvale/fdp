@@ -66,7 +66,8 @@ Vinte cartas não podem virar vinte paradas de `Tab`.
 | Cada PR | Lint de acessibilidade (`eslint-plugin-jsx-a11y` ou equivalente) |
 | Antes da entrega | Partida completa navegada só por teclado |
 | Antes da entrega | Partida completa com leitor de tela (NVDA ou VoiceOver) |
-| Antes da entrega | Simulação de deuteranopia e protanopia sobre a mesa e a paleta de avatares |
+| Cada PR | Simulação de deuteranopia e protanopia sobre a **paleta de avatares** (CA-344) — era manual, e a versão manual errou |
+| Antes da entrega | Simulação de deuteranopia e protanopia sobre **a mesa inteira**, que o teste de paleta não cobre |
 
 Ferramenta automatizada pega cerca de um terço dos problemas reais. Os dois testes manuais da
 tabela são obrigatórios para considerar a v1 entregue.

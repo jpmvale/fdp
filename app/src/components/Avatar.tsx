@@ -1,9 +1,13 @@
 import type { Avatar as AvatarProto } from '@fdp/protocol';
 
 /**
- * Cor E emoji, sempre os dois. A cor sozinha não identifica ninguém (RF-026):
- * a paleta foi otimizada para deuteranopia e protanopia, mas dois canais
- * continuam melhor que um bem escolhido.
+ * Cor E emoji, sempre os dois. A cor sozinha não identifica ninguém (RF-026).
+ *
+ * A paleta é verificada sob deuteranopia e protanopia por CA-344 — e foi o
+ * emoji que segurou a mesa enquanto ela não era: `lime` e `orange` ficaram um
+ * tempo indistinguíveis para quem tem deuteranopia sem que ninguém notasse.
+ * Dois canais não são redundância; são o que faz um erro no outro ser
+ * recuperável.
  */
 export function Avatar({ avatar, tamanho = 34 }: { avatar: AvatarProto; tamanho?: number }) {
   return (

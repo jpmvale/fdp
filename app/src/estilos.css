@@ -48,12 +48,16 @@
   --texto-medio: #b2b6ca;
 
   /* Paleta de avatares (`07` §4). A ordem é a de AVATAR_COLORS no protocolo —
-   * o índice é o contrato entre servidor e cliente. */
+   * o índice é o contrato entre servidor e cliente.
+   *
+   * Estes valores são cobrados por CA-344 e CA-345: mexer aqui sem rodar a
+   * suíte pode fazer dois jogadores virarem a mesma cor para quem tem
+   * daltonismo. Foi o que aconteceu com `lime` — ver o teste. */
   --avatar-amber: #c7b467;
   --avatar-teal: #0eb09e;
   --avatar-rose: #ff4983;
   --avatar-indigo: #6594fa;
-  --avatar-lime: #4ebf00;
+  --avatar-lime: #6cd317;
   --avatar-sky: #83d2ff;
   --avatar-orange: #f86111;
   --avatar-violet: #b580ca;

@@ -5,8 +5,9 @@ Estado do projeto para retomar depois.
 **O jogo está no ar, jogável, em <https://fdp.imp-software.cloud>.**
 
 Última sessão: 25/08/2026. Cliente React com o design Nocturne, bots, deploy
-automático na VPS, CA-046 verificado em produção e rotação da chave de acesso à
-máquina.
+automático na VPS, CA-046 verificado em produção, rotação da chave de acesso à
+máquina — e a paleta de avatares corrigida: duas cores eram a mesma sob
+deuteranopia.
 
 ## Como rodar
 
@@ -15,7 +16,7 @@ npm install
 npm run build:client   # OBRIGATÓRIO antes do primeiro `npm start`
 npm run redis          # opcional, noutro terminal
 npm start              # http://localhost:3000
-npm test               # 247 testes
+npm test               # 268 testes
 npm run typecheck
 ```
 
@@ -60,8 +61,8 @@ campos e nada derivado da partida (CA-338).
 
 ## O que ainda é provisório
 
-| Item | Situação hoje | Precisa virar |
-|---|---|---|
+Nada estrutural. O que segue é o único ponto onde o cliente não é completo, e é
+por escolha.
 
 Os **redutores por evento** de `11` §6 estão em
 [`app/src/state/redutores.ts`](app/src/state/redutores.ts), ligados ao
@@ -143,6 +144,35 @@ deliberadas, ambas comentadas no código:
 este sim implementado, por decisão posterior — o chat. Os dois primeiros eram
 falha do meu brief, que já foi corrigido.
 
+### O quarto erro: a paleta de avatares (corrigido em 25/08/2026)
+
+O canvas afirmava que a menor distância entre dois avatares era **ΔE 21,8 nas
+três condições**, por simulação Viénot 1999. Recalculando: a simulação de
+**protanopia** batia com a minha até a terceira casa, a de **deuteranopia** não
+batia de jeito nenhum. Quando duas condições usam o mesmo método e só uma
+diverge, o erro está na que diverge — e as saídas dela eram fisicamente
+implausíveis (`teal` virando roxo, `lime` virando cinza-terroso; sob
+deuteranopia verde e vermelho convergem para amarelo).
+
+O valor real era **ΔE2000 2,0** entre `lime` e `orange` sob deuteranopia: a
+mesma cor. A paleta tinha sido otimizada contra uma simulação com bug, então a
+otimização não entregou o que anunciava. O `21,8` também era ΔE76, não
+CIEDE2000 — ΔE76 exagera diferença exatamente nos amarelos e azuis saturados
+onde uma paleta de avatares vive.
+
+`lime` passou de `#4ebf00` para `#6cd317`: mínimo de 2,0 → **7,5**, com desvio
+visual de ΔE 5,7 (continua claramente verde). Reotimizar as oito chegaria a
+10,9, mas moveria cinco cores e transformaria o `lime` num sálvia que não é mais
+lime — não valia a identidade visual.
+
+A afirmação de contraste ("todas passam de 5,4:1") também era falsa: seis das
+oito ficam abaixo disso contra o feltro claro. Mas RNF-030 pede **3:1** para
+elemento gráfico e todas passam — o requisito estava cumprido, era o número
+auto-declarado que estava errado. O canvas agora traz os dois números certos.
+
+**Por que isso não virou defeito visível:** `Avatar.tsx` sempre renderiza cor
+**e** emoji. O segundo canal de RNF-031 segurou a mesa — e escondeu o erro.
+
 ## Decisões que valem lembrar
 
 - **`docs/` é a fonte da verdade.** Requisito sem teste que cite seu ID é
@@ -161,6 +191,14 @@ falha do meu brief, que já foi corrigido.
   `EM_PARTIDA` depois de uma vitória. INV-05 estava certa no documento e mal
   traduzida no código — invariante mal traduzida é pior que ausente, porque dá
   sensação de cobertura.
+- **Número tranquilizador é onde a verificação para.** A checagem de daltonismo
+  da paleta foi feita de verdade, e errada, e passou por dois agentes e uma
+  revisão porque vinha com um `ΔE 21,8` do lado. Ninguém confere um número que
+  já parece bom — e `08` §5 a tratava como checagem manual, que é a que só roda
+  quando alguém lembra. Virou CA-344, com duas aferições da própria simulação:
+  cinza não pode mudar sob dicromacia, e vermelho contra verde **precisa**
+  colapsar sob deuteranopia. Sem elas, uma simulação quebrada aprova a paleta
+  por acidente — que foi exatamente o que aconteceu.
 - **Duas listas enumeradas envelheceram em silêncio nesta sessão**, ambas
   derrubando produção: o `Dockerfile` copiava `app/build` do contexto (funcionava
   na minha máquina, imagem sem cliente num checkout limpo) e enumerava os
@@ -206,3 +244,8 @@ Nada obrigatório. O que sobrou é escolha, não dívida:
 - **Alertas de saturação** (CPU, memória, disco) ficaram de fora de propósito:
   numa VPS com quatro apps eles sobem por motivo legítimo e treinam a pessoa a
   ignorar notificação.
+- **Publicar o canvas atualizado.** `design/Main.dc.html` já tem a paleta e os
+  números corrigidos; o artifact publicado ainda mostra os antigos.
+- **A mesa inteira sob daltonismo**, que CA-344 não cobre — ele valida a paleta
+  de avatares isolada, não feltro contra carta contra texto de estado. Continua
+  como checagem manual em `08` §5.

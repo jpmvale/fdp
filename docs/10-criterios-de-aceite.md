@@ -299,6 +299,22 @@ evidência central de que a partida nunca trava — a métrica de severidade 1 d
 | CA-142 | manual | **Dado** um leitor de tela, **quando** jogo uma rodada, **então** turno, jogadas e resultado são anunciados de forma compreensível |
 | CA-143 | E | **Dado** `prefers-reduced-motion: reduce`, **quando** uma carta é jogada, **então** nenhuma animação de deslocamento ocorre |
 | CA-144 | E | **Dado** zoom de 200%, **quando** navego pelas telas, **então** nenhuma ação fica inacessível e não há rolagem horizontal |
+| CA-344 | U | **Dado** as 8 cores de avatar do `estilos.css`, **quando** simulo deuteranopia e protanopia por Viénot 1999, **então** nenhum par de avatares fica abaixo de ΔE2000 7,0 em nenhuma das três visões |
+| CA-345 | U | **Dado** as 8 cores de avatar, **quando** meço contra os dois feltros, **então** toda razão de contraste é ≥ 3:1 (RNF-030, elemento gráfico) |
+
+CA-344 era checagem manual antes da entrega (`08` §5) e foi feita — com um erro
+na simulação de deuteranopia, que passou despercebido justamente porque o
+resultado vinha acompanhado de um número tranquilizador. `lime` e `orange`
+ficavam a ΔE2000 **2,0**: a mesma cor. O emoji, que é o segundo canal exigido
+por RNF-031, evitou que virasse defeito visível — e evitou também que alguém
+percebesse.
+
+Virou teste por isso. A paleta é a principal forma de identificar jogadores na
+mesa (`07` §4), e uma checagem que só roda quando alguém lembra é uma checagem
+que erra em silêncio. O teste inclui duas aferições da própria simulação: cinza
+não pode mudar sob dicromacia, e vermelho contra verde **precisa** colapsar sob
+deuteranopia. Sem elas, uma simulação quebrada faria a paleta passar por
+acidente.
 
 ## 7. Desempenho
 
