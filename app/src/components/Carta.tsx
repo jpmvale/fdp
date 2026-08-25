@@ -8,20 +8,23 @@ const VERMELHOS = new Set(['copas', 'ouros']);
 
 export function Carta({ carta, tamanho = 'media', selecionada, aoClicar, rotulo }: {
   carta: Card | null;
-  tamanho?: 'media' | 'pequena' | undefined;
+  tamanho?: 'media' | 'pequena' | 'mini' | undefined;
   selecionada?: boolean | undefined;
   aoClicar?: (() => void) | undefined;
   rotulo?: string | undefined;
 }) {
-  const largura = tamanho === 'pequena' ? 38 : 48;
-  const altura = tamanho === 'pequena' ? 54 : 68;
+  // `mini` existe pela aritmética da mesa cheia: com 8 cartas no centro, a
+  // faixa livre entre os assentos laterais tem ~137 px em 360, e 4 cartas de
+  // 38 não cabem. Ver `Vaza`.
+  const largura = tamanho === 'mini' ? 30 : tamanho === 'pequena' ? 38 : 48;
+  const altura = tamanho === 'mini' ? 42 : tamanho === 'pequena' ? 54 : 68;
 
   const conteudo = carta ? (
     <>
-      <span style={{ fontSize: tamanho === 'pequena' ? 14 : 17, fontWeight: 700, lineHeight: 1 }}>
+      <span style={{ fontSize: tamanho === 'mini' ? 12 : tamanho === 'pequena' ? 14 : 17, fontWeight: 700, lineHeight: 1 }}>
         {carta.rank}
       </span>
-      <span style={{ fontSize: tamanho === 'pequena' ? 13 : 16, lineHeight: 1 }}>
+      <span style={{ fontSize: tamanho === 'mini' ? 11 : tamanho === 'pequena' ? 13 : 16, lineHeight: 1 }}>
         {NAIPES[carta.suit]}
       </span>
     </>

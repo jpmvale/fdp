@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LIMITS } from '@fdp/protocol';
 import { Carta } from '../components/Carta';
 import { Chat } from '../components/Chat';
@@ -25,6 +25,8 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
   return (
     <div className="pilha">
       <Cabecalho partida={partida} retrato={retrato} aoAbrirRegras={aoAbrirRegras} />
+
+      <AvisoDaVaza partida={partida} nome={nome} eu={eu} />
 
       {partida.isForeheadRound && <FaixaTesta />}
 
@@ -70,7 +72,11 @@ function Cabecalho({ partida, retrato, aoAbrirRegras }: {
           <div style={{ fontWeight: 600 }}>
             Rodada {partida.roundNumber} · {partida.cardsThisRound} {partida.cardsThisRound === 1 ? 'carta' : 'cartas'}
           </div>
-          <div className="fraco">{fase}{daVez ? ' · vez de você' : ''}</div>
+          <div className="fraco">
+            {fase}{daVez ? ' · vez de você' : ''}
+            {partida.phase !== 'APOSTAS' && !partida.isForeheadRound &&
+              ` · vaza ${partida.trickNumber} de ${partida.cardsThisRound}`}
+          </div>
         </div>
 
         {/* Ponto E palavra: cor sozinha não comunica estado (RF-026). */}
@@ -127,6 +133,81 @@ function BarraDoTurno({ retrato }: { retrato: Retrato }) {
         display: 'block', height: '100%', width: `${fracao * 100}%`,
         background: 'var(--acento)', transition: 'width 250ms linear',
       }} />
+    </div>
+  );
+}
+
+/**
+ * Quem levou a vaza, dito em palavras, no topo (`07` §2.4).
+ *
+ * Dispara pelo CRESCIMENTO de `resolvedTricks`, não pela fase: a última vaza
+ * da rodada não passa por `RECOLHIMENTO` — vai direto ao acerto de contas — e
+ * mesmo assim alguém a levou. Amarrar o aviso à fase deixaria justamente a
+ * vaza que fecha a rodada sem anúncio.
+ *
+ * A referência inicial é a contagem no momento em que a tela monta, e não
+ * zero: quem recarrega a página no meio da rodada não deve ver o anúncio de
+ * uma vaza que já assistiu.
+ */
+function AvisoDaVaza({ partida, nome, eu }: {
+  partida: PlayerView;
+  nome: (id: string) => string;
+  eu: string;
+}) {
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [saindo, setSaindo] = useState(false);
+  const vistas = useRef(partida.resolvedTricks.length);
+  const rodada = useRef(partida.roundNumber);
+
+  useEffect(() => {
+    // Rodada nova zera a lista; isso não é vaza recolhida.
+    if (partida.roundNumber !== rodada.current) {
+      rodada.current = partida.roundNumber;
+      vistas.current = partida.resolvedTricks.length;
+      return;
+    }
+    if (partida.resolvedTricks.length <= vistas.current) return;
+    vistas.current = partida.resolvedTricks.length;
+
+    const ultima = partida.resolvedTricks[partida.resolvedTricks.length - 1];
+    if (!ultima) return;
+
+    setSaindo(false);
+    if (ultima.winnerId === null) {
+      // Empate silencioso passa por bug (`07` §2.4): diz o valor e quem puxa.
+      const puxa = ultima.nextLeaderId;
+      setAviso(
+        `Empate em ${ultima.annulledValue} — ninguém levou a vaza.` +
+        (puxa ? ` ${puxa === eu ? 'Você puxa' : `${nome(puxa)} puxa`} a próxima.` : ''),
+      );
+    } else {
+      setAviso(ultima.winnerId === eu ? 'Você levou a vaza' : `${nome(ultima.winnerId)} levou a vaza`);
+    }
+
+    // Dois tempos: aos 2 s começa a sair, e só some do DOM quando a saída
+    // termina. Desmontar direto cortaria a animação pela metade.
+    const some = setTimeout(() => setSaindo(true), 2_000);
+    const desmonta = setTimeout(() => setAviso(null), 2_220);
+    return () => { clearTimeout(some); clearTimeout(desmonta); };
+  }, [partida.resolvedTricks, partida.roundNumber, nome, eu]);
+
+  if (aviso === null) return null;
+
+  return (
+    <div
+      // `polite`: o resultado é anunciado sem cortar o que o leitor de tela
+      // estiver falando (RNF-035).
+      role="status"
+      aria-live="polite"
+      className={saindo ? 'aviso-vaza saindo' : 'aviso-vaza'}
+      style={{
+        padding: '8px 12px', borderRadius: 'var(--r-md)', fontSize: 13,
+        textAlign: 'center', fontWeight: 600,
+        background: 'rgba(63,185,138,0.14)',
+        boxShadow: 'inset 0 0 0 1px rgba(63,185,138,0.5)',
+      }}
+    >
+      {aviso}
     </div>
   );
 }

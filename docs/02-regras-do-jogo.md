@@ -136,6 +136,8 @@ stateDiagram-v2
     APOSTAS --> VAZAS: cartasNaRodada > 1
     APOSTAS --> REVELACAO: cartasNaRodada == 1
     VAZAS --> VAZAS: ainda restam vazas
+    VAZAS --> RECOLHIMENTO: vaza concluída, ainda restam vazas
+    RECOLHIMENTO --> VAZAS: pausa cumprida
     VAZAS --> RESOLUCAO: última vaza concluída
     REVELACAO --> RESOLUCAO
     RESOLUCAO --> [*]
@@ -146,6 +148,7 @@ stateDiagram-v2
 | `DISTRIBUICAO` | ninguém | Servidor monta o sabot, embaralha e distribui | — |
 | `APOSTAS` | um por vez, em ordem | `move:bet` | `BET_TIMEOUT` |
 | `VAZAS` | um por vez, em ordem | `move:playCard` | `PLAY_TIMEOUT` |
+| `RECOLHIMENTO` | ninguém | Vaza fechada ainda na mesa, antes de recolher (`07` §2.4) | pausa fixa |
 | `REVELACAO` | ninguém | Cartas de testa reveladas aos donos | pausa fixa |
 | `RESOLUCAO` | ninguém | Débito de vidas, eliminações, fim de partida | pausa fixa |
 

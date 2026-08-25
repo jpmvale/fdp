@@ -1,5 +1,6 @@
 import { Avatar } from './Avatar';
 import { Carta } from './Carta';
+import { Vaza, useRecolhimento, type JogadaNaMesa } from './Vaza';
 import type { PlayerView, PublicPlayer, Retrato } from '../state/tipos';
 
 /**
@@ -40,6 +41,25 @@ export function Feltro({ retrato, eu, partida }: {
   const apostaram = Object.keys(partida.bets).length;
   const vazasFeitas = Object.values(partida.tricksWon).reduce((a, b) => a + b, 0);
 
+  const ondeSenta = (id: string) => {
+    const i = daMinha.indexOf(id);
+    return lugares[i] ?? { x: 50, y: 50 };
+  };
+
+  // Durante o recolhimento a vaza fechada vive só em `resolvedTricks` — o
+  // motor esvazia `currentTrick` para não contar as cartas duas vezes.
+  const recolhendo = partida.phase === 'RECOLHIMENTO';
+  const fechada = partida.resolvedTricks[partida.resolvedTricks.length - 1];
+  const naMesa: JogadaNaMesa[] = partida.isForeheadRound
+    ? []
+    : recolhendo
+      ? fechada?.plays ?? []
+      : partida.currentTrick?.plays ?? [];
+  const viajando = useRecolhimento(recolhendo, retrato.phaseDeadline);
+
+  // O contador do meio cede o lugar às cartas: era ele que as cartas cobriam.
+  const centroLivre = naMesa.length === 0;
+
   return (
     <div style={{ position: 'relative', height: 372, marginTop: 4 }}>
       {/* O pano. `50% / 32%` é o que dá a elipse achatada de mesa vista de
@@ -55,8 +75,9 @@ export function Feltro({ retrato, eu, partida }: {
         }}
       />
 
-      {/* Centro: o estado da MESA, não o de ninguém. */}
-      <div style={{
+      {/* Centro: o estado da MESA, não o de ninguém — e só enquanto não há
+          carta nenhuma nela. Com cartas, quem conta a rodada é o cabeçalho. */}
+      {centroLivre && <div style={{
         position: 'absolute', left: 0, right: 0, top: 142,
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
         pointerEvents: 'none',
@@ -73,7 +94,16 @@ export function Feltro({ retrato, eu, partida }: {
             ? `${apostaram} de ${total} já apostaram`
             : `vaza ${partida.trickNumber} de ${partida.cardsThisRound}`}
         </span>
-      </div>
+      </div>}
+
+      <Vaza
+        jogadas={naMesa}
+        jogadores={retrato.players}
+        regraEmpate={retrato.options.regraEmpate}
+        recolhendo={viajando}
+        posicaoDe={ondeSenta}
+        eu={eu}
+      />
 
       {daMinha.map((id, i) => {
         const jogador = retrato.players.find((p) => p.id === id);
@@ -149,17 +179,18 @@ const somaDeApostas = (partida: PlayerView) =>
   Object.values(partida.bets).reduce((a, b) => a + b, 0);
 
 /**
- * Que carta esse assento mostra: a da testa na rodada de 1 carta, a jogada na
- * vaza corrente no resto. `null` quando não há nenhuma — e, no meu assento
- * durante a testa, `null` é o VERSO, porque a carta não chega até aqui
+ * Que carta esse assento mostra: **só** a da testa, na rodada de 1 carta.
+ *
+ * A carta de testa não é uma carta jogada — está na cabeça da pessoa, à vista
+ * de todos menos dela. É a única que pertence ao assento; as jogadas vão para
+ * o centro, onde se comparam (`07` §2.4).
+ *
+ * No meu assento durante a testa, `null` é o VERSO: a carta não chega até aqui
  * (RJ-101).
  */
 function cartaDoAssento(partida: PlayerView, id: string, souEu: boolean) {
-  if (partida.isForeheadRound) {
-    return { mostra: true, carta: souEu ? null : partida.foreheadCards[id] ?? null };
-  }
-  const jogada = partida.currentTrick?.plays.find((j) => j.playerId === id);
-  return jogada ? { mostra: true, carta: jogada.card } : { mostra: false, carta: null };
+  if (!partida.isForeheadRound) return { mostra: false, carta: null };
+  return { mostra: true, carta: souEu ? null : partida.foreheadCards[id] ?? null };
 }
 
 function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta }: {

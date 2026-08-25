@@ -13,7 +13,9 @@ export {
   minGuaranteedDeviation,
   nextLeaderOf,
   resolveTrick,
+  trickStanding,
   type TrickResolution,
+  type TrickStanding,
 } from './trick.js';
 export {
   activePlayers,

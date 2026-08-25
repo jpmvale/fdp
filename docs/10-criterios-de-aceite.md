@@ -232,7 +232,17 @@ inteira, num só campo.
 | ID | Nível | Regras | Critério |
 |---|---|---|---|
 | CA-342 | I | RF-010 | **Dado** uma partida completa na máquina de sala, **quando** o cliente aplica cada evento pelo redutor, **então** o estado local é **idêntico** ao `snapshotFor` do servidor depois de cada comando, para todos os jogadores |
+| CA-346 | U | `07` §2.4 | **Dado** uma vaza fechada que não é a última da rodada, **então** a fase vira `RECOLHIMENTO`, ninguém fica na vez, nenhuma jogada é aceita, e a vaza seguinte só abre quando o relógio do servidor cumpre `TRICK_PAUSE` |
+| CA-347 | I | `07` §2.4 | **Dado** a sala em `RECOLHIMENTO`, **quando** o relógio anda menos que `TRICK_PAUSE`, **então** a fase não muda; **quando** passa, a vaza seguinte abre com o puxador de RJ-065 |
 | CA-343 | U | RF-010 | **Dado** um evento que o redutor não sabe aplicar — desconhecido, transição estrutural, ou faltando o estado de que depende —, **então** ele devolve `null` e o cliente pede o retrato |
+
+CA-346 e CA-347 nasceram de um defeito de sensação, não de correção: a vaza fechava e a
+mesa limpava no mesmo quadro, então ninguém via quem tinha levado. `07` §2.4 já pedia de 1,5
+a 3 s com a carta vencedora à vista; faltava a fase que cumpre isso. Fazer a pausa no cliente
+seria mentira — com a vaza seguinte já aberta no servidor, um bot joga em 900 ms e a tela
+mostraria uma disputa que acabou. A prova de que a pausa é real está em CA-347: sem o prazo
+no relógio da sala, o próximo despertar da mesa cai em `ROOM_MAX_LIFE` e a partida fica
+parada quatro horas.
 
 CA-342 é a régua que torna os redutores seguros. Um redutor errado não quebra:
 ele diverge em silêncio, e a tela fica *plausível* — mostrando uma vaza que não

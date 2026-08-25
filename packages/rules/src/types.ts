@@ -46,15 +46,22 @@ export type RoundPhase =
   | 'DISTRIBUICAO'
   | 'APOSTAS'
   | 'VAZAS'
+  /** Vaza fechada, cartas ainda na mesa: a pausa de legibilidade de `07` §2.4. */
+  | 'RECOLHIMENTO'
   | 'REVELACAO'
   | 'RESOLUCAO';
 
 /** Fases que avançam por timer do servidor, não por comando (`03` §4.2). */
 export const AUTOMATIC_PHASES: readonly RoundPhase[] = [
   'DISTRIBUICAO',
+  'RECOLHIMENTO',
   'REVELACAO',
   'RESOLUCAO',
 ];
+
+/** Está numa fase que o relógio do servidor avança sozinho. */
+export const isAutomaticPhase = (phase: RoundPhase): boolean =>
+  AUTOMATIC_PHASES.includes(phase);
 
 export interface TrickPlay {
   playerId: PlayerId;

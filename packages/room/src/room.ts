@@ -394,6 +394,8 @@ export function deadlineFor(room: Room, now: number): number | null {
       return now + LIMITS.betTimeoutMs;
     case 'VAZAS':
       return now + LIMITS.playTimeoutMs;
+    case 'RECOLHIMENTO':
+      return now + LIMITS.trickPauseMs;
     case 'REVELACAO':
     case 'RESOLUCAO':
       return now + LIMITS.autoPhasePauseMs;

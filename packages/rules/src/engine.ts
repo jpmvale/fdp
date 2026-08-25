@@ -160,6 +160,8 @@ export function advance(state: MatchState, ctx: EngineCtx): MoveResult {
       return deal(state);
     case 'REVELACAO':
       return reveal(state);
+    case 'RECOLHIMENTO':
+      return collectTrick(state);
     case 'RESOLUCAO':
       return resolveRound(state);
     default:
@@ -554,8 +556,18 @@ function settleTrick(
     };
   }
 
-  // RJ-065: o puxador seguinte abre a próxima vaza.
-  const nextTrick = openTrick(state, nextLeaderId);
+  // A vaza fecha, mas a mesa NÃO limpa ainda: `07` §2.4 exige que a carta
+  // vencedora fique visível de 1,5 a 3 s antes de recolher. Abrir a vaza
+  // seguinte aqui — que é o que este código fazia — apagava o resultado no
+  // mesmo quadro em que ele aparecia, e num jogo cujo ponto é ver quem levou.
+  //
+  // A pausa é fase de verdade, do lado do servidor, e não uma animação do
+  // cliente: com a próxima vaza já aberta, um bot joga em 900 ms e a tela
+  // estaria mentindo sobre o que está em jogo. `03` §4.2 já dizia que pausa
+  // de legibilidade se cumpre no servidor; esta faltava.
+  //
+  // A vaza fechada vive só em `resolvedTricks` — deixá-la também em
+  // `currentTrick` contaria as cartas duas vezes e quebraria INV-03.
   return {
     state: {
       ...state,
@@ -564,12 +576,50 @@ function settleTrick(
         tricksWon,
         mortoEmVaza,
         resolvedTricks,
-        trickNumber: trickNumber + 1,
-        currentTrick: nextTrick,
-        activePlayerId: nextLeaderId,
+        currentTrick: null,
+        activePlayerId: null,
+        phase: 'RECOLHIMENTO',
       },
     },
-    events,
+    events: [
+      ...events,
+      { type: 'round:phaseChanged', phase: 'RECOLHIMENTO', activePlayerId: null },
+    ],
+  };
+}
+
+/**
+ * Fim da pausa: o puxador seguinte abre a próxima vaza (RJ-065).
+ *
+ * Quem puxa saiu de `nextLeaderOf` quando a vaza fechou e está gravado na vaza
+ * resolvida — recalcular aqui seria decidir duas vezes a mesma coisa, com duas
+ * chances de divergir.
+ */
+function collectTrick(state: MatchState): MoveResult {
+  const { round } = state;
+  const ultima = round.resolvedTricks[round.resolvedTricks.length - 1];
+  // Impossível por construção: só se entra em RECOLHIMENTO logo após empilhar
+  // uma vaza resolvida, e `nextLeaderOf` devolve sempre um jogador. Estourar
+  // aqui é melhor que devolver falha: falha deixaria a mesa presa nesta fase
+  // para sempre, que é exatamente o defeito que o projeto não admite.
+  if (!ultima || ultima.nextLeaderId === null) {
+    throw new Error('RECOLHIMENTO sem vaza resolvida é estado impossível');
+  }
+
+  const nextLeaderId = ultima.nextLeaderId;
+  return {
+    ok: true,
+    state: {
+      ...state,
+      round: {
+        ...round,
+        trickNumber: round.trickNumber + 1,
+        currentTrick: openTrick(state, nextLeaderId),
+        activePlayerId: nextLeaderId,
+        phase: 'VAZAS',
+      },
+    },
+    events: [{ type: 'round:phaseChanged', phase: 'VAZAS', activePlayerId: nextLeaderId }],
   };
 }
 

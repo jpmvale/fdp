@@ -300,6 +300,17 @@ export const LIMITS = {
   lobbyIdleMs: 15 * 60_000,
   /** Pausa de legibilidade das fases automáticas (`03` §4.2). */
   autoPhasePauseMs: 3_000,
+  /**
+   * Fim de vaza: quanto tempo as cartas ficam na mesa antes de recolher.
+   *
+   * `07` §2.4 admite de 1,5 a 3 s. São 1,5 s parado para ler a mesa mais os
+   * 300 ms em que as cartas viajam até o vencedor — dentro da faixa, e perto do
+   * piso porque isto acontece a CADA vaza: 3 s por vaza viram uma rodada
+   * inteira de espera.
+   */
+  trickPauseMs: 1_800,
+  /** Quanto dura a viagem das cartas até o vencedor (`07` §3: 150–300 ms). */
+  trickCollectMs: 300,
 } as const;
 
 export const NICKNAME_MIN = 2;

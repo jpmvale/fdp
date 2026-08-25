@@ -10,7 +10,7 @@
 
 import { LIMITS, type BotDifficulty } from '@fdp/protocol';
 import type { Move } from '@fdp/rules';
-import { advance, autoMove, applyMove, createRng, isActive, project } from '@fdp/rules';
+import { advance, autoMove, applyMove, createRng, isActive, isAutomaticPhase, project } from '@fdp/rules';
 import { decidirAposta, decidirCarta } from '@fdp/bot';
 import {
   absentMatchPlayers,
@@ -243,7 +243,7 @@ function advanceMatchClock(room: Room, ctx: RoomCtx): { room: Room; emissions: E
 
   const phase = room.match.round.phase;
 
-  if (phase === 'DISTRIBUICAO' || phase === 'REVELACAO' || phase === 'RESOLUCAO') {
+  if (isAutomaticPhase(phase)) {
     const result = advance(room.match, ctx);
     if (!result.ok) return { room, emissions: [] };
     const next: Room = {

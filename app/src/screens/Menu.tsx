@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Folha } from '../components/Folha';
 import { Regras } from './Regras';
 import { Log } from './Log';
 import type { PlayerView, Retrato } from '../state/tipos';
@@ -25,39 +26,16 @@ export function Menu({ retrato, partida, aoFechar, aoSair }: {
   const emPartida = partida !== null && partida.endReason === null;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Regras e log da partida"
-      style={{
-        position: 'fixed', inset: 0, zIndex: 15,
-        background: 'var(--fundo)',
-        overflowY: 'auto',
-        padding: '0 12px calc(24px + env(safe-area-inset-bottom))',
-      }}
-    >
-      <div style={{ maxWidth: 460, margin: '0 auto' }} className="pilha">
-        <div style={{
-          position: 'sticky', top: 0, zIndex: 2,
-          background: 'var(--fundo)', paddingTop: 12,
-        }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <div role="tablist" aria-label="Seções" style={{ display: 'flex', gap: 6, flex: 1 }}>
-              <Aba atual={aba} valor="log" aoEscolher={setAba}>O que rolou</Aba>
-              <Aba atual={aba} valor="regras" aoEscolher={setAba}>Como se joga</Aba>
-            </div>
-            <button
-              className="fantasma"
-              onClick={aoFechar}
-              aria-label="Fechar"
-              style={{ minWidth: 44, width: 44, padding: 0 }}
-            >
-              ✕
-            </button>
-          </div>
-          <div style={{ height: 12 }} />
+    <Folha
+      rotulo="Regras e log da partida"
+      aoFechar={aoFechar}
+      cabecalho={
+        <div role="tablist" aria-label="Seções" style={{ display: 'flex', gap: 6 }}>
+          <Aba atual={aba} valor="log" aoEscolher={setAba}>O que rolou</Aba>
+          <Aba atual={aba} valor="regras" aoEscolher={setAba}>Como se joga</Aba>
         </div>
-
+      }
+    >
         {aba === 'log'
           ? <Log retrato={retrato} partida={partida} />
           : <Regras />}
@@ -87,8 +65,7 @@ export function Menu({ retrato, partida, aoFechar, aoSair }: {
             Sair da mesa
           </button>
         )}
-      </div>
-    </div>
+    </Folha>
   );
 }
 

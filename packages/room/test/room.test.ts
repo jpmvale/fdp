@@ -763,3 +763,66 @@ describe('CA-330 a CA-341: chat da mesa', () => {
     expect(applyCommand(expirada, 'p1', dizer('ainda dá?'), ctxAt(99)).ok).toBe(false);
   });
 });
+
+
+// --- fim de vaza -----------------------------------------------------------
+
+describe('CA-346: o servidor segura a mesa no fim da vaza', () => {
+  /** Mesa de 3 numa rodada de 2 cartas, com a primeira vaza recém-fechada. */
+  function comVazaFechada(): { room: Room; em: number } {
+    let room = started(roomWith(3), 100);
+    let agora = 100;
+
+    const avancar = (ate: number) => {
+      for (let t = agora; t <= ate; t += 250) {
+        const r = tick(room, ctxAt(t));
+        if (r.changed) room = r.room;
+      }
+      agora = ate;
+    };
+
+    // Sai da rodada de testa e chega numa de 2 cartas.
+    while (room.match!.cardsThisRound === 1 && room.match!.endReason === null) {
+      avancar(agora + 60_000);
+    }
+
+    // Deixa o auto-play conduzir apostas e a primeira vaza.
+    while (room.match!.round.phase !== 'RECOLHIMENTO' && room.match!.endReason === null) {
+      avancar(agora + 1_000);
+      if (agora > 400_000) throw new Error('não chegou a RECOLHIMENTO');
+    }
+    return { room, em: agora };
+  }
+
+  it('a fase não avança antes do prazo, e avança depois', () => {
+    const { room, em } = comVazaFechada();
+    expect(room.match!.round.phase).toBe('RECOLHIMENTO');
+
+    // Um tick logo antes do prazo não pode abrir a vaza seguinte: é a pausa
+    // que faz a carta vencedora ficar visível (`07` §2.4).
+    const cedo = tick(room, ctxAt(em + LIMITS.trickPauseMs - 100));
+    expect((cedo.changed ? cedo.room : room).match!.round.phase).toBe('RECOLHIMENTO');
+
+    const noPrazo = tick(room, ctxAt(em + LIMITS.trickPauseMs + 10));
+    expect(noPrazo.changed).toBe(true);
+    expect(noPrazo.room.match!.round.phase).toBe('VAZAS');
+  });
+
+  it('a pausa entra no relógio da sala, então a sala não dorme através dela', () => {
+    // `nextDeadline` é o que diz ao servidor quando acordar. Se a fase nova
+    // ficasse de fora, a mesa esperaria o próximo compromisso qualquer — ou
+    // nenhum — e a vaza seguinte abriria tarde, ou nunca.
+    const { room, em } = comVazaFechada();
+
+    const prazo = nextDeadline(room);
+    expect(prazo).not.toBeNull();
+    expect(prazo!).toBeLessThanOrEqual(em + LIMITS.trickPauseMs + 250);
+  });
+
+  it('durante a pausa ninguém está na vez, e a sala segue íntegra', () => {
+    const { room } = comVazaFechada();
+
+    expect(room.match!.round.activePlayerId).toBeNull();
+    expect(checkRoomInvariants(room)).toEqual([]);
+  });
+});

@@ -11,7 +11,9 @@ import type { Reconciler } from './net/reconcile';
 import { BloqueioConexao, FaixaConexao, bloqueia } from './components/Conexao';
 import { Home } from './screens/Home';
 import { Perfil } from './screens/Perfil';
+import { Folha } from './components/Folha';
 import { Menu } from './screens/Menu';
+import { Regras } from './screens/Regras';
 import { Lobby } from './screens/Lobby';
 import { Mesa, Resolucao } from './screens/Mesa';
 import { Pausa } from './screens/Pausa';
@@ -142,6 +144,7 @@ export function App() {
         {estado.tela === 'home' && (
           <Home
             codigoInicial={new URLSearchParams(location.search).get('sala') ?? ''}
+            aoAbrirRegras={() => setRegrasAbertas(true)}
             aoCriar={() => { setIntencao({ tipo: 'CRIAR' }); definir({ tela: 'perfil' }); }}
             aoEntrar={(codigo) => { setIntencao({ tipo: 'ENTRAR', codigo }); definir({ tela: 'perfil' }); }}
           />
@@ -161,14 +164,25 @@ export function App() {
 
         <Erro texto={estado.erro} />
         {bloqueioAtual}
-        {regrasAbertas && estado.retrato && (
+        {/* Fora da sala não há mesa para voltar nem partida para abandonar:
+            só as regras. O ☰ completo pressupõe as duas coisas. */}
+        {regrasAbertas && (estado.retrato ? (
           <Menu
             retrato={estado.retrato}
             partida={estado.retrato.match}
             aoFechar={() => setRegrasAbertas(false)}
             aoSair={sairDaMesa}
           />
-        )}
+        ) : (
+          <Folha
+            rotulo="Como se joga"
+            aoFechar={() => setRegrasAbertas(false)}
+            cabecalho={<b style={{ fontSize: 15 }}>Como se joga</b>}
+          >
+            <Regras />
+            <button onClick={() => setRegrasAbertas(false)}>Voltar</button>
+          </Folha>
+        ))}
       </Casca>
     );
   }
@@ -400,13 +414,10 @@ function narrar(msg: { type: string; payload: unknown }) {
       avisar(`${nome(p['playerId'])} ficou sem tempo: ${kind === 'BET' ? `apostou ${String(valor)}` : 'jogou sozinho'}`);
       break;
     }
-    case 'trick:resolved': {
-      const anulada = p['annulled'] as unknown as boolean;
-      avisar(anulada
-        ? `Empate em ${String(p['annulledValue'])} — ninguém leva a vaza`
-        : `${nome(p['winnerId'])} levou a vaza`);
-      break;
-    }
+    // `trick:resolved` NÃO vira aviso genérico: quem anuncia a vaza é a faixa
+    // do topo da Mesa, que aparece junto das cartas ainda na mesa e some
+    // sozinha. Os dois juntos diziam a mesma coisa em dois lugares, e o de
+    // baixo ficava depois do chat, longe do que estava sendo explicado.
     case 'match:resumed': avisar('Partida retomada'); break;
     case 'round:aborted': avisar('A rodada recomeçou sem quem saiu'); break;
     case 'round:revealed': avisar('Cartas na mesa'); break;

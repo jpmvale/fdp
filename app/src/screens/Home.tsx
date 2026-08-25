@@ -9,9 +9,10 @@ import { ROOM_CODE_LENGTH } from '@fdp/protocol';
  * razão melhor: entrar por link não é a mesma coisa que criar sala, e a Home
  * enxuta deixa as duas portas do mesmo tamanho.
  */
-export function Home({ aoCriar, aoEntrar, codigoInicial }: {
+export function Home({ aoCriar, aoEntrar, aoAbrirRegras, codigoInicial }: {
   aoCriar: () => void;
   aoEntrar: (codigo: string) => void;
+  aoAbrirRegras: () => void;
   codigoInicial: string;
 }) {
   const [codigo, setCodigo] = useState(codigoInicial.toUpperCase());
@@ -44,6 +45,17 @@ export function Home({ aoCriar, aoEntrar, codigoInicial }: {
           Entrar na sala
         </button>
       </div>
+
+      {/* `07` §2.1. Faltava aqui, que é o único lugar onde alguém chega sem
+          nunca ter visto o jogo: no lobby e na mesa as regras já estavam no ☰,
+          mas quem abre o link e não conhece FDP para nesta tela. */}
+      <button
+        className="fantasma"
+        onClick={aoAbrirRegras}
+        style={{ alignSelf: 'center', minHeight: 44, padding: '0 18px' }}
+      >
+        Como se joga
+      </button>
     </div>
   );
 }

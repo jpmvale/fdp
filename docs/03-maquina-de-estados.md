@@ -144,7 +144,8 @@ stateDiagram-v2
     APOSTAS --> APOSTAS: aposta aceita, ainda faltam jogadores
     APOSTAS --> VAZAS: todos apostaram e cartasNaRodada > 1
     APOSTAS --> REVELACAO: todos apostaram e cartasNaRodada == 1
-    VAZAS --> VAZAS: vaza resolvida, ainda restam vazas
+    VAZAS --> RECOLHIMENTO: vaza resolvida, ainda restam vazas
+    RECOLHIMENTO --> VAZAS: pausa cumprida, próxima vaza aberta
     VAZAS --> RESOLUCAO: última vaza resolvida
     REVELACAO --> RESOLUCAO: cartas reveladas
     RESOLUCAO --> [*]
@@ -155,6 +156,7 @@ stateDiagram-v2
 | `DISTRIBUICAO` | automática | servidor | nenhum | — | Cartas distribuídas (RJ-041) |
 | `APOSTAS` | **sequencial** | `activePlayerId` | `move:bet` | `BET_TIMEOUT`, só se conectado | Todos os ativos apostaram |
 | `VAZAS` | **sequencial** | `activePlayerId` | `move:playCard` | `PLAY_TIMEOUT`, só se conectado | `cartasNaRodada` vazas resolvidas |
+| `RECOLHIMENTO` | automática | servidor | nenhum | pausa 1,5 s | Próxima vaza aberta pelo puxador de RJ-065 |
 | `REVELACAO` | automática | servidor | nenhum | pausa 3 s | Cartas reveladas aos donos |
 | `RESOLUCAO` | automática | servidor | nenhum | pausa 3 s | Vidas debitadas, eliminações aplicadas |
 
@@ -175,16 +177,27 @@ Encerrada a vaza (todos os ativos jogaram), o servidor:
 3. define o puxador seguinte por `02` §3.6.2 — inclusive o caso anulado, em que puxa o
    **último jogador, na ordem de jogada, a ter jogado carta do valor empatado mais alto**
    (RJ-086);
-4. **recalcula o desvio mínimo garantido de todos e grava `mortoEmVaza`** (RJ-095).
+4. **recalcula o desvio mínimo garantido de todos e grava `mortoEmVaza`** (RJ-095);
+5. entra em `RECOLHIMENTO` e só abre a vaza seguinte quando a pausa vencer.
 
 O passo 4 é fácil de esquecer e não tem sintoma visível até uma partida terminar com todos
 zerados — quando o desempate de RJ-005 vira impossível.
 
+O passo 5 é o que dá à mesa tempo de ver quem levou. Ele **DEVE** ser cumprido no servidor,
+como as demais pausas: com a vaza seguinte já aberta, um bot joga em `BOT_THINK` e a tela
+passa a mostrar uma vaza que já não está em disputa. Durante `RECOLHIMENTO` não há
+`activePlayerId` e nenhuma jogada é aceita; a vaza fechada vive **apenas** em
+`resolvedTricks`, nunca também em `vazaAtual` — duplicá-la contaria as cartas duas vezes e
+quebraria INV-03. A última vaza da rodada não passa por aqui: quem cumpre o papel é
+`RESOLUCAO`, que já mostra o acerto de contas.
+
 ### 4.2 Transições automáticas
 
-`DISTRIBUICAO`, `REVELACAO` e `RESOLUCAO` não aceitam comando algum. Avançam por timer do
-servidor, nunca por confirmação do cliente — um cliente travado **NÃO DEVE** segurar a mesa.
-As pausas de 3 s existem para legibilidade na UI (`07` §2.4) e são cumpridas no servidor.
+`DISTRIBUICAO`, `RECOLHIMENTO`, `REVELACAO` e `RESOLUCAO` não aceitam comando algum. Avançam
+por timer do servidor, nunca por confirmação do cliente — um cliente travado **NÃO DEVE**
+segurar a mesa. As pausas existem para legibilidade na UI (`07` §2.4) e são cumpridas no
+servidor: 3 s nas fases de rodada, 1,5 s em `RECOLHIMENTO`, que acontece a cada vaza e por
+isso usa o piso da faixa que `07` §2.4 admite.
 
 Se a partida entra em `PAUSADA` durante uma fase automática, a pausa de 3 s é suspensa junto
 com os demais timers.

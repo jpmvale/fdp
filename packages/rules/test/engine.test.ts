@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  isAutomaticPhase,
   advance,
   applyMove,
   autoMove,
@@ -39,7 +40,7 @@ function settle(state: MatchState): { state: MatchState; events: EngineEvent[] }
   let current = state;
   while (
     current.endReason === null &&
-    ['DISTRIBUICAO', 'REVELACAO', 'RESOLUCAO'].includes(current.round.phase)
+    isAutomaticPhase(current.round.phase)
   ) {
     const result = advance(current, ctx);
     if (!result.ok) throw new Error(`advance falhou: ${result.motivo}`);
@@ -579,6 +580,110 @@ describe('CA-296/CA-297: retirada', () => {
     if (!result.ok) return;
     expect(result.state.endReason).toBe('VITORIA_POR_ABANDONO');
     expect(result.state.winnerIds).toEqual([state.playerOrder[2]!]);
+  });
+});
+
+// --- CA-346: a pausa de fim de vaza ----------------------------------------
+
+describe('CA-346: RECOLHIMENTO — a vaza fica na mesa antes de recolher', () => {
+  /** Mesa de 3, rodada de 2 cartas, com as apostas feitas e a 1ª vaza jogada. */
+  function primeiraVazaFechada(): MatchState {
+    let state = settle(createMatch({
+      matchId: 'm', seed: 'recolhe', playerIds: players(3),
+      options: { maxCartasPorRodada: 2, vidasIniciais: 5 },
+    })).state;
+
+    // Rodada 1 é de testa; passa por ela para chegar numa de 2 cartas.
+    while (state.cardsThisRound === 1) {
+      while (state.round.activePlayerId !== null) {
+        state = must(applyMove(state, legalMoves(state)[0]!, ctx));
+      }
+      state = settle(state).state;
+    }
+
+    while (state.round.phase === 'APOSTAS') {
+      state = must(applyMove(state, legalMoves(state)[0]!, ctx));
+    }
+    expect(state.round.phase).toBe('VAZAS');
+
+    while (state.round.phase === 'VAZAS') {
+      state = must(applyMove(state, legalMoves(state)[0]!, ctx));
+    }
+    return state;
+  }
+
+  it('fechada a vaza, a fase é RECOLHIMENTO e ninguém está na vez', () => {
+    const state = primeiraVazaFechada();
+
+    expect(state.round.phase).toBe('RECOLHIMENTO');
+    expect(state.round.activePlayerId).toBeNull();
+    // A mesa ainda mostra a vaza: é o ponto inteiro da pausa.
+    expect(state.round.resolvedTricks).toHaveLength(1);
+    expect(state.round.resolvedTricks[0]!.plays).toHaveLength(3);
+  });
+
+  it('a vaza fechada não fica em dois lugares — INV-03 continua valendo', () => {
+    // O modo de falhar aqui seria deixar a vaza em `currentTrick` E em
+    // `resolvedTricks` para o cliente ter onde ler: as cartas contariam duas
+    // vezes e a conservação quebraria sem sintoma na tela.
+    const state = primeiraVazaFechada();
+
+    expect(state.round.currentTrick).toBeNull();
+    expect(checkInvariants(state)).toEqual([]);
+  });
+
+  it('a vaza seguinte só abre quando o relógio avança a fase', () => {
+    const antes = primeiraVazaFechada();
+    expect(antes.round.trickNumber).toBe(1);
+
+    const depois = must(advance(antes, ctx));
+
+    expect(depois.round.phase).toBe('VAZAS');
+    expect(depois.round.trickNumber).toBe(2);
+    expect(depois.round.currentTrick?.plays).toEqual([]);
+    // Quem puxa é quem a vaza fechada registrou, não um recálculo.
+    expect(depois.round.activePlayerId).toBe(antes.round.resolvedTricks[0]!.nextLeaderId);
+    expect(checkInvariants(depois)).toEqual([]);
+  });
+
+  it('nenhuma jogada é aceita durante a pausa', () => {
+    const state = primeiraVazaFechada();
+    const mao = Object.values(state.hidden.hands).find((m) => m.length > 0)!;
+
+    const recusa = applyMove(state, {
+      type: 'playCard', playerId: state.playerOrder[0]!,
+      roundNumber: state.roundNumber, trickNumber: state.round.trickNumber,
+      cardId: mao[0]!,
+    }, ctx);
+
+    expect(recusa.ok).toBe(false);
+  });
+
+  it('a última vaza da rodada não passa por RECOLHIMENTO: vai direto à conta', () => {
+    // A pausa existe para o intervalo ENTRE vazas. No fim da rodada quem faz o
+    // papel dela é RESOLUCAO, que já mostra o acerto de contas — encadear as
+    // duas seria mostrar a mesma vaza parada duas vezes seguidas.
+    let state = primeiraVazaFechada();
+    state = settle(state).state;
+    while (state.round.phase === 'VAZAS') {
+      state = must(applyMove(state, legalMoves(state)[0]!, ctx));
+    }
+
+    expect(state.round.phase).toBe('RESOLUCAO');
+  });
+
+  it('a rodada de testa não tem pausa de vaza: a revelação já é a pausa', () => {
+    let state = settle(createMatch({
+      matchId: 'm', seed: 'testa', playerIds: players(3),
+      options: { maxCartasPorRodada: 3, vidasIniciais: 5 },
+    })).state;
+    expect(state.cardsThisRound).toBe(1);
+
+    while (state.round.activePlayerId !== null) {
+      state = must(applyMove(state, legalMoves(state)[0]!, ctx));
+    }
+
+    expect(state.round.phase).not.toBe('RECOLHIMENTO');
   });
 });
 

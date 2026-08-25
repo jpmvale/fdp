@@ -139,6 +139,19 @@ input:focus { border-color: var(--acento); }
 .pilha { display: flex; flex-direction: column; gap: 12px; }
 .linha { display: flex; gap: 8px; align-items: center; }
 
+/* O aviso de quem levou a vaza: entra e sai deslizando de leve. Some sozinho —
+   é informação de passagem, e um banner que fica vira ruído em cima da mesa. */
+@keyframes aviso-vaza-entra {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+.aviso-vaza { animation: aviso-vaza-entra 180ms ease-out; }
+.aviso-vaza.saindo {
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 220ms ease-in, transform 220ms ease-in;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

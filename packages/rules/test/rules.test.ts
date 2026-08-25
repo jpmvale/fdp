@@ -18,6 +18,7 @@ import {
   orderFrom,
   rankValue,
   resolveTrick,
+  trickStanding,
   type Card,
   type CardId,
   type TieRule,
@@ -340,5 +341,82 @@ describe('CA-260/CA-261: desvio mínimo garantido e morte', () => {
 
   it('acertar em cheio nunca é morte', () => {
     expect(isDoomed(2, 2, 0, 1)).toBe(false);
+  });
+});
+
+// --- parcial da vaza, para a interface --------------------------------------
+
+describe('trickStanding: quem está ganhando, e por quê', () => {
+  /** As mesmas cartas de `table`, mas na forma que a projeção entrega ao cliente. */
+  const mesa = (entries: readonly [string, number][]) =>
+    entries.map(([playerId, value], i) => ({
+      playerId,
+      card: { id: `c${i}`, rank: 'A', suit: 'copas', value, deckIndex: 0 } as Card,
+    }));
+
+  it('com a vaza pela metade, responde sobre as cartas que já estão na mesa', () => {
+    // Quem chama é que sabe se a vaza fechou; daqui a resposta é sempre "entre
+    // ESTAS cartas, quem ganha". A interface lê isso como parcial durante a
+    // vaza e como resultado quando ela fecha.
+    const parcial = trickStanding(mesa([['a', 9], ['b', 12]]), ANULA_CARTAS);
+
+    expect(parcial.winnerId).toBe('b');
+    expect(parcial.annulledIds).toEqual([]);
+  });
+
+  it('vaza vazia não tem parcial nem vencedor', () => {
+    expect(trickStanding([], ANULA_CARTAS)).toEqual({
+      winnerId: null, annulledValue: null, annulledIds: [],
+    });
+  });
+
+  // A tabela de `02` §3.6.1, agora cobrando também QUEM saiu da disputa —
+  // que é o que a interface precisa para explicar o destaque pulando.
+  it('A K 5 3: o A leva nos dois modos, sem ninguém anulado', () => {
+    const plays = mesa([['a', 14], ['b', 13], ['c', 5], ['d', 3]]);
+    for (const rule of [ANULA_VAZA, ANULA_CARTAS]) {
+      const r = trickStanding(plays, rule);
+      expect(r.winnerId).toBe('a');
+      expect(r.annulledIds).toEqual([]);
+    }
+  });
+
+  it('A A K 5 3: os dois ases se anulam e o destaque desce para o K', () => {
+    const plays = mesa([['a', 14], ['b', 14], ['c', 13], ['d', 5], ['e', 3]]);
+
+    const cartas = trickStanding(plays, ANULA_CARTAS);
+    expect(cartas.winnerId).toBe('c');
+    expect(cartas.annulledValue).toBe(14);
+    expect(cartas.annulledIds.sort()).toEqual(['a', 'b']);
+
+    const vaza = trickStanding(plays, ANULA_VAZA);
+    expect(vaza.winnerId).toBeNull();
+    expect(vaza.annulledIds.sort()).toEqual(['a', 'b']);
+  });
+
+  it('A A K K 5: a escada desce duas vezes e sobra o 5', () => {
+    const plays = mesa([['a', 14], ['b', 14], ['c', 13], ['d', 13], ['e', 5]]);
+    const r = trickStanding(plays, ANULA_CARTAS);
+
+    expect(r.winnerId).toBe('e');
+    // `annulledValue` é só o topo (RJ-087), mas a interface precisa das quatro.
+    expect(r.annulledValue).toBe(14);
+    expect(r.annulledIds.sort()).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('empate geral: ninguém leva e todos ficam anulados', () => {
+    const r = trickStanding(mesa([['a', 7], ['b', 7]]), ANULA_CARTAS);
+    expect(r.winnerId).toBeNull();
+    expect(r.annulledIds.sort()).toEqual(['a', 'b']);
+  });
+
+  it('concorda com resolveTrick, que é o que o motor usa', () => {
+    const entries: [string, number][] = [['a', 14], ['b', 14], ['c', 13], ['d', 5]];
+    const { plays, cards } = table(entries);
+    for (const rule of [ANULA_VAZA, ANULA_CARTAS]) {
+      const doMotor = resolveTrick(plays, cards, rule);
+      const daTela = trickStanding(mesa(entries), rule);
+      expect({ winnerId: daTela.winnerId, annulledValue: daTela.annulledValue }).toEqual(doMotor);
+    }
   });
 });
