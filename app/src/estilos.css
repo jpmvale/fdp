@@ -62,6 +62,13 @@
   --avatar-orange: #f86111;
   --avatar-violet: #b580ca;
 
+  /* Nota de desempenho. Medidas contra `--poco`, o fundo do cartão onde a
+   * nota aparece: todas passam de 4,5:1, e há teste cobrando isso. */
+  --nota-baixa: #ef4d5a;
+  --nota-media: #e0a33a;
+  --nota-alta: #3fb98a;
+  --nota-otima: #6594fa;
+
   --r-sm: 6px;
   --r-md: 10px;
   --r-lg: 16px;

@@ -6,8 +6,9 @@ Estado do projeto para retomar depois.
 
 Última sessão: 25/08/2026. Cliente React com o design Nocturne, bots, deploy
 automático na VPS, CA-046 verificado em produção, rotação da chave de acesso à
-máquina — e a paleta de avatares corrigida: duas cores eram a mesma sob
-deuteranopia.
+máquina, paleta de avatares corrigida — e uma leva de ajustes de mesa: a vaza
+acontece no centro, o vencedor fica visível antes de a mesa limpar, balões
+saem do jogador, e o fim de partida virou um resumo com nota de desempenho.
 
 ## Como rodar
 
@@ -16,7 +17,7 @@ npm install
 npm run build:client   # OBRIGATÓRIO antes do primeiro `npm start`
 npm run redis          # opcional, noutro terminal
 npm start              # http://localhost:3000
-npm test               # 268 testes
+npm test               # 302 testes
 npm run typecheck
 ```
 
@@ -107,6 +108,88 @@ pedir o retrato é mais honesto que fingir que não se está pedindo.
 Não podia nem chegar a pausar: `TRANSPORT_GRACE` é 10 s e ninguém ficou fora
 mais de 635 ms.
 
+## A mesa, depois dos ajustes de 25/08/2026
+
+Cinco mudanças pedidas pelo usuário. **As três primeiras eram requisitos de
+`07` que nunca tinham sido implementados**, não funcionalidades novas — e a
+primeira não era cosmética.
+
+### `RECOLHIMENTO`: uma fase nova no motor
+
+O motor fechava a vaza e abria a seguinte **no mesmo passo**. Não existia
+instante nenhum em que a mesa mostrasse quem levou. `07` §2.4 sempre pediu de
+1,5 a 3 s com a carta vencedora à vista.
+
+Fazer isso no cliente seria mentira: com a vaza seguinte já aberta no servidor,
+um bot joga em 900 ms e a tela mostraria uma disputa encerrada. Virou fase
+automática de verdade (`03` §4.2), de 1,8 s — 1,5 s parado mais 300 ms de
+viagem das cartas até o vencedor.
+
+Detalhes que valem lembrar:
+
+- **A vaza fechada vive só em `resolvedTricks`.** Deixá-la também em
+  `currentTrick`, para o cliente ter onde ler, contaria as cartas duas vezes e
+  quebraria INV-03.
+- **A última vaza da rodada também passa por aqui.** Ia direto ao acerto de
+  contas e era a única do jogo cujo resultado ninguém via.
+- **A rodada de testa fica de fora**: lá as cartas estão nas testas, não na
+  mesa, e quem mostra o resultado é `REVELACAO`.
+- Cobrado por CA-346 e CA-347. Sem o prazo no relógio da sala, o próximo
+  despertar da mesa cai em `ROOM_MAX_LIFE` e a partida fica parada **quatro
+  horas** — o teste mede isso.
+
+### As cartas no centro, e o limite que as tinha afastado de lá
+
+O código prendia a carta ao assento com um comentário dizendo que o centro
+cobre nomes e placar com 8 jogadores. **Medi: estava certo** — duas cartas
+invadiam os assentos laterais.
+
+A saída não foi desistir do centro. O contador da rodada subiu para o
+cabeçalho, a vaza ficou confinada à faixa entre os assentos (`67% − 104px`,
+~137 px em 360), e a carta encolhe para `mini` quando passa de 4 na mesa.
+Remedido com 8: **zero colisões, sem rolagem horizontal**.
+
+O destaque de quem está ganhando usa `trickStanding`, **a mesma função do
+motor** — reimplementá-la no cliente seria pedir para as duas divergirem no
+empate em cascata de `EMPATE_ANULA_CARTAS`, que é o caso mais difícil de
+perceber.
+
+### Vocabulário: a tela diz "mão"
+
+O que `docs/` chama de **vaza**, a interface chama de **"mão"**. E o que era "a
+mão do jogador" virou **"suas cartas"** — a palavra foi ocupada pela disputa, e
+sem essa segunda troca a mesma tela usaria o mesmo nome para duas coisas.
+
+`docs/` e o código seguem em "vaza", registrado em `01` e `07`. São 110 regras
+`RJ-###` com ID estável mais `Trick`/`tricksWon`/`trickNumber` em quatro
+pacotes; renomear a espinha do projeto não mudaria nada que o jogador vê.
+
+### Balões, log de vidas e o resumo do fim
+
+- **Balões saem do assento** de quem falou no chat ou perdeu vida, e os
+  corações debitados caem do próprio contador. O débito de vida não tinha sinal
+  nenhum antes — o número mudava sozinho, no momento de maior carga da partida.
+- **Log de vidas perdidas** embaixo do chat, por rodada, saindo de `history`:
+  sobrevive a recarregar a página.
+- **Fim de partida** com aposta contra mãos feitas, quem saiu em cada rodada, e
+  **nota de desempenho de 0 a 10**.
+
+### A nota de desempenho (`app/src/desempenho.ts`)
+
+Responde outra pergunta que não o placar: **quem jogou melhor**. Pontaria 45%,
+acertos em cheio 30%, sobrevivência 25%. Vencer garante o piso da faixa
+excelente.
+
+**O piso é 8, e não 9, por medição e não por gosto.** Com 9, o cenário que
+motivou a nota — o segundo colocado que acerta tudo e desaba na última rodada —
+chega a 8,1 e nunca passaria do vencedor mais sofrível. O piso precisa caber
+dentro do alcance de quem jogou bem e perdeu, senão "vencer não garante a maior
+nota" vira letra morta. A fronteira da faixa excelente acompanha o piso.
+
+Rodada abortada não entra na conta de ninguém, nem no numerador nem no
+denominador (RJ-155). As quatro cores da nota têm teste de contraste, e cada
+faixa carrega a palavra junto — cor nunca é o único canal (RNF-031).
+
 ## Deploy
 
 **Automático.** Push na `main` → CI → imagem no GHCR → `~/bin/deploy.sh fdp <sha>`
@@ -196,6 +279,18 @@ auto-declarado que estava errado. O canvas agora traz os dois números certos.
   `EM_PARTIDA` depois de uma vitória. INV-05 estava certa no documento e mal
   traduzida no código — invariante mal traduzida é pior que ausente, porque dá
   sensação de cobertura.
+- **Instrumento estrangulado parece defeito de código.** Passei um bom tempo
+  concluindo que a animação de recolher não disparava, porque o navegador
+  automatizado me dava 6 amostras em 26 segundos — a janela de 300 ms sumia
+  entre duas leituras. O código estava certo desde o começo. Quando a medição
+  discordar do raciocínio, **desconfie da medição primeiro**: a pista aqui era
+  a taxa de amostragem absurda, visível o tempo todo e ignorada.
+- **Cronômetro de cliente não sabe quando a fase começou.** A primeira versão
+  da viagem das cartas contava a partir de quando o cliente via a mudança de
+  fase — e erra por latência, pela granularidade de 250 ms do relógio da sala,
+  e por qualquer resync no meio. O certo é contar **de trás para frente a
+  partir de `phaseDeadline`**, que é o instante exato em que o servidor vai
+  agir. Virou `esperaAteViajar`, com teste.
 - **Número tranquilizador é onde a verificação para.** A checagem de daltonismo
   da paleta foi feita de verdade, e errada, e passou por dois agentes e uma
   revisão porque vinha com um `ΔE 21,8` do lado. Ninguém confere um número que

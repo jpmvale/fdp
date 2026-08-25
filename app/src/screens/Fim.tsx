@@ -1,4 +1,5 @@
 import { Avatar } from '../components/Avatar';
+import { CORES, desempenhoDaPartida } from '../desempenho';
 import { Vidas } from '../components/Vidas';
 import type { EndReason } from '@fdp/rules';
 import type { Retrato, PlayerView } from '../state/tipos';
@@ -72,6 +73,7 @@ export function Fim({ retrato, eu, partida, aoRevanche, aoSair }: {
         })}
       </div>
 
+      <Notas partida={partida} retrato={retrato} eu={eu} />
       <Numeros partida={partida} retrato={retrato} eu={eu} />
       <Queda partida={partida} retrato={retrato} />
 
@@ -199,6 +201,61 @@ function Queda({ partida, retrato }: { partida: PlayerView; retrato: Retrato }) 
           </span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * A nota de desempenho, ordenada pela nota e não pela classificação.
+ *
+ * É de propósito que as duas listas discordem: a classificação diz quem
+ * venceu, esta diz quem jogou melhor. Quando a mesma pessoa lidera as duas,
+ * não há o que discutir; quando não, é exatamente aí que a mesa tem assunto.
+ */
+function Notas({ partida, retrato, eu }: {
+  partida: PlayerView; retrato: Retrato; eu: string;
+}) {
+  const notas = desempenhoDaPartida(partida).filter((d) => d.rodadasJogadas > 0);
+  if (notas.length === 0) return null;
+
+  return (
+    <div className="cartao pilha" style={{ gap: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <span className="rotulo">desempenho</span>
+        <span className="fraco">pontaria, acertos e quanto durou</span>
+      </div>
+
+      {notas.map((d) => {
+        const jogador = retrato.players.find((p) => p.id === d.playerId);
+        const { cor, rotulo } = CORES[d.faixa];
+        return (
+          <div key={d.playerId} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <Avatar avatar={jogador?.avatar ?? { emoji: '🦊', color: 'amber' }} tamanho={26} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 14 }}>
+                {jogador?.nickname ?? '?'}{d.playerId === eu ? ' · você' : ''}
+                {d.venceu && <span aria-hidden style={{ color: 'var(--texto-apagado)' }}> · venceu</span>}
+              </div>
+              <div className="fraco" style={{ fontSize: 11 }}>
+                {d.acertos} de {d.rodadasJogadas} {d.rodadasJogadas === 1 ? 'rodada' : 'rodadas'} em cheio
+                {d.abandonou && ' · abandonou'}
+              </div>
+            </div>
+
+            {/* Número, palavra E cor: a cor é o terceiro canal, nunca o único
+                (RNF-031). Quem não distingue a cor lê "excelente" do lado. */}
+            <div style={{ textAlign: 'right' }}>
+              <div style={{
+                color: cor, fontSize: 22, fontWeight: 600, lineHeight: 1,
+                fontVariantNumeric: 'tabular-nums',
+              }}>
+                {d.nota.toFixed(1)}
+              </div>
+              <div style={{ color: cor, fontSize: 10, letterSpacing: '.06em' }}>{rotulo}</div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
