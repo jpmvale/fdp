@@ -201,9 +201,25 @@ encerra as partidas em curso e nada mais (RNF-063). O que precisa de backup é o
 repositório, que já vive no git, e `~/apps/fdp/.env.prod` — que você regenera, ao
 custo de derrubar as sessões vivas.
 
+### Para onde vai o aviso
+
+Receptor padrão do stack: **`email-infra`** → `jpmvale@gmail.com`. Agrupamento
+por pasta e nome do alerta, espera de 30 s, repetição a cada 4 h.
+
+**O que estava errado até 25/08/2026:** o receptor padrão era `empty` — um
+receptor que existe e não tem integração nenhuma. As dez regras do stack
+avaliavam certo e entregavam em lugar nenhum, inclusive as oito de
+infraestrutura (backup, disco, memória, load, container em loop, site fora do
+ar). O ponto `email-infra` já existia; só nada apontava para ele.
+
+Vale como lembrete geral: **regra saudável não é a mesma coisa que aviso
+entregue**, e o painel do Grafana mostra a primeira, não a segunda.
+
 ## O que ainda falta
 
-- **Ponto de notificação.** As regras disparam, mas o destino do aviso é o
-  padrão do stack. Vale apontar para onde você realmente olha — e testar com um
-  disparo de verdade, porque alerta que ninguém recebe é o mesmo que alerta que
-  não existe.
+- **Provar a entrega.** A configuração está conferida — a política aponta para
+  um ponto que existe, com o endereço certo, integração `email` válida —, mas
+  nenhum e-mail chegou ainda porque nada disparou. O caminho mais curto é o
+  botão **Test** em Alerting → Contact points → `email-infra`. O mais completo é
+  parar a sonda por seis minutos e deixar `fdp-sonda-parada` disparar de
+  verdade, o que exercita regra, política e ponto de contato de ponta a ponta.

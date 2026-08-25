@@ -187,9 +187,11 @@ printf "\n%s\n" "$(cat chave.pub)" >> ~/.ssh/authorized_keys
 
 ## O que fazer a seguir
 
-1. **Apontar o ponto de notificação** dos alertas. Eles estão no ar e avaliando,
-   mas o aviso vai para o destino padrão do stack — e alerta que ninguém recebe
-   é o mesmo que alerta que não existe. Vale testar com um disparo real.
+1. **Provar a entrega do alerta.** O roteamento foi configurado (padrão →
+   `email-infra` → jpmvale@gmail.com) e a configuração está conferida, mas
+   nenhum aviso chegou ainda porque nada disparou. Botão **Test** em Alerting →
+   Contact points resolve em um clique; parar a sonda por seis minutos prova o
+   caminho inteiro.
 2. **Completar os eventos estruturais**, se os 31% de resync incomodarem:
    `round:phaseChanged` não carrega a vaza que o motor acaba de criar, e
    `trick:resolved` não carrega a ordem de jogo da próxima. Enquanto não
