@@ -10,13 +10,15 @@ const DIFICULDADES: { valor: BotDifficulty; rotulo: string; explica: string }[] 
   { valor: 'MEDIO', rotulo: 'Médio', explica: 'Aposta pela força da mão e segura carta alta.' },
 ];
 
-export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRemoverBot }: {
+export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRemoverBot, aoAbrirPerfil, aoAbrirRegras }: {
   retrato: Retrato;
   eu: string;
   aoIniciar: () => void;
   aoExpulsar: (playerId: string) => void;
   aoAdicionarBot: (dificuldade: BotDifficulty) => void;
   aoRemoverBot: (playerId: string) => void;
+  aoAbrirPerfil: () => void;
+  aoAbrirRegras: () => void;
 }) {
   const [dificuldade, setDificuldade] = useState<BotDifficulty>('MEDIO');
   const jogadores = retrato.players.filter((p) => !p.isSpectator);
@@ -123,6 +125,15 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
           )}
         </div>
       )}
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="fantasma" onClick={aoAbrirPerfil} style={{ flex: 1 }}>
+          Trocar apelido e cara
+        </button>
+        <button className="fantasma" onClick={aoAbrirRegras} style={{ flex: 1 }}>
+          Como se joga
+        </button>
+      </div>
 
       <Chat />
 

@@ -6,7 +6,7 @@ import { Feltro } from '../components/Feltro';
 import { Vidas } from '../components/Vidas';
 import type { Retrato, PlayerView } from '../state/tipos';
 
-export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoApostar, aoJogar }: {
+export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoApostar, aoJogar, aoAbrirRegras }: {
   retrato: Retrato;
   eu: string;
   partida: PlayerView;
@@ -14,6 +14,7 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
   aoSelecionar: (cardId: string | null) => void;
   aoApostar: (valor: number) => void;
   aoJogar: (cardId: string) => void;
+  aoAbrirRegras: () => void;
 }) {
   const nome = (id: string) => retrato.players.find((p) => p.id === id)?.nickname ?? '—';
   const ausentes = new Set(retrato.pause?.absentPlayerIds ?? []);
@@ -22,7 +23,7 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
 
   return (
     <div className="pilha">
-      <Cabecalho partida={partida} retrato={retrato} />
+      <Cabecalho partida={partida} retrato={retrato} aoAbrirRegras={aoAbrirRegras} />
 
       {partida.isForeheadRound && <FaixaTesta />}
 
@@ -54,7 +55,9 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
   );
 }
 
-function Cabecalho({ partida, retrato }: { partida: PlayerView; retrato: Retrato }) {
+function Cabecalho({ partida, retrato, aoAbrirRegras }: {
+  partida: PlayerView; retrato: Retrato; aoAbrirRegras: () => void;
+}) {
   const fase = partida.phase === 'APOSTAS' ? 'Fase de apostas' : 'Fase de vazas';
   const daVez = partida.activePlayerId === retrato.match?.viewerId;
   const estavel = retrato.status !== 'PAUSADA';
@@ -80,7 +83,8 @@ function Cabecalho({ partida, retrato }: { partida: PlayerView; retrato: Retrato
 
         <button
           className="fantasma"
-          aria-label="Regras e log da rodada"
+          onClick={aoAbrirRegras}
+          aria-label="Abrir as regras"
           style={{ minWidth: 44, width: 44, padding: 0 }}
         >
           ☰

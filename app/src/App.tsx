@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PROTOCOL_VERSION, type Avatar as AvatarProto } from '@fdp/protocol';
 import { conectar, type Conexao } from './net/socket';
 import * as sessao from './net/sessao';
@@ -7,6 +7,8 @@ import { useEstado, definir, ler, avisar, errar } from './state/loja';
 import type { Retrato } from './state/tipos';
 import { BloqueioConexao, FaixaConexao, bloqueia } from './components/Conexao';
 import { Home } from './screens/Home';
+import { Perfil } from './screens/Perfil';
+import { Regras } from './screens/Regras';
 import { Lobby } from './screens/Lobby';
 import { Mesa, Resolucao } from './screens/Mesa';
 import { Pausa } from './screens/Pausa';
@@ -15,6 +17,11 @@ import { Fim } from './screens/Fim';
 export function App() {
   const estado = useEstado();
   const conexao = useRef<Conexao | null>(null);
+  const [regrasAbertas, setRegrasAbertas] = useState(false);
+  // O que o Perfil vai fazer ao confirmar: criar sala, entrar numa, ou só
+  // salvar (quando já se está na mesa).
+  const [intencao, setIntencao] = useState<{ tipo: 'CRIAR' } | { tipo: 'ENTRAR'; codigo: string } | null>(null);
+  const [perfilAberto, setPerfilAberto] = useState(false);
 
   const entrar = (s: sessao.Sessao) => {
     sessao.guardar(s.roomCode, s.sessionToken);
@@ -85,27 +92,43 @@ export function App() {
   const enviar = (tipo: string, payload?: unknown) =>
     conexao.current?.enviar(tipo as never, payload);
 
-  if (estado.tela === 'home' || !estado.retrato) {
+  const foraDaSala = estado.tela === 'home' || estado.tela === 'perfil';
+
+  if (foraDaSala || !estado.retrato) {
     return (
       <Casca>
-        <FaixaConexao estado={estado.tela === 'home' && !bloqueia(estado.conexao) ? 'CONECTADO' : estado.conexao} />
-        {estado.tela === 'home' ? (
+        <FaixaConexao estado={foraDaSala && !bloqueia(estado.conexao) ? 'CONECTADO' : estado.conexao} />
+
+        {estado.tela === 'home' && (
           <Home
             codigoInicial={new URLSearchParams(location.search).get('sala') ?? ''}
-            aoCriar={(apelido, avatar) => criar(apelido, avatar, entrar)}
-            aoEntrar={(codigo, apelido, avatar) => juntar(codigo, apelido, avatar, entrar)}
+            aoCriar={() => { setIntencao({ tipo: 'CRIAR' }); definir({ tela: 'perfil' }); }}
+            aoEntrar={(codigo) => { setIntencao({ tipo: 'ENTRAR', codigo }); definir({ tela: 'perfil' }); }}
           />
-        ) : (
-          <p className="fraco">Entrando na sala…</p>
         )}
+
+        {estado.tela === 'perfil' && (
+          <Perfil
+            aoVoltar={() => definir({ tela: 'home' })}
+            aoConfirmar={(apelido, avatar) => {
+              if (intencao?.tipo === 'ENTRAR') juntar(intencao.codigo, apelido, avatar, entrar);
+              else criar(apelido, avatar, entrar);
+            }}
+          />
+        )}
+
+        {estado.tela === 'sala' && !estado.retrato && <p className="fraco">Entrando na sala…</p>}
+
         <Erro texto={estado.erro} />
         {bloqueioAtual}
+        {regrasAbertas && <Regras aoFechar={() => setRegrasAbertas(false)} />}
       </Casca>
     );
   }
 
   const retrato = estado.retrato;
   const eu = estado.eu!;
+  const souEu = retrato.players.find((p) => p.id === eu);
   const partida = retrato.match;
   const acabou = partida?.endReason != null;
   const nome = (id: string) => retrato.players.find((p) => p.id === id)?.nickname ?? '—';
@@ -120,6 +143,22 @@ export function App() {
           eu={eu}
           aoResolver={(action) => enviar('host:resolveAbsence', { action })}
         />
+      )}
+
+      {/* Perfil sobre a sala, como as regras: quem troca de cara no lobby
+          quer voltar para o lobby, não recomeçar de algum lugar. */}
+      {perfilAberto && (
+        <Sobreposicao>
+          <Perfil
+            inicial={souEu}
+            jaNaMesa={retrato.players}
+            aoVoltar={() => setPerfilAberto(false)}
+            aoConfirmar={(nickname, avatar) => {
+              enviar('player:setProfile', { nickname, avatar });
+              setPerfilAberto(false);
+            }}
+          />
+        </Sobreposicao>
       )}
 
       {acabou && partida ? (
@@ -138,6 +177,7 @@ export function App() {
               trickNumber: partida.trickNumber,
               bet,
             })}
+            aoAbrirRegras={() => setRegrasAbertas(true)}
             aoJogar={(cardId) => {
               enviar('move:playCard', {
                 matchId: partida.matchId,
@@ -158,13 +198,29 @@ export function App() {
           aoExpulsar={(playerId) => enviar('host:kick', { playerId })}
           aoAdicionarBot={(difficulty) => enviar('host:addBot', { difficulty })}
           aoRemoverBot={(playerId) => enviar('host:removeBot', { playerId })}
+          aoAbrirPerfil={() => setPerfilAberto(true)}
+          aoAbrirRegras={() => setRegrasAbertas(true)}
         />
       )}
 
       <Avisos avisos={estado.avisos} />
       <Erro texto={estado.erro} />
       {bloqueioAtual}
+      {regrasAbertas && <Regras aoFechar={() => setRegrasAbertas(false)} />}
     </Casca>
+  );
+}
+
+/** Uma tela inteira por cima da atual, com o mesmo respiro da casca. */
+function Sobreposicao({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 15,
+      background: 'var(--fundo)', overflowY: 'auto',
+      padding: '12px 12px calc(24px + env(safe-area-inset-bottom))',
+    }}>
+      <div style={{ maxWidth: 460, margin: '0 auto' }}>{children}</div>
+    </div>
   );
 }
 
