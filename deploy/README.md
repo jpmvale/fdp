@@ -15,11 +15,11 @@ convenção da máquina.
 
 | Peça | Onde |
 |---|---|
-| Fonte na VPS | `~/apps/fdp` (rsync a partir do repositório) |
+| Fonte na VPS | `~/apps/fdp`, clone do repositório — `deploy.sh` dá `git checkout --detach <sha>` |
 | Stack | `docker-compose.prod.yml` na raiz do repositório |
 | Containers | `fdp-api` e `fdp-redis`, nenhum publicando porta no host |
 | Redes | `internal` (Redis) e `edge` (só a API, para o Caddy alcançar) |
-| Segredo | `~/apps/fdp/.env.prod`, modo 600 |
+| Segredo | `~/apps/fdp/.env`, modo 600 (o compose lê sozinho) |
 | Roteamento | bloco `fdp.imp-software.cloud` em `~/caddy/Caddyfile` (cópia em [`Caddyfile`](Caddyfile)) |
 | Sonda | `~/bin/metrica-fdp.sh` no cron de minuto (cópia em [`metrica-fdp.sh`](metrica-fdp.sh)) |
 
@@ -33,16 +33,16 @@ outro. Roda sem persistência em disco de propósito (RNF-063) — salas têm TT
 Feita em 25/08/2026. Para refazer do zero:
 
 ```bash
-ssh vps 'mkdir -p ~/apps/fdp'
-rsync -az --delete --exclude '.git' --exclude 'node_modules' --exclude '.env*' \
-  ./ vps:~/apps/fdp/
+ssh vps 'git clone https://github.com/jpmvale/fdp.git ~/apps/fdp'
 
 # Segredo estável entre reinícios: trocá-lo invalida toda sessão viva e derruba
-# as partidas em curso (RNF-075).
+# as partidas em curso (RNF-075). Fica em `.env` e não em `.env.prod` porque é
+# esse nome que o compose carrega sozinho — e `deploy.sh` chama o compose sem
+# `--env-file`.
 ssh vps 'cd ~/apps/fdp && umask 077 && \
-  printf "FDP_SESSION_SECRET=%s\nIMAGE_TAG=%s\n" "$(openssl rand -hex 32)" "$(git rev-parse --short HEAD)" > .env.prod'
+  printf "FDP_SESSION_SECRET=%s\n" "$(openssl rand -hex 32)" > .env'
 
-ssh vps 'cd ~/apps/fdp && docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build'
+ssh vps 'cd ~/apps/fdp && docker compose -f docker-compose.prod.yml up -d --build'
 ```
 
 Depois, o bloco de [`Caddyfile`](Caddyfile) vai para o **fim** de
@@ -58,17 +58,36 @@ O TLS é emitido no primeiro acesso, e depende do DNS já estar apontando.
 
 ## Subir versão nova
 
-Enquanto não houver imagem no GHCR nem workflow de deploy, é rsync e rebuild:
+**Automático.** Um push na `main` roda o CI; passando, o workflow `Deploy`
+constrói a imagem, empurra para o GHCR e chama `~/bin/deploy.sh fdp <sha>` na
+VPS por SSH, com a chave presa a esse script por forced command.
+
+O `deploy.sh` é compartilhado com coda, kindred e expense-analyzer, e faz mais
+do que subir: põe o repositório no MESMO commit da imagem, confere que os
+containers rodam de fato a tag pedida, verifica pela URL pública e **reverte
+sozinho** se a verificação falhar. Só o serviço `api` entra na esteira — o
+`redis` é imagem oficial e recriá-lo derrubaria as salas vivas à toa.
+
+Para publicar à mão, quando a esteira não é uma opção — o `deploy.sh` só é
+alcançável pela chave do Actions, que o carrega por forced command:
 
 ```bash
-rsync -az --delete --exclude '.git' --exclude 'node_modules' --exclude '.env*' \
-  ./ vps:~/apps/fdp/
-ssh vps 'cd ~/apps/fdp && docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build'
+ssh vps 'cd ~/apps/fdp && git fetch -q origin && git checkout -q --detach <sha> && \
+  docker compose -f docker-compose.prod.yml up -d --build'
 ```
 
-O container tem `stop_grace_period: 20s` e recebe `SIGTERM`: `main.ts` avisa os
-clientes, persiste as salas sujas e sai. É o caminho que **CA-046** exercita — a
-partida atravessa o deploy.
+Isso constrói na própria VPS em vez de baixar do GHCR: serve para emergência,
+não para o dia a dia.
+
+### Segredos do repositório
+
+O workflow precisa de três, em **Settings → Secrets and variables → Actions**:
+
+| Segredo | O que é |
+|---|---|
+| `VPS_HOST` | `187.77.242.128` |
+| `VPS_DEPLOY_KEY` | A chave PRIVADA cujo par está em `~/.ssh/authorized_keys` da VPS, presa a `command="/home/deploy/bin/deploy.sh"`. É a mesma dos outros três apps |
+| `VPS_HOST_KEY` | A linha de `known_hosts` da VPS, para o SSH não aceitar qualquer host no meio do caminho |
 
 ## Verificar
 
@@ -127,6 +146,7 @@ parou, e o silêncio não pode significar "tudo bem").
 | Salas vivas | `ssh vps 'docker exec fdp-redis redis-cli --scan --pattern "room:*"'` |
 | Versão no ar | `curl -s https://fdp.imp-software.cloud/api/health` |
 | Rodar a sonda à mão | `ssh vps '~/bin/metrica-fdp.sh && cat ~/metricas/fdp.prom'` |
+| Ver o log de deploy | `ssh vps 'tail -30 ~/backups/deploy.log'` |
 
 **Backup não é necessário.** O Redis guarda salas com TTL de 4 h; perder tudo
 encerra as partidas em curso e nada mais (RNF-063). O que precisa de backup é o
@@ -135,7 +155,4 @@ custo de derrubar as sessões vivas.
 
 ## O que ainda falta
 
-- **Registro em `~/bin/deploy.sh`** e workflow de deploy no GitHub Actions, como
-  os outros três apps. Hoje a imagem é construída na própria VPS; o registro só
-  faz sentido quando houver imagem no GHCR, senão cria um caminho quebrado.
 - **Regras de alerta** no Grafana sobre as métricas acima.

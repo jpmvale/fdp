@@ -45,7 +45,7 @@ services:
       # Obrigatório em produção: sem ele o processo recusa subir (RNF-075).
       # Estável entre reinícios — trocá-lo invalida toda sessão viva e derruba
       # as partidas em curso.
-      FDP_SESSION_SECRET: ${FDP_SESSION_SECRET:?defina FDP_SESSION_SECRET no .env.prod}
+      FDP_SESSION_SECRET: ${FDP_SESSION_SECRET:?defina FDP_SESSION_SECRET no .env}
       REDIS_URL: redis://redis:6379
       ALLOWED_ORIGIN: https://fdp.imp-software.cloud
       # Só é seguro PORQUE o Caddy está na frente e sobrescreve
