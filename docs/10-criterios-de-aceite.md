@@ -239,12 +239,24 @@ ele diverge em silêncio, e a tela fica *plausível* — mostrando uma vaza que 
 aconteceu, ou uma carta que já foi jogada. Nenhum teste por evento pega isso,
 porque cada um passa sozinho.
 
-Na medição de 25/08/2026, uma partida de 3 jogadores até o fim: **246 eventos
-reduzidos contra 110 resyncs, 69%**. O que resta pedindo retrato são as
-transições estruturais — começo de partida, de rodada e de vaza, resolução e
-pausa —, e é assim porque os eventos que as anunciam não carregam o estado
-necessário para reconstruí-las. Enquanto não carregarem, resync é a resposta
-certa.
+Medições de 25/08/2026, numa partida de 3 jogadores até o fim:
+
+| Momento | Reduzidos | Resyncs | Proporção |
+|---|---|---|---|
+| Primeira versão dos redutores | 246 | 110 | 69% |
+| Depois de completar `round:phaseChanged` e `trick:resolved` | **300** | **56** | **84%** |
+
+A diferença não veio de redutor mais esperto: veio de **completar os eventos**.
+`round:phaseChanged` passou a carregar a vaza que nasce ao entrar em VAZAS,
+`trick:resolved` a vaza seguinte e o mapa de condenados. Antes disso o cliente
+teria de derivar quem lidera e em que ordem se joga — que é regra, e regra não
+se decide no cliente.
+
+Os 16% que sobram são as fronteiras de rodada e de partida: `round:started`,
+`round:dealt`, `round:resolved`, `match:started`, `match:ended` e o ciclo de
+pausa. São um punhado por rodada contra dezenas de jogadas, e reconstruí-los
+exigiria carregar no evento praticamente o retrato inteiro — a essa altura,
+pedir o retrato é mais honesto que fingir que não se está pedindo.
 
 ### 4.10 Propriedade e ponta a ponta
 

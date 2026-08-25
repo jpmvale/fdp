@@ -172,10 +172,10 @@ tentativa de trapaça nunca seja mascarada por um erro de regra.
 |---|---|---|---|
 | EV-010 | `round:dealt` | `{ hand: Card[] }` — mão completa em rodada de N>1 | **só o dono** |
 | EV-011 | `round:started` | `{ roundNumber, cardsThisRound, isForeheadRound, firstBidderId, foreheadCards }` | **projetado** |
-| EV-012 | `round:phaseChanged` | `{ phase, activePlayerId, deadline, forbiddenBet? }` | todos |
+| EV-012 | `round:phaseChanged` | `{ phase, activePlayerId, deadline, forbiddenBet?, currentTrick, trickNumber }` | todos |
 | EV-020 | `move:betPlaced` | `{ playerId, bet, betsSoFar, forbiddenBet }` | todos |
 | EV-021 | `move:cardPlayed` | `{ playerId, card, trickNumber, nextPlayerId, deadline }` | todos |
-| EV-022 | `trick:resolved` | `{ trickNumber, plays, winnerId, annulled, nextLeaderId, tricksWon }` | todos |
+| EV-022 | `trick:resolved` | `{ trickNumber, winnerId, annulled, annulledValue, nextLeaderId, tricksWon, nextTrick, nextTrickNumber, mortoEmVaza }` | todos |
 | EV-023 | `round:revealed` | `{ cards: Record<PlayerId, Card> }` — só rodada de testa | todos |
 | EV-013 | `round:resolved` | `{ summary: RoundSummary, lives, eliminated }` | todos |
 | EV-024 | `move:autoPlayed` | `{ playerId, kind: 'BET' \| 'CARD', value }` | todos |
@@ -199,6 +199,16 @@ Regras de projeção:
 - **EV-012** envia `forbiddenBet` apenas quando o `activePlayerId` é o último apostador, e
   apenas para ele — os demais não precisam do valor e enviá-lo a todos entregaria de graça uma
   conta que o jogador deveria fazer sozinho.
+- **EV-012** e **EV-022** carregam a VAZA, e não só o aviso de que algo mudou:
+  `round:phaseChanged` traz a vaza que nasce ao entrar em VAZAS e o número dela;
+  `trick:resolved` traz a vaza seguinte, o número dela e o mapa de quem já está
+  condenado. Todos são dados públicos — as cartas de uma vaza são públicas por
+  RJ-066, e "já era" é conta que a mesa inteira faria (RJ-009).
+
+  Não é enfeite: sem esses campos o cliente teria de DERIVAR quem lidera a
+  próxima vaza e em que ordem se joga, o que é regra — e regra não se decide no
+  cliente (`11` §6). Com eles, o redutor monta o estado; sem eles, pedia o
+  retrato inteiro a cada vaza.
 - **EV-021** carrega a carta real: uma vez jogada, ela é pública (RJ-066). E
   carrega o `deadline` da vez que começa: entre as cartas de uma vaza a fase não
   muda, então não há `round:phaseChanged` no caminho, e sem o prazo aqui o

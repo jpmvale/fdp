@@ -126,7 +126,7 @@ describe('CA-342: o estado reduzido não diverge do retrato do servidor', () => 
     // Registrado para a próxima pessoa saber o que esperar, e para uma queda
     // brusca aqui virar sinal em vez de surpresa.
     const proporcao = reduzidos / (reduzidos + resyncs);
-    expect(proporcao).toBeGreaterThan(0.4);
+    expect(proporcao).toBeGreaterThan(0.75);
   });
 });
 

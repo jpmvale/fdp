@@ -6,7 +6,7 @@
  * importa daqui e o validador nunca entra no bundle dele (RNF-055).
  */
 
-import type { Card, CardId, MatchOptions, PlayerId, RoundPhase } from '@fdp/rules';
+import type { Card, CardId, MatchOptions, PlayerId, PublicTrick, RoundPhase } from '@fdp/rules';
 
 export const PROTOCOL_VERSION = 1;
 
@@ -158,7 +158,7 @@ export type ServerEvent =
   | { type: 'match:started'; payload: { matchId: string; playerOrder: PlayerId[]; lives: Record<PlayerId, number>; options: MatchOptions } }
   | { type: 'round:dealt'; payload: { hand: Card[] } }
   | { type: 'round:started'; payload: { roundNumber: number; cardsThisRound: number; deckCount: number; isForeheadRound: boolean; firstBidderId: PlayerId; foreheadCards: Record<PlayerId, Card> } }
-  | { type: 'round:phaseChanged'; payload: { phase: RoundPhase; activePlayerId: PlayerId | null; deadline: number | null; forbiddenBet?: number | null } }
+  | { type: 'round:phaseChanged'; payload: { phase: RoundPhase; activePlayerId: PlayerId | null; deadline: number | null; forbiddenBet?: number | null; currentTrick: PublicTrick | null; trickNumber: number } }
   | { type: 'round:resolved'; payload: { summary: unknown; lives: Record<PlayerId, number>; eliminated: PlayerId[] } }
   | { type: 'match:ended'; payload: { winnerIds: PlayerId[]; lives: Record<PlayerId, number>; endReason: string } }
   // EV-040 — chat (RF-017)
@@ -170,7 +170,7 @@ export type ServerEvent =
   // EV-020..EV-024 — jogadas
   | { type: 'move:betPlaced'; payload: { playerId: PlayerId; bet: number; betsSoFar: Record<PlayerId, number>; forbiddenBet: number | null } }
   | { type: 'move:cardPlayed'; payload: { playerId: PlayerId; card: Card; trickNumber: number; nextPlayerId: PlayerId | null; deadline: number | null } }
-  | { type: 'trick:resolved'; payload: { trickNumber: number; winnerId: PlayerId | null; annulled: boolean; annulledValue: number | null; nextLeaderId: PlayerId | null; tricksWon: Record<PlayerId, number> } }
+  | { type: 'trick:resolved'; payload: { trickNumber: number; winnerId: PlayerId | null; annulled: boolean; annulledValue: number | null; nextLeaderId: PlayerId | null; tricksWon: Record<PlayerId, number>; nextTrick: PublicTrick | null; nextTrickNumber: number; mortoEmVaza: Record<PlayerId, number | null> } }
   | { type: 'round:revealed'; payload: { cards: Record<PlayerId, Card> } }
   | { type: 'move:autoPlayed'; payload: { playerId: PlayerId; kind: 'BET' | 'CARD'; value: number | Card } }
   // EV-030..EV-034 — pausa (`03` §1.2)

@@ -72,6 +72,21 @@ jobs:
         env:
           REDIS_URL: redis://127.0.0.1:6379
 
+      # Compilado dentro de `src/` faz o Vite resolver o `.js` em vez do `.ts`
+      # (os imports são `'./room.js'`, convenção ESM do TypeScript), e a suíte
+      # passa a rodar contra código velho SEM AVISO NENHUM. Aconteceu em
+      # 25/08/2026 e custou uma hora de depuração de um bug que não existia.
+      - name: Nada de compilado dentro de src/
+        run: |
+          achados=$(find packages/*/src server/src app/src \
+            \( -name '*.js' -o -name '*.d.ts' -o -name '*.js.map' \) 2>/dev/null || true)
+          if [ -n "$achados" ]; then
+            echo "::error::há saída de compilação dentro de src/ — o Vite vai resolver o .js e não o .ts"
+            echo "$achados"
+            exit 1
+          fi
+          echo "src/ limpo"
+
       # O cliente não conhece a máquina de sala. O TESTE de equivalência dos
       # redutores conhece — é a razão de ele existir, comparar os dois lados —,
       # e por isso `app/tsconfig.json` referencia `packages/room`. Sem esta

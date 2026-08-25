@@ -6,3 +6,15 @@ dist/
 .vercel
 .DS_Store
 app/build/
+
+# Saída de compilação que já vazou para dentro de `src/` uma vez, em 25/08/2026.
+# O estrago é silencioso: `index.ts` importa de `'./room.js'`, e com um `.js` de
+# verdade ao lado do `.ts` o Vite resolve o COMPILADO — os testes passam a rodar
+# contra código velho sem nenhum aviso.
+packages/*/src/*.js
+packages/*/src/*.d.ts
+packages/*/src/*.js.map
+server/src/*.js
+server/src/*.d.ts
+app/src/*.js
+app/src/*.d.ts

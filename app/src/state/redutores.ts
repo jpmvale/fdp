@@ -116,11 +116,7 @@ function aplicar(retrato: Retrato, evento: ServerEvent): Reducao {
       const m = retrato.match;
       if (!m) return null;
 
-      // Entrar em VAZAS cria a primeira vaza no servidor — com `leaderId` e
-      // ordem de jogo, que este evento não carrega. Derivar isso aqui seria o
-      // cliente decidindo regra. Peça o retrato: acontece uma vez por rodada.
       const fase = p['phase'] as unknown as PlayerView['phase'];
-      if (fase === 'VAZAS' && m.currentTrick === null) return null;
       // O prazo é da SALA, não da partida — e muda a cada turno. Esquecê-lo
       // deixava a barra do turno congelada no prazo anterior.
       const comPrazo = {
@@ -129,7 +125,12 @@ function aplicar(retrato: Retrato, evento: ServerEvent): Reducao {
       };
       return comPartida(comPrazo, {
         ...m,
-        phase: p['phase'] as unknown as PlayerView['phase'],
+        phase: fase,
+        // Entrar em VAZAS cria a primeira vaza no servidor, com líder e ordem
+        // de jogo. O evento passou a carregá-la justamente para o cliente não
+        // precisar derivar nada — derivar seria decidir regra aqui.
+        currentTrick: (p['currentTrick'] as unknown as PlayerView['currentTrick']) ?? null,
+        trickNumber: (p['trickNumber'] as unknown as number) ?? m.trickNumber,
         activePlayerId: p['activePlayerId'] as unknown as string | null,
         // Só quem está na vez recebe `forbiddenBet`; ausente no payload
         // significa "não é você", e `null` é a resposta certa (RJ-054).
@@ -177,6 +178,31 @@ function aplicar(retrato: Retrato, evento: ServerEvent): Reducao {
         // A própria mão só encolhe quando fui eu que joguei. A carta dos outros
         // nunca esteve aqui.
         hand: quem === m.viewerId ? m.hand.filter((c) => c.id !== carta.id) : m.hand,
+      });
+    }
+
+    case 'trick:resolved': {
+      const m = retrato.match;
+      if (!m || !m.currentTrick) return null;
+
+      // A vaza que estava em curso vira resolvida, com o veredito colado nela.
+      const fechada = {
+        ...m.currentTrick,
+        winnerId: (p['winnerId'] as unknown as string | null) ?? null,
+        annulledValue: (p['annulledValue'] as unknown as number | null) ?? null,
+        nextLeaderId: (p['nextLeaderId'] as unknown as string | null) ?? null,
+      };
+
+      return comPartida(retrato, {
+        ...m,
+        resolvedTricks: [...m.resolvedTricks, fechada],
+        // `null` quando a rodada acabou — e aí o que vem a seguir é
+        // `round:resolved`, que continua pedindo o retrato.
+        currentTrick: (p['nextTrick'] as unknown as PlayerView['currentTrick']) ?? null,
+        trickNumber: (p['nextTrickNumber'] as unknown as number) ?? m.trickNumber,
+        // Mapas inteiros, não deltas.
+        tricksWon: { ...(p['tricksWon'] as unknown as Record<string, number>) },
+        mortoEmVaza: { ...(p['mortoEmVaza'] as unknown as Record<string, number | null>) },
       });
     }
 

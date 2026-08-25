@@ -67,8 +67,11 @@ Os **redutores por evento** de `11` §6 estão em
 [`app/src/state/redutores.ts`](app/src/state/redutores.ts), ligados ao
 reconciliador de `05` §3 que já existia. Cada redutor devolve o estado novo ou
 `null` — "não sei montar isto" —, e `null` termina onde tudo terminava antes:
-pedindo o retrato. Medido em 69% dos eventos reduzidos numa partida completa
-(CA-342).
+pedindo o retrato. **84% dos eventos reduzidos** numa partida completa (CA-342).
+
+Os 16% que sobram são as fronteiras de rodada e de partida. Reconstruí-las
+exigiria carregar no evento praticamente o retrato inteiro — a essa altura,
+pedir o retrato é mais honesto que fingir que não se está pedindo.
 
 ## Verificado funcionando
 
@@ -163,6 +166,14 @@ falha do meu brief, que já foi corrigido.
   na minha máquina, imagem sem cliente num checkout limpo) e enumerava os
   pacotes do workspace um a um (quebrou ao entrar o `@fdp/bot`). Lista enumerada
   de coisa que cresce envelhece sempre; a única questão é quando.
+- **Saída de compilação dentro de `src/` faz a suíte rodar contra código velho,
+  em silêncio.** Os imports são `'./room.js'` (convenção ESM do TypeScript), e
+  com um `.js` de verdade ao lado do `.ts` o Vite resolve o COMPILADO. Havia 34
+  desses arquivos, commitados sem ninguém notar, e por uma hora eu depurei um
+  bug que não existia — o código estava certo e não era ele que rodava. Agora há
+  trava no CI e no `.gitignore`. A pista que denuncia: uma alteração no fonte
+  não muda o comportamento do teste, e um `console.log` no meio da função não
+  imprime.
 - **Licença MIT** foi escolha minha, não do usuário. Trocar se ele preferir.
 
 ## Segurança — incidente de 25/08/2026
@@ -187,7 +198,11 @@ printf "\n%s\n" "$(cat chave.pub)" >> ~/.ssh/authorized_keys
 
 ## O que fazer a seguir
 
-1. **Completar os eventos estruturais**, se os 31% de resync incomodarem:
-   `round:phaseChanged` não carrega a vaza que o motor acaba de criar, e
-   `trick:resolved` não carrega a ordem de jogo da próxima. Enquanto não
-   carregarem, o redutor pede o retrato — e está certo em pedir.
+Nada obrigatório. O que sobrou é escolha, não dívida:
+
+- **Reduzir as fronteiras de rodada** (os 16% restantes), se algum dia
+  incomodarem. Custaria engordar `round:started`/`round:resolved` com quase o
+  retrato inteiro, e provavelmente não vale.
+- **Alertas de saturação** (CPU, memória, disco) ficaram de fora de propósito:
+  numa VPS com quatro apps eles sobem por motivo legítimo e treinam a pessoa a
+  ignorar notificação.

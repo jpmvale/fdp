@@ -792,6 +792,13 @@ export function translate(events: readonly EngineEvent[], room: Room): Emission[
               activePlayerId: event.activePlayerId,
               deadline: room.phaseDeadline,
               forbiddenBet: view.forbiddenBet,
+              // Entrar em VAZAS cria a primeira vaza, com líder e ordem de
+              // jogo. Sem mandá-la aqui, o cliente não tem como montar esse
+              // estado sem derivar regra — e regra não se decide no cliente.
+              currentTrick: view.currentTrick,
+              // A vaza corrente vem com o número dela: entrar em VAZAS não é
+              // só mudar de fase, é começar a vaza 1.
+              trickNumber: view.trickNumber,
             },
           }));
         }
@@ -818,7 +825,13 @@ export function translate(events: readonly EngineEvent[], room: Room): Emission[
         break;
       }
 
-      case 'trick:resolved':
+      case 'trick:resolved': {
+        // Aqui `match` já é o estado DEPOIS da resolução: `currentTrick` é a
+        // vaza SEGUINTE, e `null` quando a rodada acabou. As duas informações
+        // que faltavam ao cliente — quem lidera e em que ordem se joga — vêm
+        // dentro dela. As cartas de uma vaza são públicas (RJ-066), então esta
+        // projeção é a mesma para todo mundo.
+        const publica = project(match, match.playerOrder[0]!);
         emissions.push(all({
           type: 'trick:resolved',
           payload: {
@@ -828,9 +841,16 @@ export function translate(events: readonly EngineEvent[], room: Room): Emission[
             annulledValue: event.annulledValue,
             nextLeaderId: event.nextLeaderId,
             tricksWon: match.round.tricksWon,
+            nextTrick: publica.currentTrick,
+            nextTrickNumber: publica.trickNumber,
+            // Quem já não tem salvação. É informação PÚBLICA (RJ-009): a mesa
+            // inteira faria essa conta, e a interface mostra "☠ já era" para
+            // todos. Muda exatamente quando uma vaza fecha.
+            mortoEmVaza: publica.mortoEmVaza,
           },
         }));
         break;
+      }
 
       case 'round:revealed': {
         const cards: Record<PlayerId, Card> = {};
