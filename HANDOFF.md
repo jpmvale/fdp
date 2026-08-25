@@ -58,7 +58,7 @@ aceite.
 |---|---|---|
 | `app/index.html` | HTML único, sem build, deliberadamente feio | Cliente Vite + React de `07`, com design system |
 | Aplicação incremental de eventos | O cliente provisório pede snapshot a cada evento | Os redutores por evento, na camada `state/` do cliente React |
-| Deploy | Nada na VPS | `deploy/Caddyfile`, `deploy/fdp.service`, README de instalação |
+| Deploy | Artefatos prontos em `deploy/`, **não executados** | Rodar o roteiro de `deploy/README.md` na VPS |
 
 A **decisão** de reconciliação de `05` §3 — aplicar, descartar ou pedir resync — já
 está pronta e testada em [`app/src/net/reconcile.ts`](app/src/net/reconcile.ts),
@@ -113,20 +113,28 @@ Ao montar o cliente React, dois pontos já resolvidos que economizam trabalho:
 - `CLOSE_CODES` e `shouldReconnect` em `@fdp/protocol` dizem quando reconectar e
   quando parar de tentar.
 
+O brief para colar no claude.ai/design está em [`BRIEF-DESIGN.md`](BRIEF-DESIGN.md),
+com duas decisões deixadas em aberto de propósito — tema (escuro ou claro) e
+personalidade (acompanhar o deboche do nome ou contrastar com ele).
+
 Requisitos normativos completos em [`docs/07-requisitos-ui.md`](docs/07-requisitos-ui.md).
 
 ## Pendências fora da UI
 
-**VPS (Hostinger).** A arquitetura de `docs/11` assume um processo Node persistente
-atrás do Caddy, com Redis local. O servidor já está pronto para isso — lê segredo do
-ambiente, confia em `X-Forwarded-For` sob `TRUST_PROXY`, e sai limpo no `SIGTERM`.
-Para configurar, falta:
+**VPS (Hostinger).** Os artefatos existem e estão commitados — `deploy/Caddyfile`,
+`deploy/fdp.service`, `deploy/deploy.sh` e o roteiro passo a passo em
+`deploy/README.md`. O servidor já está pronto: lê segredo do ambiente, confia em
+`X-Forwarded-For` sob `TRUST_PROXY` e sai limpo no `SIGTERM`.
+
+**Nada disso foi executado.** Para rodar, falta:
 
 1. Host e usuário — a chave SSH está no Mac do usuário, não nesta máquina
 2. Domínio apontando para a VPS (o Caddy precisa dele para o TLS automático)
 3. Saída de `ssh <host> "nproc; free -h; df -h /; cat /etc/os-release | head -2"`
 
-Depois disso: `deploy/Caddyfile`, `deploy/fdp.service` e o README de instalação.
+Com isso, o roteiro de `deploy/README.md` roda do começo ao fim, e a verificação
+final dele é CA-046: `systemctl restart` no meio de uma partida e as três abas
+continuam de onde pararam.
 
 **Vercel foi descartada** por custo do Redis gerenciado. A integração foi removida e
 o projeto desvinculado — não há nada sendo cobrado.
