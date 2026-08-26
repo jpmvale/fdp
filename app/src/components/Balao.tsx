@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage, PlayerView } from '../state/tipos';
 
 /**
@@ -67,11 +67,30 @@ export function Balao({ balao, x, y, empilhado, aoSumir }: {
 }) {
   const [saindo, setSaindo] = useState(false);
 
+  /**
+   * O `aoSumir` vive numa ref, e NÃO nas dependências do efeito.
+   *
+   * Aqui estava um balão que às vezes não sumia. O efeito dependia de
+   * `aoSumir`, que é recriado a cada render do feltro; toda vez que a
+   * identidade mudava, o efeito refazia os dois temporizadores **do zero**. E
+   * remover um balão é um `setState` no feltro, ou seja, um render — então
+   * cada balão que sumia empurrava a contagem de todos os outros para o
+   * começo. Com um balão só isso nunca aparece. Com vários ao mesmo tempo, que
+   * é o que acontece quando alguém morre e a rodada debita vida de meia mesa,
+   * o último da fila pode ser adiado indefinidamente.
+   *
+   * Guardando a função numa ref, o efeito passa a depender só da identidade do
+   * balão — que é o que de fato define quando ele deve sumir.
+   */
+  const sumir = useRef(aoSumir);
+  sumir.current = aoSumir;
+
   useEffect(() => {
-    const some = setTimeout(() => setSaindo(true), DURACAO[balao.tipo]);
-    const tira = setTimeout(() => aoSumir(balao.id), DURACAO[balao.tipo] + (balao.tipo === 'vida' ? 140 : 260));
+    const espera = DURACAO[balao.tipo];
+    const some = setTimeout(() => setSaindo(true), espera);
+    const tira = setTimeout(() => sumir.current(balao.id), espera + (balao.tipo === 'vida' ? 140 : 260));
     return () => { clearTimeout(some); clearTimeout(tira); };
-  }, [balao.id, balao.tipo, aoSumir]);
+  }, [balao.id, balao.tipo]);
 
   // Nos assentos de cima o balão desce; nos de baixo, sobe. Um balão fixo para
   // cima sairia do feltro em quem senta no topo.
@@ -181,8 +200,13 @@ export function useBaloes(chat: ChatMessage[], partida: PlayerView | null): {
     if (perdas.length > 0) setBaloes((atuais) => comTeto([...atuais, ...perdas]));
   }, [partida]);
 
-  const descartar = (id: string) =>
-    setBaloes((atuais) => atuais.filter((b) => b.id !== id));
+  // Identidade estável. O `Balao` já não depende disso para contar o tempo,
+  // mas uma função recriada a cada render é o tipo de detalhe que volta a
+  // morder no próximo efeito que alguém escrever.
+  const descartar = useCallback(
+    (id: string) => setBaloes((atuais) => atuais.filter((b) => b.id !== id)),
+    [],
+  );
 
   // Derivado dos balões em vez de guardado à parte: os dois some juntos, e não
   // há como um coração ficar caindo depois de o balão ter ido embora.

@@ -196,6 +196,7 @@ e o jogo inteiro depende de a mesa confiar no que está acontecendo.
 | CA-328 | I | RF-018 | **Dado** uma sala onde só restam bots, **quando** o ócio vence, **então** ela encerra como qualquer outra |
 | CA-348 | I | RF-018 | **Dado** as quatro dificuldades em partidas completas, **então** cada nível vence mais que o anterior — medido em torneio, não afirmado |
 | CA-349 | I | RJ-023, RJ-054 | **Dado** qualquer dificuldade, **quando** joga partidas inteiras, **então** o motor não recusa nenhuma jogada |
+| CA-350 | I | RF-009 | **Dado** o fim de partida, **quando** o host manda `host:toLobby`, **então** a sala volta a `LOBBY` sem começar nada, espectadores viram jogadores, e o comando é recusado fora do fim de partida e a quem não é host |
 
 ### 4.9 Chat (RF-017)
 

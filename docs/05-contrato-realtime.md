@@ -100,6 +100,7 @@ existe caminho de código separado para "recuperar partida".
 | `host:startMatch` | `{}` | host, só em `LOBBY` | Inicia partida |
 | `host:endMatch` | `{}` | host, só em `EM_PARTIDA` | Encerra sem vencedor |
 | `host:rematch` | `{}` | host, só em `FIM_DE_PARTIDA` | Nova partida, mesmo grupo |
+| `host:toLobby` | `{}` | host, só em `FIM_DE_PARTIDA` | Volta à sala de espera **sem** começar partida |
 | `host:resolveAbsence` | `{ action: 'CONTINUAR_SEM' \| 'ENCERRAR' }` | host, só em `PAUSADA` **e** após `decisionUnlockedAt` | Resolve a ausência (RJ-153/RJ-154) |
 
 ### 4.2 Jogadas

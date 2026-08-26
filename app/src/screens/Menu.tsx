@@ -14,16 +14,34 @@ import type { PlayerView, Retrato } from '../state/tipos';
  * Abre no log quando há partida: no meio do jogo a pergunta quase sempre é o
  * que rolou, e quem quer as regras clica uma vez. Sem partida, só há regras.
  */
-export function Menu({ retrato, partida, aoFechar, aoSair }: {
+export function Menu({ retrato, partida, eu, aoFechar, aoSair, aoEncerrar }: {
   retrato: Retrato;
   partida: PlayerView | null;
+  eu: string;
   aoFechar: () => void;
   aoSair: () => void;
+  aoEncerrar: () => void;
 }) {
   const [aba, setAba] = useState<'log' | 'regras'>(partida ? 'log' : 'regras');
   const [confirmando, setConfirmando] = useState(false);
 
   const emPartida = partida !== null && partida.endReason === null;
+
+  /**
+   * Encerrar a partida só aparece quando **não há outra pessoa na mesa** — só
+   * eu e bots.
+   *
+   * O comando é do host e sempre existiu (`host:endMatch`), mas nunca teve
+   * botão, e é por bom motivo: com gente jogando, encerrar por conta própria
+   * tira a partida de todo mundo sem que ninguém possa discordar. Contra bots
+   * não há de quem discordar, e ficar preso numa partida que já não interessa
+   * é o problema real.
+   */
+  const souHost = retrato.hostId === eu;
+  const outrosHumanos = retrato.players.filter(
+    (p) => !p.bot && !p.isSpectator && p.id !== eu && p.connection !== 'SAIU' && p.connection !== 'REMOVIDO',
+  ).length;
+  const podeEncerrar = emPartida && souHost && outrosHumanos === 0;
 
   return (
     <Folha
@@ -46,6 +64,12 @@ export function Menu({ retrato, partida, aoFechar, aoSair }: {
             vão embora e a rodada é refeita sem a pessoa. Por isso o segundo
             toque — não é cerimônia, é que um toque acidental aqui custaria a
             partida de quem tocou e atrapalharia a mesa inteira. */}
+        {podeEncerrar && !confirmando && (
+          <button className="fantasma" onClick={aoEncerrar}>
+            Encerrar a partida e voltar ao lobby
+          </button>
+        )}
+
         {confirmando ? (
           <div className="cartao pilha" style={{ gap: 8 }}>
             <p className="fraco" style={{ textAlign: 'center' }}>

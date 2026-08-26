@@ -52,7 +52,7 @@ O produto vive ou morre por três atributos, nesta ordem de prioridade:
 | RF-006 | Partida completa segundo [02-regras-do-jogo.md](./02-regras-do-jogo.md) |
 | RF-007 | Vidas, apostas e vazas de todos visíveis e atualizadas em tempo real |
 | RF-008 | Tela de fim de partida com classificação final |
-| RF-009 | Revanche com o mesmo grupo, sem recriar a sala |
+| RF-009 | Revanche com o mesmo grupo, sem recriar a sala — e volta ao lobby para arrumar a mesa antes |
 | RF-010 | Reconexão automática com recuperação integral do estado |
 | RF-011 | Pausa por ausência, com decisão do host e teto de tempo (`02` §3.8) |
 | RF-012 | Host pode expulsar um jogador do lobby |

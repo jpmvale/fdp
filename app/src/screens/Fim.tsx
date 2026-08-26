@@ -18,12 +18,13 @@ const MOTIVOS: Record<EndReason, string> = {
   ENCERRADA_POR_AUSENCIA: 'A pausa passou do limite esperando quem caiu.',
 };
 
-export function Fim({ retrato, eu, partida, aoRevanche, aoSair }: {
+export function Fim({ retrato, eu, partida, aoRevanche, aoSair, aoVoltarAoLobby }: {
   retrato: Retrato;
   eu: string;
   partida: PlayerView;
   aoRevanche: () => void;
   aoSair: () => void;
+  aoVoltarAoLobby: () => void;
 }) {
   const vencedores = partida.winnerIds ?? [];
   const souHost = retrato.hostId === eu;
@@ -56,6 +57,16 @@ export function Fim({ retrato, eu, partida, aoRevanche, aoSair }: {
           revanche — quem quisesse parar de jogar ficava preso na tela de fim,
           sem nada para fazer além de fechar a aba. */}
       {souHost && <button onClick={aoRevanche}>Revanche com o mesmo grupo</button>}
+
+      {/* A revanche recomeça na hora, com a mesma mesa. Isto volta para a sala
+          de espera, onde dá para trocar os bots, a dificuldade e as opções
+          antes de jogar de novo — não havia caminho para isso: do fim só se
+          saía jogando outra igual ou fechando a aba. */}
+      {souHost && (
+        <button className="fantasma" onClick={aoVoltarAoLobby}>
+          Voltar ao lobby e arrumar a mesa
+        </button>
+      )}
 
       <button className="fantasma" onClick={aoSair}>Sair da mesa</button>
 
@@ -156,9 +167,9 @@ function Desempenho({ partida, retrato, eu, ordem, saiu }: {
         <span style={{ flex: 1 }} />
         {/* Uma palavra por coluna: "em cheio" quebrava em duas linhas e
             empurrava o cabeçalho inteiro para baixo em 360 px. */}
-        <span style={{ width: 42, textAlign: 'right' }}>aposta</span>
-        <span style={{ width: 30, textAlign: 'right' }}>fez</span>
         <span style={{ width: 44, textAlign: 'right' }}>cheios</span>
+        <span style={{ width: 46, textAlign: 'right' }}>erro/rod</span>
+        <span style={{ width: 30, textAlign: 'right' }}>pior</span>
         <span style={{ width: 38, textAlign: 'right' }}>nota</span>
       </div>
 
@@ -186,13 +197,27 @@ function Desempenho({ partida, retrato, eu, ordem, saiu }: {
                 {jogador.nickname}{id === eu ? ' · você' : ''}
               </span>
 
-              <span style={{ width: 42, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{n.apostou}</span>
-              <span style={{ width: 30, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{n.fez}</span>
               <span style={{
                 width: 44, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
                 color: n.acertos > 0 ? 'var(--texto)' : 'var(--texto-apagado)',
               }}>
                 {n.acertos}/{n.jogadas}
+              </span>
+              {/* Quanto a aposta ficou longe, em média, por rodada. Zero é
+                  pontaria perfeita; 1,0 é errar por uma mão toda rodada. */}
+              <span style={{
+                width: 46, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+                color: n.erroMedio === 0 ? 'var(--texto)' : 'var(--texto-medio)',
+              }}>
+                {n.erroMedio.toFixed(1)}
+              </span>
+              {/* O tombo isolado que uma média esconde: errar por 4 numa rodada
+                  e acertar o resto dá média baixa e custou 4 vidas. */}
+              <span style={{
+                width: 30, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+                color: n.pior >= 3 ? 'var(--vidas)' : 'var(--texto-apagado)',
+              }}>
+                {n.pior === 0 ? '—' : `−${n.pior}`}
               </span>
               {/* Número E cor; a palavra vem na linha de baixo. Cor nunca é o
                   único canal (RNF-031). */}
@@ -223,23 +248,44 @@ function Desempenho({ partida, retrato, eu, ordem, saiu }: {
   );
 }
 
-/** Aposta contra mão feita, na partida inteira — somado de `history`. */
+/**
+ * O quanto cada um errou, rodada a rodada.
+ *
+ * A primeira versão desta tabela mostrava os TOTAIS de aposta e de mãos
+ * feitas, e eles enganam: apostar 10 e fazer 10 na partida inteira parece
+ * pontaria perfeita e pode ser o contrário — erra-se por 3 numa rodada, por 3
+ * para o outro lado na seguinte, os totais fecham e o jogador perdeu 6 vidas
+ * no caminho. Soma de aposta contra soma de mãos deixa os erros se cancelarem,
+ * que é exatamente o que a vida perdida NÃO faz.
+ *
+ * O que substitui é o desvio: `|aposta − mãos feitas|` em cada rodada, que é a
+ * conta que o jogo cobra (RJ-090). Mostrado como MÉDIA por rodada, e não como
+ * total, porque quem caiu na rodada 3 jogou menos que quem chegou na 7 — um
+ * total premiaria ser eliminado cedo.
+ *
+ * Rodada abortada (RJ-155) fica fora dos dois lados da conta: ela é refeita e
+ * não debita ninguém, e contá-la puniria quem estava na mesa quando outra
+ * pessoa caiu.
+ */
 function numerosDaPartida(partida: PlayerView) {
-  const linhas = new Map<string, { apostou: number; fez: number; acertos: number; jogadas: number }>();
+  const linhas = new Map<string, { erroMedio: number; pior: number; acertos: number; jogadas: number }>();
+
   for (const id of partida.playerOrder) {
-    let apostou = 0, fez = 0, acertos = 0, jogadas = 0;
+    let desvio = 0, pior = 0, acertos = 0, jogadas = 0;
+
     for (const r of partida.history) {
       const aposta = r.bets[id];
-      // Rodada abortada (RJ-155) é refeita e não debita ninguém: contá-la
-      // puniria quem estava na mesa quando outra pessoa caiu.
       if (aposta === undefined || r.aborted) continue;
       jogadas++;
-      apostou += aposta;
       const feitas = r.tricksWon[id] ?? 0;
-      fez += feitas;
-      if (aposta === feitas) acertos++;
+      const erro = Math.abs(aposta - feitas);
+      desvio += erro;
+      if (erro > pior) pior = erro;
+      if (erro === 0) acertos++;
     }
-    if (jogadas > 0) linhas.set(id, { apostou, fez, acertos, jogadas });
+
+    if (jogadas > 0) linhas.set(id, { erroMedio: desvio / jogadas, pior, acertos, jogadas });
   }
+
   return linhas;
 }

@@ -652,6 +652,54 @@ describe('CA-328: sala só com bots não vive para sempre', () => {
 // Chat (RF-017) — `docs/10` §4.9
 // ---------------------------------------------------------------------------
 
+describe('CA-350: voltar ao lobby depois da partida', () => {
+  const aoLobby: Command = { type: 'host:toLobby', payload: {} };
+
+  it('do fim de partida, a sala volta a LOBBY sem começar nada', () => {
+    let room = ok(applyCommand(roomWith(1), 'p1', { type: 'host:addBot', payload: { difficulty: 'FACIL' } }, ctxAt(10))).room;
+    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
+    room = ok(applyCommand(room, 'p1', { type: 'host:endMatch', payload: {} }, ctxAt(30))).room;
+    expect(room.status).toBe('FIM_DE_PARTIDA');
+
+    const { room: depois } = ok(applyCommand(room, 'p1', aoLobby, ctxAt(40)));
+
+    // A diferença para a revanche: aqui ninguém começa a jogar. É para poder
+    // trocar bots e opções antes.
+    expect(depois.status).toBe('LOBBY');
+    expect(depois.match).toBeNull();
+    expect(depois.phaseDeadline).toBeNull();
+  });
+
+  it('não serve para fugir do meio de uma partida', () => {
+    let room = ok(applyCommand(roomWith(1), 'p1', { type: 'host:addBot', payload: { difficulty: 'FACIL' } }, ctxAt(10))).room;
+    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
+
+    const recusado = applyCommand(room, 'p1', aoLobby, ctxAt(30));
+    expect(recusado.ok).toBe(false);
+    // No meio da partida o caminho é `host:endMatch`, que é outro gesto.
+    expect(applyCommand(room, 'p1', { type: 'host:endMatch', payload: {} }, ctxAt(30)).ok).toBe(true);
+  });
+
+  it('só o host volta a mesa para o lobby', () => {
+    let room = roomWith(2);
+    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
+    room = ok(applyCommand(room, 'p1', { type: 'host:endMatch', payload: {} }, ctxAt(30))).room;
+    expect(applyCommand(room, 'p2', aoLobby, ctxAt(40)).ok).toBe(false);
+  });
+
+  it('espectador da partida passada joga a próxima (RF-014)', () => {
+    let room = roomWith(2);
+    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
+    room = ok(join(room, { playerId: 'p9', nickname: 'Tarde', avatar: AVATAR }, ctxAt(25))).room;
+    expect(room.players.find((p) => p.id === 'p9')!.isSpectator).toBe(true);
+
+    room = ok(applyCommand(room, 'p1', { type: 'host:endMatch', payload: {} }, ctxAt(30))).room;
+    const { room: depois } = ok(applyCommand(room, 'p1', aoLobby, ctxAt(40)));
+
+    expect(depois.players.find((p) => p.id === 'p9')!.isSpectator).toBe(false);
+  });
+});
+
 describe('CA-330 a CA-341: chat da mesa', () => {
   const dizer = (text: string): Command => ({ type: 'chat:send', payload: { text } });
   const mensagens = (r: Room) => r.chat;

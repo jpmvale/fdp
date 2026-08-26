@@ -170,8 +170,10 @@ export function App() {
           <Menu
             retrato={estado.retrato}
             partida={estado.retrato.match}
+            eu={estado.eu ?? ''}
             aoFechar={() => setRegrasAbertas(false)}
             aoSair={sairDaMesa}
+            aoEncerrar={() => { enviar('host:endMatch'); setRegrasAbertas(false); }}
           />
         ) : (
           <Folha
@@ -229,6 +231,7 @@ export function App() {
           partida={partida}
           aoRevanche={() => enviar('host:rematch')}
           aoSair={sairDaMesa}
+          aoVoltarAoLobby={() => enviar('host:toLobby')}
         />
       ) : partida ? (
         <>
@@ -280,8 +283,10 @@ export function App() {
         <Menu
           retrato={retrato}
           partida={partida}
+          eu={eu}
           aoFechar={() => setRegrasAbertas(false)}
           aoSair={sairDaMesa}
+          aoEncerrar={() => { enviar('host:endMatch'); setRegrasAbertas(false); }}
         />
       )}
     </Casca>

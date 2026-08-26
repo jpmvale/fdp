@@ -544,6 +544,22 @@ export function applyCommand(
       return startMatch(lobby, ctx);
     }
 
+    case 'host:toLobby': {
+      // Só do fim de partida. No meio dela o caminho é `host:endMatch`, que é
+      // um gesto diferente e com consequência diferente — encerrar sem
+      // vencedor não é a mesma coisa que arrumar a mesa depois que acabou.
+      if (room.status !== 'FIM_DE_PARTIDA') return failWith('WRONG_STATUS', 'SEM_FIM_DE_PARTIDA');
+      // Espectadores viram jogadores na volta ao lobby (RF-014), como na
+      // revanche: quem chegou no meio da partida passada joga a próxima.
+      const players = room.players.map((p) => (isPresent(p) ? { ...p, isSpectator: false } : p));
+      const lobby: Room = {
+        ...room, status: 'LOBBY', match: null, pause: null, phaseDeadline: null, players,
+      };
+      return commit(lobby, ctx, [
+        all({ type: 'room:statusChanged', payload: { status: 'LOBBY' } }),
+      ]);
+    }
+
     case 'host:resolveAbsence':
       return resolveAbsence(room, command.payload.action, ctx);
 

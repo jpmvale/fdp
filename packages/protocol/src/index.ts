@@ -128,6 +128,8 @@ export type Command =
   | { type: 'host:startMatch'; payload: Record<string, never> }
   | { type: 'host:endMatch'; payload: Record<string, never> }
   | { type: 'host:rematch'; payload: Record<string, never> }
+  /** Volta à sala de espera sem começar nada — para mexer na mesa antes. */
+  | { type: 'host:toLobby'; payload: Record<string, never> }
   | { type: 'host:resolveAbsence'; payload: { action: 'CONTINUAR_SEM' | 'ENCERRAR' } }
   | { type: 'move:bet'; payload: MoveBase & { bet: number } }
   | { type: 'move:playCard'; payload: MoveBase & { cardId: CardId } };
@@ -137,7 +139,7 @@ export type CommandType = Command['type'];
 export const HOST_ONLY_COMMANDS = [
   'host:kick', 'host:setOptions', 'host:startMatch',
   'host:endMatch', 'host:rematch', 'host:resolveAbsence',
-  'host:addBot', 'host:removeBot',
+  'host:addBot', 'host:removeBot', 'host:toLobby',
 ] as const satisfies readonly CommandType[];
 
 // ---------------------------------------------------------------------------

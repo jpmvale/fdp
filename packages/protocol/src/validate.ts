@@ -100,6 +100,7 @@ export const commandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('host:startMatch'), payload: empty }),
   z.object({ type: z.literal('host:endMatch'), payload: empty }),
   z.object({ type: z.literal('host:rematch'), payload: empty }),
+  z.object({ type: z.literal('host:toLobby'), payload: empty }),
   z.object({
     type: z.literal('host:resolveAbsence'),
     payload: z.object({ action: z.enum(['CONTINUAR_SEM', 'ENCERRAR']) }).strict(),
