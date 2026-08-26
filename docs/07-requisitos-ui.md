@@ -158,10 +158,28 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 | RF-056 | A chegada da própria vez **DEVE** ter aviso sonoro, tocado na **transição** e não enquanto a vez dura. Mesa pausada não avisa. |
 | RF-057 | O tempo acabando **DEVE** ter aviso próprio no último quarto do prazo, com frequência crescente — som **e** pulso visual na barra, nunca só um dos dois (RNF-031). Só para quem está na vez: os outros veriam pressão que não é deles. |
 | RF-058 | O áudio **DEVE** ser armado no **primeiro gesto** do jogador (toque ou tecla) e **DEVE** ter interruptor visível no menu ☰, cujo rótulo diz o estado atual. A escolha sobrevive a recarregar a página. |
+| RF-059 | Na vez do jogador, o **feltro inteiro** **DEVE** acender com borda vermelha pulsante **e** exibir sobre a mesa o aviso escrito **"É A SUA VEZ!"**. Só na própria vez, e nunca com a mesa pausada. |
 
 RF-055 corrige um erro que passava por decoração: a barra normalizava sempre pelo prazo da
 aposta (45 s), então a vez de jogar carta (30 s) nascia em 67% e a vez de um bot (900 ms)
 nascia em 2%. Ela praticamente nunca começava cheia, e a pressa que ela comunicava era falsa.
+
+RF-059 é o aviso para quem **não** está com o telefone na mão: som resolve para quem ouve, a
+borda resolve para quem olhou a tela de longe. Os dois canais somados ao texto e à cor fazem
+quatro, e nenhum deles é obrigatório sozinho (RNF-031) — quem não distingue o vermelho lê "É A
+SUA VEZ!", quem joga no mudo vê o pulso.
+
+O pulso é lento de propósito: um ciclo de 1,4 s dá ~0,7 piscada por segundo, bem abaixo das
+3/s que disparam convulsão fotossensível (WCAG 2.3.1). Com `prefers-reduced-motion` ele para —
+mas **cheio**, e isso precisou de regra própria: a regra global de RNF-034 corta a duração para
+0,01 ms, e uma animação `infinite` com essa duração não para no último quadro, ela cicla
+depressa demais e congela onde calhar. Medido: congelava no quadro fraco, deixando o aviso
+pálido justamente para quem pediu menos movimento.
+
+O aviso escrito mora numa faixa apertada do feltro, e o número saiu de medição e não de
+estimativa — quando a vez é minha e eu jogo por último há 7 cartas na mesa, ou seja, o único
+momento em que o aviso aparece é o mesmo em que a pilha do centro está mais funda. CA-362
+guarda os quatro lados.
 
 RF-058 é o que faz RF-056 e RF-057 existirem de fato. Áudio preparado fora de um gesto nasce
 `suspended` e nunca soa, **sem erro nenhum no console** — o jogo parece ter som e não tem. E

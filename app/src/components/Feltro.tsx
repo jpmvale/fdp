@@ -24,6 +24,63 @@ import type { PlayerView, PublicPlayer, Retrato } from '../state/tipos';
  */
 const ASSENTO = 104;
 
+/**
+ * Altura do aviso "É A SUA VEZ!", em px do feltro (que tem 372).
+ *
+ * Foi MEDIDA na mesa cheia, não escolhida. Na coluna do meio — que é onde o
+ * aviso fica, centralizado — o espaço está ocupado assim, com 8 jogadores:
+ *
+ *     4–106    assento de cima do meio (com carta de testa, o caso mais alto)
+ *   142–207    o contador do centro, enquanto não há carta na mesa
+ *   112–246    as cartas jogadas (`Vaza` começa em 112 e QUEBRA em duas
+ *              fileiras a partir de 5 cartas — foi isto que derrubou as duas
+ *              primeiras posições que tentei)
+ *   290–392    o meu assento
+ *
+ * Sobra **246 a 290**, e não é coincidência que seja apertado: quando a vez é
+ * minha e eu jogo por último, há exatamente 7 cartas na mesa — o caso mais
+ * fundo coincide com o único momento em que o aviso aparece. Por isso ele é
+ * compacto, e por isso o número é medido e não estimado.
+ *
+ * Tentei 86 (logo acima das cartas): cabem 6 px. Tentei 226: a segunda fileira
+ * de cartas passa por cima.
+ *
+ * CA-362 defende os quatro lados. Se um assento crescer, se a carta mudar de
+ * tamanho, se a fileira quebrar mais cedo ou se o contador ganhar uma linha, o
+ * teste cai antes de a mesa ficar embolada na tela de alguém.
+ */
+export const AVISO_DA_VEZ = 254;
+
+/** Altura do feltro. Sai daqui para o `style` para que o teste use a mesma. */
+export const ALTURA_DO_FELTRO = 372;
+
+/** Altura do aviso: 2+2 de respiro, 15 de linha, 1,5+1,5 de borda. Medida. */
+export const ALTURA_DO_AVISO = 22;
+
+/**
+ * O que ocupa a coluna do meio, MEDIDO na mesa de 8 em 360 px.
+ *
+ * Não sai de cálculo — sai de `getBoundingClientRect` com a mesa cheia. Está
+ * aqui para o teste poder cobrar, e para que quem mexer em assento, carta ou
+ * contador tenha onde atualizar o número junto.
+ */
+export const OCUPADO = {
+  /** Assentos de cima, com carta de testa (o caso mais alto). */
+  assentosDeCima: { de: 4, ate: 106 },
+  /** Cartas jogadas: `Vaza` começa em 112 e quebra fileira a partir de 5. */
+  cartasNaMesa: { de: 112, ate: 246 },
+  /** O contador do centro, enquanto não há carta na mesa. */
+  contadorDoCentro: { de: 142, ate: 207 },
+} as const;
+
+/** O pano, em px do feltro: `left/right 54, top 8, bottom 30`. */
+export const PANO = { de: 8, ate: ALTURA_DO_FELTRO - 30 } as const;
+
+/** Onde o meu assento começa — sou sempre o índice 0 de `posicoes`. */
+export function topoDoMeuAssento(total: number): number {
+  return (posicoes(total)[0]!.y / 100) * ALTURA_DO_FELTRO - 22;
+}
+
 export function Feltro({ retrato, eu, partida }: {
   retrato: Retrato;
   eu: string;
@@ -70,8 +127,12 @@ export function Feltro({ retrato, eu, partida }: {
   // O contador do meio cede o lugar às cartas: era ele que as cartas cobriam.
   const centroLivre = naMesa.length === 0;
 
+  // Mesa parada não tem vez de ninguém: acender o feltro enquanto se espera
+  // alguém reconectar mandaria jogar quem não pode jogar.
+  const minhaVez = partida.activePlayerId === eu && retrato.status !== 'PAUSADA';
+
   return (
-    <div style={{ position: 'relative', height: 372, marginTop: 4 }}>
+    <div style={{ position: 'relative', height: ALTURA_DO_FELTRO, marginTop: 4 }}>
       {/* O pano. `50% / 32%` é o que dá a elipse achatada de mesa vista de
           cima, em vez do círculo de um relógio. */}
       <div
@@ -84,6 +145,59 @@ export function Feltro({ retrato, eu, partida }: {
           boxShadow: 'inset 0 0 40px rgba(0,0,0,0.45)',
         }}
       />
+
+      {/* A mesa inteira acende na sua vez.
+
+          Sobre o pano e sob todo o resto: é moldura, não conteúdo, e não pode
+          disputar leitura com carta, nome ou vidas. A geometria é a MESMA do
+          pano acima — se um dia a elipse mudar, as duas mudam juntas ou a
+          borda descola do feltro. */}
+      {minhaVez && (
+        <div
+          aria-hidden
+          className="vez-borda"
+          style={{
+            position: 'absolute',
+            left: 54, right: 54, top: 8, bottom: 30,
+            borderRadius: '50% / 32%',
+            pointerEvents: 'none',
+            zIndex: 1,
+          }}
+        />
+      )}
+
+      {/* E o aviso escrito, logo acima das cartas.
+
+          A borda diz "alguma coisa é com você"; só o texto diz o quê. Vale
+          para quem não distingue o vermelho, para quem joga no mudo, e para
+          quem olhou a tela agora e não viu a transição — RNF-031 de novo: o
+          aviso tem quatro canais e nenhum deles é obrigatório.
+
+          `aria-live="polite"` porque isto é mudança de estado do jogo
+          (RNF-035); "polite" e não "assertive" porque a vez pode esperar o
+          leitor de tela terminar a frase — não é erro. */}
+      {minhaVez && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="vez-aviso"
+          style={{
+            position: 'absolute',
+            top: AVISO_DA_VEZ, left: '50%', transform: 'translateX(-50%)',
+            padding: '2px 11px',
+            borderRadius: 999,
+            border: '1.5px solid var(--vidas)',
+            background: 'rgba(8,14,23,0.94)',
+            color: 'var(--vidas)',
+            fontSize: 11, fontWeight: 700, letterSpacing: '.08em', lineHeight: '15px',
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+            zIndex: 5,
+          }}
+        >
+          É A SUA VEZ!
+        </div>
+      )}
 
       {/* Centro: o estado da MESA, não o de ninguém — e só enquanto não há
           carta nenhuma nela. Com cartas, quem conta a rodada é o cabeçalho. */}
@@ -175,7 +289,7 @@ export function Feltro({ retrato, eu, partida }: {
  * laterais, e você sempre na base**. As laterais empilham em vez de se
  * espalhar, que é o que mantém tudo dentro da tela com a mesa cheia.
  */
-function posicoes(total: number): { x: number; y: number }[] {
+export function posicoes(total: number): { x: number; y: number }[] {
   const outros = total - 1;
   const emCima = Math.min(3, outros);
   const sobra = outros - emCima;

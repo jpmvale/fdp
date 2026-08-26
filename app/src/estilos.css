@@ -216,3 +216,55 @@ input:focus { border-color: var(--acento); }
   50%      { opacity: 0.45; }
 }
 .barra-apertando { animation: barra-pulsa 520ms ease-in-out infinite; }
+
+/* É A SUA VEZ: a mesa inteira acende quando a vez chega.
+
+   O som resolve para quem está com o celular no ouvido; isto resolve para
+   quem está olhando a tela de longe, no meio da conversa, e para quem joga no
+   mudo — que é metade de quem joga no celular (RNF-031: o aviso tem som, cor,
+   movimento E texto; nenhum deles sozinho).
+
+   O pulso é lento de propósito: um ciclo de 1,4 s dá ~0,7 piscada por segundo,
+   muito abaixo das 3/s que disparam convulsão fotossensível (WCAG 2.3.1).
+   Pisca-pisca de alarme aqui seria hostil, e o jogo é de mesa de bar.
+
+   Movimento reduzido é tratado LOGO ABAIXO, com regra própria. Eu tinha
+   suposto que a regra global bastava — ela corta a duração para 0,01 ms — e
+   medi o resultado: a animação não para no último quadro, ela cicla depressa
+   demais e congela onde calhar. Caiu no quadro fraco (alpha 0,40), ou seja, o
+   aviso ficava PÁLIDO justamente para quem pediu menos movimento. */
+@keyframes vez-pulsa {
+  0%, 100% {
+    border-color: var(--vidas);
+    box-shadow: 0 0 14px 2px rgba(239, 77, 90, 0.38), inset 0 0 26px rgba(239, 77, 90, 0.16);
+  }
+  50% {
+    border-color: rgba(239, 77, 90, 0.34);
+    box-shadow: 0 0 4px 0 rgba(239, 77, 90, 0.10), inset 0 0 8px rgba(239, 77, 90, 0.04);
+  }
+}
+
+.vez-borda {
+  border: 2px solid var(--vidas);
+  animation: vez-pulsa 1.4s ease-in-out infinite;
+}
+
+.vez-aviso {
+  animation: vez-pulsa 1.4s ease-in-out infinite;
+}
+
+/* Sem movimento, o aviso fica CHEIO e parado — nunca pálido (RNF-034).
+
+   É `animation-name` e não o atalho `animation`: a regra global marca
+   `animation-duration` com `!important`, e o atalho perderia a duração para
+   ela e continuaria animando. Trocar o nome por `none` desliga a animação
+   inteira sem disputar propriedade nenhuma. */
+@media (prefers-reduced-motion: reduce) {
+  .vez-borda, .vez-aviso {
+    animation-name: none;
+    border-color: var(--vidas);
+  }
+  .vez-borda {
+    box-shadow: 0 0 14px 2px rgba(239, 77, 90, 0.38), inset 0 0 26px rgba(239, 77, 90, 0.16);
+  }
+}

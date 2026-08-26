@@ -410,9 +410,17 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-358 | U | RF-053 | **Dado** uma carta só na mão, na minha vez, **então** ela sai sozinha depois de 1,5 a 3 s; com duas cartas, nada sai sozinho |
 | CA-359 | U | RF-050 | **Dado** a fase de apostas, **então** quem inicia a mão é quem abre a rodada (RJ-038); **dado** a fase de vazas, é o líder da vaza corrente (RJ-065), que muda de mão em mão |
 | CA-361 | U | RF-056, RF-058 | **Dado** a tela montada, **então** o áudio fica pendurado em toque **e** teclado; o primeiro gesto solta os dois ouvintes, desmontar sem gesto também solta, e gestos seguintes não quebram |
+| CA-362 | U | RF-059 | **Dado** o aviso "É A SUA VEZ!" no feltro, **então** ele não cruza as cartas jogadas (com a mesa cheia), nem os assentos de cima, nem o contador do centro, nem o meu assento — com 2 a 8 jogadores —, e fica dentro do pano |
 
 CA-356 mede o defeito que consertou: a barra normalizava pelo prazo da aposta em todos os
 casos, então a vez de jogar carta nascia em 67% e a de um bot em 2%.
+
+CA-362 existe porque a faixa é apertada por um motivo que não some: quando a vez é minha e eu
+jogo por último, há exatamente 7 cartas na mesa — o momento em que o aviso aparece é o mesmo em
+que a pilha do centro está mais funda. Metade do teste sai de `posicoes()`, e acompanha mudança
+de layout sozinha; a outra metade são medidas de `getBoundingClientRect` na mesa de 8 em 360 px,
+que alguém precisa refazer se assento, carta ou contador mudarem de tamanho. As duas posições
+que tentei antes (86 e 226) fazem o teste cair.
 
 CA-361 prende o defeito mais silencioso desta leva. `AudioContext` criado fora de um gesto do
 usuário nasce `suspended` e fica assim: **todos** os avisos saem mudos a sessão inteira, e o
