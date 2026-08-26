@@ -98,6 +98,13 @@ export function criarDadosEmMemoria(opcoes: OpcoesMemoria = {}): Dados {
       return c ? clonar(c) : null;
     },
 
+    async provedoresPorEmail(email) {
+      const alvo = emailNormalizado(email);
+      const achados = new Set<Provedor>();
+      for (const i of identidades.values()) if (i.email === alvo) achados.add(i.provedor);
+      return [...achados].sort();
+    },
+
     async atualizarPerfil(id, { apelido, avatar }) {
       const c = contas.get(id);
       if (!c) return null;

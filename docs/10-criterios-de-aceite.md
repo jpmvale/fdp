@@ -419,9 +419,16 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-376 | I | RF-072 | **Dado** duas contas de mesmo apelido, **quando** entram na mesma sala, **então** as duas entram, a segunda desempatada, e cada uma segue apontando para a própria conta |
 | CA-377 | I | RF-072 | **Dado** o desempate da mesa, **então** o apelido da CONTA não muda: noutra sala vazia a pessoa volta a entrar com o nome original |
 | CA-378 | I | RF-073 | **Dado** quem tem conta editando o perfil, **então** grava na conta e o slug não acompanha o apelido |
+| CA-364 | I | RF-061 | **Dado** a volta do provedor, **então** ela é recusada sem `state` na URL, sem o cookie, com os dois diferentes, com `state` de outro provedor, na segunda vez com o mesmo `state`, e depois de dez minutos |
+| CA-365 | I | RF-062 | **Dado** SSO cujo e-mail **não** é verificado pelo provedor, **então** a conta de senha existente NÃO é assumida e nasce conta separada; **dado** e-mail verificado, a conta é assumida e a senha some. No GitHub, só o e-mail `primary` **e** `verified` autoriza |
 
 CA-356 mede o defeito que consertou: a barra normalizava pelo prazo da aposta em todos os
 casos, então a vez de jogar carta nascia em 67% e a de um bot em 2%.
+
+CA-365 fecha o buraco que transformaria D-3 num sequestro: sem exigir verificação, bastaria pôr
+o e-mail alheio no perfil do provedor para tomar a conta de outra pessoa. No GitHub isso custa
+um segundo pedido — o e-mail do perfil público pode estar vazio ou não verificado, e é o
+`primary` **e** `verified` que decide.
 
 CA-363 mede o que não dá erro: sem o hash de mentira, e-mail inexistente responde na hora — não
 há hash a calcular — e o tempo de resposta vira uma consulta de "esta pessoa tem conta aqui?".

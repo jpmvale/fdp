@@ -13,6 +13,7 @@ import { createMemoryStore, type RoomStore } from '@fdp/store';
 import { createHub, CLOSE_CODES } from './hub.js';
 import { createHttpApp } from './http.js';
 import type { Dados } from '@fdp/contas';
+import { configuracaoDoAmbiente } from './sso.js';
 import { createPersistence } from './persistence.js';
 import { createSigner } from './session.js';
 import { attachWebSocket } from './ws.js';
@@ -111,6 +112,7 @@ async function main(): Promise<void> {
     trustProxy: TRUST_PROXY,
     version: VERSION,
     dados,
+    sso: configuracaoDoAmbiente(process.env),
   });
 
   const server = serve({ fetch: app.fetch, port: PORT }, (info) => {

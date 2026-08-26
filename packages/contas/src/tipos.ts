@@ -131,6 +131,16 @@ export interface Contas {
   /** Para o login por senha. Devolve a credencial, nunca a conta sozinha. */
   credencialPorEmail(email: string): Promise<Credencial | null>;
 
+  /**
+   * Que provedores já respondem por este e-mail.
+   *
+   * Existe para RF-063: quem tenta entrar com senha numa conta que o SSO
+   * assumiu precisa ouvir *"esta conta agora entra pelo Google"*, e não
+   * "senha inválida" — que é o comportamento fácil e o que faz a pessoa
+   * tentar cinco vezes e ir embora achando que é bug.
+   */
+  provedoresPorEmail(email: string): Promise<Provedor[]>;
+
   atualizarPerfil(
     id: ContaId,
     dados: { apelido: string; avatar: Avatar },

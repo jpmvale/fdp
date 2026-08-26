@@ -25,7 +25,12 @@ export const lembrarSala = (codigo: string) => localStorage.setItem('fdp.ultima'
 
 /** Erro com o motivo já em português, pronto para a tela. */
 export class ErroApi extends Error {
-  constructor(readonly codigo: string, mensagem: string) {
+  constructor(
+    readonly codigo: string,
+    mensagem: string,
+    /** `params` de RNF-001 — a tela precisa deles para explicar o que houve. */
+    readonly params?: Record<string, unknown>,
+  ) {
     super(mensagem);
   }
 }
@@ -43,7 +48,13 @@ async function api<T>(caminho: string, corpo?: unknown, metodo?: string): Promis
     : { method: metodo ?? 'GET', credentials: 'same-origin' };
   const r = await fetch(caminho, init);
   const dados = (await r.json()) as Record<string, string>;
-  if (!r.ok) throw new ErroApi(dados.code ?? 'ERRO', dados.motivo ?? dados.code ?? 'Deu errado.');
+  if (!r.ok) {
+    throw new ErroApi(
+      dados.code ?? 'ERRO',
+      dados.motivo ?? dados.code ?? 'Deu errado.',
+      (dados as unknown as { params?: Record<string, unknown> }).params,
+    );
+  }
   return dados as T;
 }
 
@@ -87,6 +98,28 @@ export const sairDaConta = () => api<{ ok: true }>('/api/sessao', undefined, 'DE
  */
 export const salvarPerfilDaConta = (apelido: string, avatar: unknown) =>
   api<{ conta: ContaPublica }>('/api/eu', { apelido, avatar }, 'PATCH');
+
+/** Que provedores estão de pé. Vazio = nenhum botão, e nenhuma promessa. */
+export async function provedoresDeSso(): Promise<string[]> {
+  try {
+    const r = await api<{ provedores: string[] }>('/api/sso');
+    return r.provedores;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * A ida ao provedor é NAVEGAÇÃO, não `fetch`.
+ *
+ * O fluxo é de redirecionamentos e termina num `Set-Cookie` de primeira parte;
+ * puxá-lo por `fetch` daria CORS, cookie bloqueado e uma tela em branco. E
+ * `destino` volta para onde a pessoa estava — o servidor só aceita caminho
+ * interno, senão um login viraria trampolim para phishing.
+ */
+export function irParaSso(provedor: string, destino: string): void {
+  location.href = `/api/sso/${encodeURIComponent(provedor)}?destino=${encodeURIComponent(destino)}`;
+}
 
 export const perfilPublico = (slug: string) =>
   api<{ conta: ContaPublica; resumo: { partidas: number; vitorias: number; notaMedia: number | null } }>(

@@ -176,6 +176,36 @@ export function descreverContratoDeDados(harness: DadosHarness): void {
         expect(depois!.slug).toBe(r.conta.slug);
       }));
 
+    /** RF-063 depende disto para não dizer "senha inválida" ao dono da conta. */
+    it('sabe que provedores respondem por um e-mail', () =>
+      comDados(async (d) => {
+        expect(await d.contas.provedoresPorEmail('ana@exemplo.com')).toEqual([]);
+
+        await d.contas.criarComSso({
+          apelido: 'Ana', avatar: AVATAR, provedor: 'google',
+          subject: 'sub-1', email: 'Ana@Exemplo.com',
+        });
+        // Casa por caixa: o e-mail guardado foi normalizado.
+        expect(await d.contas.provedoresPorEmail('ana@exemplo.com')).toEqual(['google']);
+        expect(await d.contas.provedoresPorEmail('outro@exemplo.com')).toEqual([]);
+      }));
+
+    it('depois da tomada, o e-mail passa a responder pelo provedor', () =>
+      comDados(async (d) => {
+        const r = await d.contas.criarComSenha({
+          apelido: 'João', avatar: AVATAR, email: 'joao@exemplo.com', hash: 'h' });
+        if (!r.ok) throw new Error('cadastro falhou');
+        expect(await d.contas.provedoresPorEmail('joao@exemplo.com')).toEqual([]);
+
+        await d.contas.assumirPorSso({
+          contaId: r.conta.id, provedor: 'google',
+          subject: 'sub-g', email: 'joao@exemplo.com' });
+
+        // É esta virada que a tela usa para dizer o que houve, em vez de
+        // "senha inválida".
+        expect(await d.contas.provedoresPorEmail('joao@exemplo.com')).toEqual(['google']);
+      }));
+
     it('assumir conta que não existe não cria nada', () =>
       comDados(async (d) => {
         const r = await d.contas.assumirPorSso({

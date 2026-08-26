@@ -175,6 +175,23 @@ export function montarRotasDeConta(
     // de resposta numa consulta de "esta pessoa tem conta neste site?".
     if (!credencial) {
       await gastarComoSeFosse(senha);
+
+      /**
+       * RF-063: a conta existe, mas o SSO a assumiu (D-3) e a senha foi
+       * apagada. Dizer "senha inválida" aqui é o comportamento fácil e o que
+       * faz a pessoa tentar cinco vezes e ir embora achando que é bug.
+       *
+       * Isto revela que o e-mail tem conta. **Já revelava**: o cadastro
+       * responde `EMAIL_EM_USO` para e-mail conhecido, então a existência de
+       * conta é descobrível desde a F2 e esta mensagem não abre classe nova de
+       * vazamento. Fechar os dois exige confirmação de e-mail, que é o §8 e
+       * está adiado por D-10 — quando entrar, os dois caminhos mudam juntos.
+       */
+      const provedores = await dados.contas.provedoresPorEmail(email);
+      if (provedores.length > 0) {
+        return c.json({ code: 'CONTA_MIGRADA_PARA_SSO', params: { provedores } }, 409);
+      }
+
       return c.json({ code: 'CREDENCIAL_INVALIDA' }, 401);
     }
 

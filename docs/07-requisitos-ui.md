@@ -163,6 +163,13 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 | RF-064 | Jogar sem conta **DEVE** continuar completo: entrar por link, jogar e ver o fim de partida sem cadastro, mesmo com o banco fora do ar |
 | RF-072 | Duas contas de mesmo apelido na mesma sala desempatam na **entrada**, nunca são recusadas na porta |
 | RF-073 | O editor de perfil de quem tem conta edita **a conta**, e parte do apelido dela — nunca do desempatado pela mesa |
+| RF-061 | Entrar com Google ou GitHub. Só provedor **configurado** vira botão: um botão que devolve 503 é pior que nenhum |
+| RF-062 | SSO com e-mail **verificado pelo provedor** assume a conta de senha, apaga a senha e derruba as sessões |
+| RF-063 | Entrar com senha numa conta assumida por SSO **DEVE** dizer o que houve — *"esta conta agora entra pelo Google"* —, nunca "senha inválida" |
+
+Na tela de conta, os botões de SSO vêm **antes** do formulário de senha. Sem recuperação de
+senha (§8 do plano 01), quem entra pelo Google nunca fica sem acesso — e a ordem dos botões é a
+única recomendação que a interface consegue fazer.
 
 A tela de cadastro **DEVE** dizer, no ato, que ainda não há recuperação de senha (§8 do plano
 01). Não é rodapé jurídico: sem confirmação de e-mail não existe "esqueci minha senha", e quem

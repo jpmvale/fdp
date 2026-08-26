@@ -250,6 +250,13 @@ export async function criarDadosEmPostgres(opcoes: OpcoesPostgres): Promise<Dado
       return rows[0] ? paraCredencial(rows[0]) : null;
     },
 
+    async provedoresPorEmail(email) {
+      const { rows } = await pool.query(
+        `SELECT DISTINCT provedor FROM identidades_sso
+          WHERE lower(email) = $1 ORDER BY provedor`, [emailNormalizado(email)]);
+      return rows.map((r) => r.provedor as Provedor);
+    },
+
     async atualizarPerfil(id, { apelido, avatar }) {
       // O slug NÃO acompanha o apelido: ele é o endereço do perfil, e link que
       // muda ao trocar de apelido é link quebrado na conversa de outra pessoa.

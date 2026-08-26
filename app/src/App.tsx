@@ -130,6 +130,30 @@ export function App() {
     void quemSouEu().then((conta) => { if (conta) definir({ conta }); });
   }, []);
 
+  /**
+   * A volta do SSO.
+   *
+   * Quem entra pelo Google sai desta aba e volta noutra navegação, então o
+   * `quemSouEu` acima já pega o cookie novo. O que falta é dizer o que houve —
+   * sem isso, cancelar no provedor devolve a pessoa à mesma tela sem nenhuma
+   * explicação, e parece que o botão não funcionou.
+   *
+   * O parâmetro é limpo da URL depois: recarregar a página não pode repetir o
+   * aviso, e `?sso=ok` num link compartilhado não significa nada.
+   */
+  useEffect(() => {
+    const sso = new URLSearchParams(location.search).get('sso');
+    if (!sso) return;
+
+    if (sso === 'ok') avisar('Você entrou');
+    else if (sso === 'cancelado') avisar('Login cancelado');
+    else if (sso === 'falhou') errar('O provedor recusou o login. Tente de novo.');
+
+    const url = new URL(location.href);
+    url.searchParams.delete('sso');
+    history.replaceState(null, '', url.toString());
+  }, []);
+
   useEffect(() => {
     const p = estado.retrato?.match;
     if (!p) return;

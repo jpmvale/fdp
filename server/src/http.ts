@@ -34,6 +34,8 @@ import { createRateLimiter } from './limits.js';
 import type { SessionSigner } from './session.js';
 import type { Dados } from '@fdp/contas';
 import { contaDoCookie, montarRotasDeConta } from './contas-http.js';
+import { montarRotasDeSso } from './sso-http.js';
+import type { Buscar, ConfigSso } from './sso.js';
 
 export interface HttpOptions {
   hub: Hub;
@@ -54,6 +56,10 @@ export interface HttpOptions {
   dados?: Dados | null;
   /** Sem TLS em teste, o cookie não pode exigir `Secure`. */
   cookieSeguro?: boolean;
+  /** Provedores de SSO configurados. Vazio = nenhum botão, e nenhuma rota. */
+  sso?: ConfigSso;
+  /** Injetável para o teste percorrer o fluxo de SSO sem rede. */
+  buscarSso?: Buscar;
 }
 
 /** Avatar de quem não escolheu. A sala troca se já estiver tomado. */
@@ -316,6 +322,15 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
     now,
     clientIp,
     ...(options.cookieSeguro === undefined ? {} : { cookieSeguro: options.cookieSeguro }),
+  });
+
+  montarRotasDeSso(app, {
+    dados: options.dados ?? null,
+    signer,
+    config: options.sso ?? {},
+    now,
+    ...(options.cookieSeguro === undefined ? {} : { cookieSeguro: options.cookieSeguro }),
+    ...(options.buscarSso === undefined ? {} : { buscar: options.buscarSso }),
   });
 
   app.get('/api/health', (c) =>

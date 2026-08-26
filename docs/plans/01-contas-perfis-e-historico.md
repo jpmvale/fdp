@@ -2,7 +2,7 @@
 
 Status: **EM EXECUÇÃO** · Aberto em 26/08/2026 · P11 emendada em 26/08/2026
 
-Fases: **F1 e F2 concluídas** (26/08/2026) · F3 a F5 não começaram.
+Fases: **F1, F2 e F3 concluídas** (26/08/2026) · F4 e F5 não começaram.
 
 Cria contas (SSO e e-mail/senha), perfil público de jogador, histórico persistente de
 partidas e avatar por imagem.
@@ -210,11 +210,17 @@ depois precisa saber que essa é uma **exceção deliberada**, e não um caso es
 
 ### 6.2 SSO
 
-Fluxo de **código de autorização com PKCE**, inteiro no servidor. O cliente só é redirecionado;
-não há SDK, não há token de provedor chegando ao navegador (I-3).
+Fluxo de **código de autorização**, inteiro no servidor. O cliente só é redirecionado; não há
+SDK, não há token de provedor chegando ao navegador (I-3).
 
-- `state` assinado e casado com um cookie de vida curta — é a defesa contra CSRF de login, e
-  não é opcional.
+- **PKCE (S256) só no Google.** Corrigido em 26/08/2026: esta seção dizia "com PKCE" sem
+  ressalva, e o **GitHub não implementa PKCE** em OAuth App nenhum — mandar `code_challenge`
+  para lá é ruído que ele ignora. Há teste afirmando a ausência, para ela não parecer
+  esquecimento de quem passar por aqui depois.
+- `state` casado com um cookie de vida curta — é a defesa contra CSRF de login, e não é
+  opcional: o atacante consegue fabricar a URL de volta, mas não consegue pôr um cookie no
+  navegador da vítima. O estado pendente vive **em memória** (processo único, `11` §3.1), o
+  `state` vale uma volta só, e expira em dez minutos.
 - A chave da identidade é `(provedor, subject)`, **nunca o e-mail**: o e-mail no Google e no
   GitHub pode mudar; o `sub` não.
 - GitHub não devolve e-mail verificado no perfil por padrão: é preciso chamar `/user/emails` e
@@ -439,8 +445,28 @@ público por slug (D-4) e `PATCH /api/eu` para R-4.
 *Deliberadamente adiado:* CA-379 (avatar de imagem não trocado pela mesa) depende da união de
 `Avatar`, que é da F5.
 
-**F3 — SSO.** Google e GitHub, PKCE, `state`, e a regra de tomada de conta com a tela de RF-063.
+**F3 — SSO.** ✅ **Concluída em 26/08/2026.** Google e GitHub, `state`, e a regra de tomada de
+conta com a tela de RF-063.
 *Gate:* CA-364, CA-365, CA-366.
+
+*Cumprido:* 24 testes percorrendo o fluxo inteiro com o provedor simulado — ida, `state`, troca
+do código, perfil e a conta que sai do outro lado. O provedor é injetado porque o caminho que
+mais importa, a tomada de conta, não pode ser verificado só em produção com uma conta de
+verdade.
+
+*Uma tensão que precisou de decisão:* RF-063 manda dizer *"esta conta agora entra pelo Google"*,
+e isso revela que o e-mail tem conta — o oposto de CA-363. Resolvido assim: **já revelava**. O
+cadastro responde `EMAIL_EM_USO` para e-mail conhecido desde a F2, então a existência de conta
+é descobrível e esta mensagem não abre classe nova de vazamento. Fechar os dois exige
+confirmação de e-mail (§8, adiada por D-10) — quando entrar, os dois caminhos mudam juntos.
+
+*Na tela, o SSO vem antes do formulário de senha.* Não é moda: sem recuperação de senha, quem
+entra pelo Google nunca fica sem acesso, e a ordem dos botões é a única recomendação que a
+interface consegue fazer.
+
+*Falta para valer em produção:* criar os apps no Google e no GitHub e pôr `GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID` e `GITHUB_CLIENT_SECRET` no ambiente da VPS. Sem
+eles, `/api/sso` devolve lista vazia e a tela não desenha botão nenhum.
 
 **F4 — Histórico e perfil público.** Primeiro mover `desempenho` para `@fdp/rules` (§9.1),
 depois gravar e depois expor.

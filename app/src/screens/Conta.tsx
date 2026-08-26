@@ -1,5 +1,8 @@
-import { useState } from 'react';
-import { criarConta, entrarComSenha, ErroApi, type ContaPublica } from '../net/sessao';
+import { useEffect, useState } from 'react';
+import {
+  criarConta, entrarComSenha, ErroApi, irParaSso, provedoresDeSso,
+  type ContaPublica,
+} from '../net/sessao';
 import { Folha } from '../components/Folha';
 
 /**
@@ -24,6 +27,11 @@ export function Conta({ aoFechar, aoEntrar }: {
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [provedores, setProvedores] = useState<string[]>([]);
+
+  // Só desenha botão de provedor que existe de fato: um "Entrar com Google"
+  // que devolve 503 é pior que não oferecer nada.
+  useEffect(() => { void provedoresDeSso().then(setProvedores); }, []);
 
   const criando = modo === 'criar';
   const podeEnviar =
@@ -38,7 +46,9 @@ export function Conta({ aoFechar, aoEntrar }: {
         : await entrarComSenha(email.trim(), senha);
       aoEntrar(r.conta);
     } catch (e) {
-      setErro(e instanceof ErroApi ? mensagem(e.codigo) : 'Não deu para conectar.');
+      setErro(e instanceof ErroApi
+        ? mensagem(e.codigo, e.params)
+        : 'Não deu para conectar.');
     } finally {
       setOcupado(false);
     }
@@ -55,6 +65,32 @@ export function Conta({ aoFechar, aoEntrar }: {
         Conta guarda seu apelido, seu avatar e o histórico das suas partidas.
         Para jogar não precisa: o link entra direto.
       </p>
+
+      {/* O SSO vem PRIMEIRO, e não por moda.
+
+          Sem confirmação de e-mail não existe recuperação de senha (§8 do
+          plano 01): quem entra pelo Google nunca fica sem acesso, e quem
+          escolhe senha assume um risco que a tela avisa logo abaixo. Pôr o
+          caminho seguro na frente é a única recomendação que a ordem dos
+          botões consegue fazer. */}
+      {provedores.length > 0 && (
+        <div className="pilha" style={{ gap: 8 }}>
+          {provedores.map((p) => (
+            <button
+              key={p}
+              className="fantasma"
+              onClick={() => irParaSso(p, location.pathname + location.search)}
+            >
+              Entrar com {p === 'google' ? 'Google' : 'GitHub'}
+            </button>
+          ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ flex: 1, height: 1, background: 'var(--linha)' }} />
+            <span className="fraco">ou com e-mail</span>
+            <span style={{ flex: 1, height: 1, background: 'var(--linha)' }} />
+          </div>
+        </div>
+      )}
 
       <div className="pilha" style={{ gap: 10 }}>
         {criando && (
@@ -123,9 +159,16 @@ export function Conta({ aoFechar, aoEntrar }: {
  * e-mail que não existe: dizer "não encontramos esse e-mail" entrega quem tem
  * conta aqui, e o perfil é público por link (D-4).
  */
-function mensagem(codigo: string): string {
+function mensagem(codigo: string, params?: Record<string, unknown>): string {
   switch (codigo) {
     case 'CREDENCIAL_INVALIDA': return 'E-mail ou senha não conferem.';
+    // RF-063. Dizer "senha inválida" aqui é o comportamento fácil, e o que faz
+    // a pessoa tentar cinco vezes e ir embora achando que é bug.
+    case 'CONTA_MIGRADA_PARA_SSO': {
+      const lista = Array.isArray(params?.['provedores']) ? params['provedores'] as string[] : [];
+      const nome = lista.includes('google') ? 'Google' : lista.includes('github') ? 'GitHub' : 'outro serviço';
+      return `Esta conta agora entra pelo ${nome}. Use o botão acima.`;
+    }
     case 'EMAIL_EM_USO': return 'Já existe uma conta com esse e-mail.';
     case 'EMAIL_INVALIDO': return 'Esse e-mail não parece um e-mail.';
     case 'SENHA_FRACA': return 'A senha precisa de pelo menos 10 caracteres.';

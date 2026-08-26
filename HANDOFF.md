@@ -454,3 +454,39 @@ Rodar local com contas:
 docker run -d --rm --name fdp-postgres -p 5433:5432 -e POSTGRES_PASSWORD=fdp postgres:17-alpine
 DATABASE_URL='postgres://postgres:fdp@127.0.0.1:5433/postgres' npm run dev
 ```
+
+## SSO no ar, mas sem provedor configurado (26/08/2026)
+
+F3 do plano 01. Google e GitHub, fluxo de código de autorização inteiro no servidor — sem SDK,
+sem token de provedor chegando ao navegador (RNF-055 não sobreviveria a um SDK de OAuth).
+
+**Ainda não funciona em produção, e de propósito:** falta criar os apps no Google e no GitHub e
+pôr `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID` e `GITHUB_CLIENT_SECRET` no
+ambiente da VPS. Sem eles `/api/sso` devolve lista vazia e a tela não desenha botão — um botão
+que responde 503 é pior que nenhum. O `redirect_uri` a cadastrar é
+`https://fdp.imp-software.cloud/api/sso/{google|github}/retorno`.
+
+Três coisas que não são óbvias:
+
+- **PKCE só no Google.** O GitHub não implementa PKCE em OAuth App nenhum. A ausência tem teste
+  para não parecer esquecimento e "ser consertada" depois.
+- **A chave da identidade é `(provedor, subject)`, nunca o e-mail.** E-mail no Google e no
+  GitHub muda; o `sub` não. Casar por e-mail faria a conta trocar de dono no dia em que alguém
+  trocasse de endereço.
+- **No GitHub, `/user/emails` é obrigatório.** O e-mail do perfil público pode estar vazio ou
+  não verificado, e é o `primary` **e** `verified` que autoriza a tomada de conta de D-3. Usar o
+  do perfil transformaria a regra num sequestro.
+
+## Compilado dentro de src/ mordeu de novo (26/08/2026)
+
+Segunda vez. Os imports são `'./memoria.js'` — convenção ESM do TypeScript —, então um `.js`
+obsoleto ao lado do `.ts` **ganha** a resolução e a suíte roda contra código velho sem aviso. O
+sintoma foi um método que existia no fonte e "não era função" em tempo de execução.
+
+O guarda do CI não pegou, e não pegaria: esses arquivos são **ignorados pelo git**, então o CI
+nunca os vê e passa verde enquanto só a máquina de quem desenvolve quebra. Agora há
+`server/test/higiene.test.ts`, que roda onde o problema mora. Se ele ficar vermelho:
+
+```bash
+find packages/*/src app/src server/src \( -name '*.js' -o -name '*.d.ts' \) -delete
+```

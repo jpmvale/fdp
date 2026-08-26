@@ -126,6 +126,25 @@ o jogo funciona inteiro — conta é acréscimo, nunca pedágio.
 | `PATCH` | `/api/eu` | Edita apelido e avatar **da conta** (R-4). O slug não muda |
 | `GET` | `/api/perfis/{slug}` | Perfil público (D-4). Sem listagem e sem busca |
 
+### 6.1 SSO (F3)
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `GET` | `/api/sso` | Que provedores estão de pé. Vazio = nenhum botão na tela |
+| `GET` | `/api/sso/{provedor}` | Redireciona ao provedor, com `state` no cookie e na URL |
+| `GET` | `/api/sso/{provedor}/retorno` | Volta: confere o `state`, troca o código e entra |
+
+**PKCE só no Google.** O GitHub não implementa PKCE em OAuth App; lá a defesa é o `state` mais o
+segredo do cliente. O `state` é obrigatório nos dois, vale uma volta só e expira em dez minutos.
+
+O `destino` aceita **apenas caminho interno**. Login que aceita URL de fora é trampolim de
+phishing: manda ao provedor de verdade e traz de volta ao site do atacante, já autenticado.
+
+A tomada de conta de D-3 acontece aqui, e **só com e-mail verificado pelo provedor**. Sem essa
+exigência a regra vira sequestro: bastaria pôr o endereço alheio no perfil do provedor.
+
+### 6.2 Sessão
+
 A sessão é um cookie `HttpOnly; Secure; SameSite=Lax`, com JWT de claim `tipo: 'conta'`. O
 token de SALA continua na query string do WebSocket porque expira com a sala e só serve para
 ela; sessão de conta é identidade permanente e não pode viajar assim. **Os dois nunca se

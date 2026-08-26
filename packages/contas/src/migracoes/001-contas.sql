@@ -51,6 +51,11 @@ CREATE TABLE identidades_sso (
 
 CREATE INDEX identidades_sso_conta ON identidades_sso (conta_id);
 
+-- RF-063 pergunta "que provedores respondem por este e-mail?" no caminho do
+-- login, que é quente. Sem o índice funcional, é varredura da tabela.
+CREATE INDEX identidades_sso_email ON identidades_sso (lower(email))
+  WHERE email IS NOT NULL;
+
 CREATE TABLE partidas (
   id           uuid        PRIMARY KEY,
   sala_codigo  text        NOT NULL,
