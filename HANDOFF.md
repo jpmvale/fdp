@@ -10,6 +10,11 @@ e avatar por imagem, tudo no ar. Antes dele, na mesma leva: identidade única na
 mesa, a vaza acontecendo no centro com pausa para ver quem levou, balões saindo
 do jogador e o fim de partida com nota de desempenho.
 
+**Leia primeiro "O jogo estava fora do ar sem parecer".** O cliente mandava a
+versão errada do protocolo e todo comando era recusado — o jogo esteve
+inteiramente quebrado em produção por um período, parecendo um erro qualquer.
+Corrigido e no ar em `e2d5607`.
+
 Produção responde `protocolVersion: 2`, `contas: true` e `/api/sso` com os dois
 provedores. As seções por assunto abaixo estão em ordem cronológica; a mais
 recente é a última.
@@ -21,7 +26,7 @@ npm install
 npm run build:client   # OBRIGATÓRIO antes do primeiro `npm start`
 npm run redis          # opcional, noutro terminal
 npm start              # http://localhost:3000
-npm test               # 497 testes
+npm test               # 511 testes (2 pulados: Redis e Postgres, que só rodam com as env deles)
 npm run typecheck
 ```
 
@@ -52,7 +57,7 @@ Para parar: `pkill -f "tsx server"`.
 
 | Pacote | O quê |
 |---|---|
-| `packages/rules` | Motor de regras puro e determinístico. 110 regras `RJ-###` |
+| `packages/rules` | Motor de regras puro e determinístico. 113 regras `RJ-###` |
 | `packages/bot` | Decisão dos bots — puro, só depende de `rules`. As quatro dificuldades |
 | `packages/store` | `RoomStore` de 6 métodos, em memória **e em Redis**, mesma suíte de contrato |
 | `packages/contas` | Contas, credenciais, identidades de SSO e histórico — memória **e Postgres**, mesma suíte |
@@ -165,7 +170,7 @@ O que `docs/` chama de **vaza**, a interface chama de **"mão"**. E o que era "a
 mão do jogador" virou **"suas cartas"** — a palavra foi ocupada pela disputa, e
 sem essa segunda troca a mesma tela usaria o mesmo nome para duas coisas.
 
-`docs/` e o código seguem em "vaza", registrado em `01` e `07`. São 110 regras
+`docs/` e o código seguem em "vaza", registrado em `01` e `07`. São 113 regras
 `RJ-###` com ID estável mais `Trick`/`tricksWon`/`trickNumber` em quatro
 pacotes; renomear a espinha do projeto não mudaria nada que o jogador vê.
 
@@ -367,6 +372,112 @@ naquele momento, o acesso root estaria perdido. A forma robusta:
 printf "\n%s\n" "$(cat chave.pub)" >> ~/.ssh/authorized_keys
 ```
 
+## O jogo estava fora do ar sem parecer (26/08/2026)
+
+**O cliente mandava `v: 1` em todo comando e o servidor exige 2 desde F2.**
+
+`app/src/net/socket.ts` escrevia a versão à mão, desde o commit em que o cliente
+nasceu. Quando as contas entraram e o protocolo virou 2, o servidor passou a
+recusar **todo** comando desse cliente com `PROTOCOL_VERSION`.
+
+O que faz este bug valer uma seção não é o campo — é como ele se escondeu:
+
+- A sala continuava sendo criada, porque isso é HTTP.
+- A tela desenhava inteira, o socket abria, o retrato chegava.
+- Só os **comandos** morriam: sentar bot, começar partida, apostar, jogar
+  carta, falar no chat. Tudo o que é o jogo.
+- E o que aparecia era um `Não deu certo. Tente de novo.` vermelho — a frase
+  genérica —, porque `PROTOCOL_VERSION` nem tinha tradução no cliente.
+
+**CA-373 sempre cobriu isto pelo lado do servidor**: cliente em 1 contra
+servidor em 2 é recusado com `ERR-426`. O teste passava. E enquanto passava, o
+cliente de verdade era exatamente esse cliente em 1.
+
+> Testar a REJEIÇÃO não testa o EMISSOR. CA-373 provava que um cliente errado
+> seria recusado; ninguém perguntou se o nosso era o errado.
+
+CA-387 (`app/test/socket.test.ts`) pergunta pelo emissor, com um WebSocket de
+mentira que guarda o que foi enviado. E o `v` agora é `PROTOCOL_VERSION`
+importado do mesmo módulo que o servidor valida — as duas pontas não têm mais
+como discordar.
+
+O erro também virou bloqueio de conexão (`DESATUALIZADO`, a tela que manda
+recarregar) em vez de mais um aviso vermelho no rodapé. Versão de protocolo não
+é erro de jogada: é o cliente inteiro velho demais, e nenhum comando depois dele
+vai funcionar.
+
+**Como foi achado:** não por teste, nem por relato — por tentar sentar um bot no
+navegador enquanto verificava outra coisa. É o terceiro bug desta natureza
+achado jogando (INV-05, a pausa de fim de vaza, este). A suíte E2E ausente
+continua sendo a dívida que mais custa.
+
+## Chat, balão e perfil (26/08/2026)
+
+**RNF-016 — intervalo mínimo de 1 s entre mensagens da mesma pessoa.**
+`docs/05` §7 argumentava que RNF-010 (20 comandos/10 s) bastava, porque quem
+inunda o chat gasta o próprio direito de jogar. O argumento estava certo sobre o
+abuso e errado sobre a tela: 2 mensagens por segundo não é ataque, é uma pessoa
+animada, e mesmo assim enche o feltro de balões no meio de uma mão. Os dois
+limites coexistem e medem coisas diferentes — RNF-010 protege o servidor de quem
+automatiza, RNF-016 protege a mesa de quem conversa.
+
+Dois detalhes não são cosméticos: é **por pessoa** (o silêncio de quem falou não
+cala a mesa), e a tentativa **recusada não marca o relógio** — se marcasse, quem
+insiste a cada 200 ms empurraria o próprio prazo e ficaria mudo para sempre.
+
+O instante mora em `RoomPlayer.lastChatAt`, e não em memória do processo: um
+contador local perderia a conta a cada reinício, e a primeira coisa que um deploy
+faria seria liberar a rajada que o limite existe para conter. Sala gravada antes
+do campo volta do Redis sem ele e é lida como "nunca falou".
+
+**RF-079 — o balão compacta em 70 caracteres.** Uma mensagem no teto de RNF-014
+(280) num balão de 132 px vira onze linhas saindo do assento por cima das cartas.
+O balão avisa que fulano falou e dá o começo; o texto inteiro vive no painel do
+chat, que é onde se lê. Corta no fim de uma palavra, e só recua até o espaço
+enquanto sobrar mensagem — um link colado, que não tem espaço nenhum, não pode
+virar reticências sozinhas.
+
+**RF-078 — editar perfil na home.** O editor só existia dentro da sala, e isso
+deixava a conta sem dono: apelido, cor, emoji e foto são da CONTA, e trocá-los
+exigia estar numa mesa. A tela é a mesma (`Perfil`), com `rotulo` e `subtitulo`
+próprios; logado, ela parte da identidade da conta — mesmo motivo de R-4 do
+plano 01 §5.1, para o desempate de uma mesa não virar o nome permanente.
+
+## Avatar: dois problemas, e o segundo não era o que parecia (26/08/2026)
+
+Relato: *"parece que está tendo problemas ao subir imagens de avatar"*. Eram dois.
+
+**RNF-017 — o envio gastava o orçamento de CADASTRO.** `limiteCadastro`, 10 por
+hora **por IP**, compartilhado com `POST /api/contas`. Três coisas erradas de uma
+vez: são 10 no total (trocar a foto algumas vezes derrubava o cadastro); o limite
+é conferido **antes** da validação, então tentativa recusada também custava slot;
+e é por IP, então uma república, um escritório ou um CGNAT de operadora dividem o
+contador — quem descobria era o vizinho que nunca tentou nada. Reproduzido: 8º
+envio deu 429, e criar conta do mesmo IP em seguida também. Agora tem orçamento
+próprio, 30/h **por conta** — a rota exige sessão, então o dono é conhecido e não
+há razão para cobrar de quem divide o endereço.
+
+**CA-389 — HEIC, e a hipótese que quase virou um conserto pior.** HEIC é a foto
+padrão do iPhone desde 2017, e caía em `NAO_E_IMAGEM` — a frase mais errada
+possível, porque a pessoa está olhando para a imagem enquanto lê que não é uma.
+A correção óbvia era aceitar a marca `ftyp`, e eu cheguei a escrevê-la.
+
+**Não funciona.** O `sharp` empacotado traz libheif **sem decodificador de HEVC**:
+AVIF (que é AV1) abre, HEIC (que é HEVC) não — HEVC é patenteado e não entra no
+binário pronto. Medido com arquivo de verdade (`sips -s format heic`), não
+deduzido da documentação: libvips responde `Decoder plugin generated an error`.
+Aceitar os bytes teria trocado um erro claro por um confuso — *"não consegui
+abrir essa imagem, ela pode estar corrompida"*.
+
+Então HEIC é **reconhecido para ser recusado direito**: motivo próprio
+(`HEIC_NAO_SUPORTADO`) e uma frase que diz o que fazer — mandar em JPEG,
+Ajustes › Câmera › Formatos › "Mais compatível". Aceitar de verdade exige um
+libvips com decodificador de HEVC, que é decisão de licença e de imagem de
+container, não de código. **AVIF entra** (CA-388).
+
+A lista de marcas é fechada contra vídeo: a mesma caixa `ftyp` embrulha MP4 e
+MOV, e aceitar a caixa em vez das marcas abriria o decodificador para eles.
+
 ## O que fazer a seguir
 
 O [plano 01](docs/plans/01-contas-perfis-e-historico.md) **está entregue** (F1–F5, 26/08/2026)
@@ -377,7 +488,7 @@ onde mora quase todo o trabalho restante.
 
 | O quê | Onde | Por que importa |
 |---|---|---|
-| **Nenhuma suíte E2E existe** | `11` §8 previa Playwright; não há `test/e2e/` nem a dependência | 17 dos 196 critérios são de nível `E`. Ninguém os executa hoje, e o gate do M4 exige 100% dos `CA` de v1 passando |
+| **Nenhuma suíte E2E existe** | `11` §8 previa Playwright; não há `test/e2e/` nem a dependência | 17 dos 207 critérios são de nível `E`. Ninguém os executa hoje, e o gate do M4 exige 100% dos `CA` de v1 passando. **É a dívida mais cara do projeto**: três bugs graves foram achados jogando e nenhum por teste — INV-05 (sala travada), a pausa de fim de vaza, e o `v: 1` que derrubou o jogo inteiro em produção. Os três eram invisíveis para 500 testes unitários verdes |
 | **Nenhum teste de carga** | RNF-060: 500 salas, 2.000 sockets | Junto vão CA-160 a CA-164 (desempenho). Nada disso foi medido contra a VPS |
 | **Auditoria de segurança** | `09` §3.1 | A tabela de ameaças nunca foi percorrida em bloco |
 | **Os dois testes manuais de a11y** | `08` §5 — CA-141 (teclado) e CA-142 (leitor de tela) | São manuais por natureza e obrigatórios para o M4 |

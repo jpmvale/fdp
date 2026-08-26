@@ -59,7 +59,7 @@ Regras completas e normativas em [`docs/02-regras-do-jogo.md`](docs/02-regras-do
 ## Documentação
 
 O diretório [`docs/`](docs/) é a **fonte da verdade** do projeto — 14 documentos com 113 regras
-de jogo, 196 critérios de aceite e 18 invariantes de estado, todos com identificador estável e
+de jogo, 207 critérios de aceite e 18 invariantes de estado, todos com identificador estável e
 rastreados até o teste que os cobre.
 
 Capacidades novas entram por um **plano** em [`docs/plans/`](docs/plans/), que vive lá até
@@ -75,7 +75,7 @@ Requer Node 24+.
 npm install
 npm run build:client   # OBRIGATÓRIO antes do primeiro `npm start`
 npm start              # http://localhost:3000
-npm test               # 497 testes
+npm test               # 511 testes
 npm run typecheck
 ```
 
