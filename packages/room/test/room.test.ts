@@ -786,8 +786,12 @@ describe('CA-330 a CA-341: chat da mesa', () => {
   it('CA-337: o apelido é congelado no envio', () => {
     let room = roomWith(2);
     room = ok(applyCommand(room, 'p2', dizer('era J2'), ctxAt(50))).room;
+    // Avatar diferente do de p1 de propósito: identidade é única na mesa, e
+    // reaproveitar `AVATAR` aqui faria o teste do apelido morrer por causa do
+    // emoji — que não é o que ele mede.
+    const meuAvatar = room.players.find((p) => p.id === 'p2')!.avatar;
     room = ok(applyCommand(
-      room, 'p2', { type: 'player:setProfile', payload: { nickname: 'OutroNome', avatar: AVATAR } }, ctxAt(60),
+      room, 'p2', { type: 'player:setProfile', payload: { nickname: 'OutroNome', avatar: meuAvatar } }, ctxAt(60),
     )).room;
     room = ok(applyCommand(room, 'p2', dizer('agora sou OutroNome'), ctxAt(70))).room;
 

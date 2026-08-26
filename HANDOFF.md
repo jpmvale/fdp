@@ -190,6 +190,27 @@ Rodada abortada não entra na conta de ninguém, nem no numerador nem no
 denominador (RJ-155). As quatro cores da nota têm teste de contraste, e cada
 faixa carrega a palavra junto — cor nunca é o único canal (RNF-031).
 
+## Identidade na mesa (26/08/2026)
+
+Apelido, emoji e **cor** são únicos dentro da sala — `04` §2 exigia só que o *par*
+`(emoji, cor)` fosse único, e não bastava: a cor é o canal principal de identificação
+(`07` §4), e dois jogadores de cor igual já são parecidos demais a 360 px.
+
+A regra morava em **três lugares com três implementações** — entrada pelo HTTP, criação de
+bot, e nenhuma na edição de perfil. A que faltava era a que valia: bastava abrir o perfil no
+lobby para a mesa ter dois "Ana" da mesma cor. Agora é uma só, em
+[`packages/room/src/identidade.ts`](packages/room/src/identidade.ts), e a garantia é da
+**sala** — não da fronteira HTTP, que é por onde ela escapava.
+
+Os dois caminhos tratam colisão de formas diferentes, de propósito: a **entrada** desempata
+sozinha e deixa entrar (CA-006 — quem chegou depois não escolheu colidir), a **edição** recusa
+com motivo (a escolha é deliberada e a tela mostra o que está tomado). Cobrado por CA-374 e
+CA-375.
+
+A conta fecha: 8 cores para 8 assentos, 24 emojis para no máximo 12 pessoas. Com mais gente
+que cor — jogadores mais espectadores —, a cor repete e o emoji único é o que ainda garante o
+par de `04` §2.
+
 ## Deploy
 
 **Automático.** Push na `main` → CI → imagem no GHCR → `~/bin/deploy.sh fdp <sha>`
@@ -343,7 +364,18 @@ printf "\n%s\n" "$(cat chave.pub)" >> ~/.ssh/authorized_keys
 
 ## O que fazer a seguir
 
-Nada obrigatório. O que sobrou é escolha, não dívida:
+**[Plano 01 — Contas, perfis e histórico](docs/plans/01-contas-perfis-e-historico.md)**, status
+`PROPOSTO`. Cinco fases com gate de saída; F1→F3 sequenciais, F4 depende de F1+F2, F5 depende
+de F2. A primeira coisa é a emenda **P11** em `00` §5 — nada do plano vale antes dela.
+
+Duas correções ao plano, encontradas conferindo o código:
+
+- **§5 diz que a checagem de `PROTOCOL_VERSION` não existe e é a primeira tarefa da F2.**
+  Existe: `validate.ts` recusa `v` diferente e devolve `PROTOCOL_VERSION`, o `ws.ts` emite, e há
+  teste de integração. Subir para a versão 2 já faz o cliente velho pedir recarregar.
+- **A pendência 4 (apelido duplicado) foi resolvida** e a mesa já garante — ver D-11.
+
+O resto continua sendo escolha, não dívida:
 
 - **Reduzir as fronteiras de rodada** (os 16% restantes), se algum dia
   incomodarem. Custaria engordar `round:started`/`round:resolved` com quase o

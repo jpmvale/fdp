@@ -271,6 +271,7 @@ export function App() {
           <Perfil
             inicial={souEu}
             jaNaMesa={retrato.players}
+            eu={eu}
             aoVoltar={() => setPerfilAberto(false)}
             aoConfirmar={(nickname, avatar) => {
               enviar('player:setProfile', { nickname, avatar });

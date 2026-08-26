@@ -65,8 +65,26 @@ interface Avatar {
 }
 ```
 
-O par `(emoji, color)` **DEVE** ser único dentro da sala. Se houver colisão na entrada, o
-servidor atribui a próxima combinação livre.
+**`emoji` e `color` DEVEM ser únicos, cada um, dentro da sala** — e não apenas o par.
+
+A regra antiga exigia só o par. Não bastava: a cor é o canal principal de identificação na
+mesa (`07` §4), e dois jogadores de cor igual com emojis diferentes já são duas pessoas
+parecidas demais a 360 px. A conta fecha: 8 cores para 8 assentos, 24 emojis para no máximo
+12 pessoas na sala. Com mais gente que cor — jogadores mais espectadores —, a cor pode
+repetir, e aí o emoji único é o que ainda garante o par.
+
+O mesmo vale para o **apelido**: único dentro da sala, sem diferenciar maiúsculas.
+
+Os dois caminhos que criam identidade tratam a colisão de formas diferentes, de propósito:
+
+| Caminho | O que faz | Por quê |
+|---|---|---|
+| **Entrada** (`join`, `host:addBot`) | O servidor desempata sozinho e deixa entrar | CA-006: quem chegou depois não escolheu colidir, e barrar a segunda "Ana" na porta é atrito puro |
+| **Edição** (`player:setProfile`) | Recusa, com o motivo | A escolha é deliberada e a tela mostra o que está tomado; desempatar sem avisar trocaria a escolha de alguém em silêncio |
+
+A garantia é da **sala** (`packages/room`), não da fronteira HTTP. Ela já morou em três
+lugares com três implementações, e a que faltava — a edição de perfil — era justamente a que
+deixava dois "Ana" de mesma cor na mesa.
 
 O **`sessionToken`** que autentica o jogador **NÃO DEVE** fazer parte de `Player`, nem trafegar
 em nenhum evento. Ele vive apenas no par cliente ↔ servidor. Ver `06` §4.

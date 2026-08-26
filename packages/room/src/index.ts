@@ -16,6 +16,13 @@ export {
 export { nextDeadline, tick, type TickResult } from './tick.js';
 export { checkRoomInvariants } from './invariants.js';
 export {
+  apelidoLivre,
+  avatarLivre,
+  conflitosDe,
+  temConflito,
+  type Conflito,
+} from './identidade.js';
+export {
   generateCode,
   generateFreeCode,
   isBlockedCode,

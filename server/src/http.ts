@@ -46,36 +46,8 @@ export interface HttpOptions {
   version?: string;
 }
 
-/** Paleta fechada de `07` §4: é como se identifica quem é quem na mesa. */
-const AVATARS: Avatar[] = AVATAR_COLORS.map((color, index) => ({
-  emoji: AVATAR_EMOJIS[index]!,
-  color,
-}));
-
-function freeAvatar(room: Room | null, wanted?: Avatar): Avatar {
-  const taken = new Set(
-    (room?.players ?? []).filter(isPresent).map((p) => `${p.avatar.emoji}|${p.avatar.color}`),
-  );
-  if (wanted && !taken.has(`${wanted.emoji}|${wanted.color}`)) return wanted;
-  return AVATARS.find((a) => !taken.has(`${a.emoji}|${a.color}`)) ?? AVATARS[0]!;
-}
-
-/**
- * CA-006: dois jogadores pedindo "Ana" precisam existir os dois, com apelidos
- * distintos. Recusar o segundo seria pior — quem chegou depois não tem culpa, e
- * "esse apelido já existe" numa sala de amigos é atrito puro.
- */
-function distinctNickname(room: Room | null, wanted: string): string {
-  const taken = new Set(
-    (room?.players ?? []).filter(isPresent).map((p) => p.nickname.toLocaleLowerCase('pt-BR')),
-  );
-  if (!taken.has(wanted.toLocaleLowerCase('pt-BR'))) return wanted;
-  for (let suffix = 2; suffix <= LIMITS.maxPlayers + LIMITS.maxSpectators + 1; suffix++) {
-    const candidate = `${wanted} ${suffix}`;
-    if (!taken.has(candidate.toLocaleLowerCase('pt-BR'))) return candidate;
-  }
-  return `${wanted} ${randomBytes(2).toString('hex')}`;
-}
+/** Avatar de quem não escolheu. A sala troca se já estiver tomado. */
+const PADRAO: Avatar = { emoji: AVATAR_EMOJIS[0]!, color: AVATAR_COLORS[0]! };
 
 interface Identity {
   nickname: string;
@@ -183,7 +155,8 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
     hub.adopt(
       createRoom(
         code,
-        { playerId, nickname: identity.value.nickname, avatar: freeAvatar(null, identity.value.avatar) },
+        // Sala nova: não há com quem colidir, então o host leva o que pediu.
+        { playerId, nickname: identity.value.nickname, avatar: identity.value.avatar ?? PADRAO },
         ctx,
       ),
     );
@@ -237,11 +210,9 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
     const ctx = hub.ctx();
     const result = join(
       room,
-      {
-        playerId,
-        nickname: distinctNickname(room, identity.value.nickname),
-        avatar: freeAvatar(room, identity.value.avatar),
-      },
+      // Sem pré-deduplicar: `join` é quem garante a identidade única agora.
+      // Duas checagens do mesmo com regras próprias foi o que criou o buraco.
+      { playerId, nickname: identity.value.nickname, avatar: identity.value.avatar ?? PADRAO },
       ctx,
     );
     if (!result.ok) {

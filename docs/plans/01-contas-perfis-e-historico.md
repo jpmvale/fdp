@@ -57,6 +57,8 @@ Decisões que tomei por conta e ficam registradas para serem contestadas:
 | D-7 | Sessão de conta em **cookie `HttpOnly; Secure; SameSite=Lax`** | O token de sala viaja na query string, e é aceitável porque expira com a sala e só serve para ela (`session.ts`). Sessão de conta não pode viajar assim: fica em cookie, e o token de sala passa a ser **derivado** dela. |
 | D-8 | Revogação por **época na conta**, não por tabela de sessões | Um inteiro em `contas`; o token carrega a época; incrementar derruba tudo que foi emitido antes. Resolve "sair de todos os aparelhos" e o item de §7 sem tabela nova nem varredura. |
 | D-9 | Redimensionamento **no servidor**, com `sharp` | I-3. E o cliente não é confiável para decidir o que é uma imagem. |
+| D-10 | **Recuperação de senha por e-mail**, adiada | Envio comum, como qualquer serviço. Não bloqueia fase nenhuma; traz o primeiro terceiro do qual o projeto depende para funcionar, e por isso precisa de monitoramento próprio. Ver §8 |
+| D-11 | **Apelido duplicado resolve-se na mesa** | Duas contas podem se chamar igual; a mesa, não. `04` §2 e CA-374/CA-375 já garantem isso. Entrar com conta passa a poder colidir, e a F2 tem de desempatar na entrada — ver §13 |
 
 ---
 
@@ -231,16 +233,20 @@ Isto merece seção própria porque a consequência principal não é a que pare
 conta, com todo o histórico dela, acaba ali. E como o perfil é público por link (D-4), a pessoa
 vê o próprio histórico e não consegue mais entrar nele.
 
-Três saídas, e a escolha é sua — nenhuma delas bloqueia este plano:
+**Decidido em 26/08/2026 (D-10): saída 3, adiada.** A recuperação será um envio de e-mail
+comum, como em qualquer outro serviço — link com token de uso único e prazo curto. Não entra
+agora e não bloqueia nenhuma fase, mas deixa de ser pergunta em aberto: o desenho de dados já
+a acomoda, e a decisão está tomada.
 
-1. **Aceitar e ser honesto na tela do cadastro**: dizer, no ato, que sem SSO não há recuperação.
-   Custa uma frase.
-2. **Empurrar o SSO como caminho principal** e deixar e-mail/senha como alternativa secundária.
-   Quem entra pelo Google nunca fica sem acesso.
-3. **Adicionar verificação de e-mail depois**, o que destrava recuperação e permite fundir
-   contas. Exige um provedor de envio (Resend, SES) — infra nova, mas pequena.
+O que isso implica quando chegar a hora:
 
-A tabela já tem `email_verificado` justamente para que (3) não precise de migração.
+- **Provedor de envio** (Resend, SES ou equivalente) — infra nova, pequena, e a primeira do
+  projeto que depende de terceiro para funcionar. Um e-mail que não chega é um usuário que
+  não entra, então precisa de monitoramento próprio, não só de código.
+- `email_verificado` já está na tabela justamente para isso não exigir migração.
+- Até lá, vale a saída 1 **junto** da 2: o cadastro por senha diz, na hora, que ainda não há
+  recuperação, e o SSO fica como caminho principal na tela. Uma frase e uma ordem de botões —
+  e é o que impede alguém de perder o histórico sem ter sido avisado.
 
 ---
 
@@ -380,10 +386,20 @@ F1 a F3 são sequenciais. F4 depende de F1 e F2. F5 depende de F2 e é independe
 
 ## 13. O que este plano deixa em aberto
 
-1. **Recuperação de senha** — §8. Precisa da sua escolha entre as três saídas.
+1. ~~**Recuperação de senha**~~ — **resolvido** (D-10, §8): envio de e-mail comum, adiado.
+   Fica pendente só o provedor de envio, quando a fase chegar.
 2. **Moderação de avatar e apelido** — §10, risco aceito.
 3. **LGPD**: contas guardam e-mail, e o histórico guarda apelido de convidado. Falta decidir
    retenção e um caminho de apagamento de conta. Não bloqueia F1–F3; bloqueia divulgar o jogo
    fora do círculo de amigos.
-4. **Apelido duplicado**: duas contas com o mesmo apelido são permitidas? O `slug` resolve a URL,
-   mas a mesa com dois "João" é confusa. Sugiro permitir e resolver na mesa, não no cadastro.
+4. ~~**Apelido duplicado**~~ — **resolvido** (D-11, 26/08/2026): **resolve-se na mesa, não no
+   cadastro**, e a mesa passou a garantir isso antes deste plano. `04` §2 agora exige apelido,
+   emoji e cor únicos **dentro da sala**, com a regra implementada em `packages/room` e
+   cobrada por CA-374 e CA-375.
+
+   Duas contas podem ter o mesmo apelido — o `slug` resolve a URL do perfil. O que não pode é
+   a **mesa** ter dois "João", e é lá que a regra vale. A consequência para este plano: quem
+   entra com conta traz apelido e avatar da conta (§5), então **a colisão passa a ser possível
+   entre duas contas na mesma sala**, e o caminho de entrada tem de desempatar como já faz com
+   convidado — sufixando na entrada, nunca recusando na porta. Isso ainda não está escrito em
+   nenhuma fase; entra na F2, junto de `PublicPlayer.conta`.

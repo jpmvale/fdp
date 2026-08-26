@@ -35,6 +35,12 @@ const FRASES: Record<string, string> = {
   NAO_E_BOT: 'Esse jogador não é um bot.',
   JOGADOR_DESCONHECIDO: 'Esse jogador não está na sala.',
 
+  // Identidade na mesa. Na entrada o servidor desempata sozinho (CA-006); ao
+  // EDITAR o perfil ele recusa, porque aí a escolha é deliberada.
+  APELIDO_TOMADO: 'Esse apelido já é de outra pessoa na mesa.',
+  EMOJI_TOMADO: 'Esse emoji já é de outra pessoa na mesa.',
+  COR_TOMADA: 'Essa cor já é de outra pessoa na mesa.',
+
   // Pausa.
   PARTIDA_PAUSADA: 'A partida está pausada.',
   DECISAO_AINDA_BLOQUEADA: 'Ainda dá tempo de ele voltar. Espere um pouco.',

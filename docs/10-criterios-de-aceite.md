@@ -410,6 +410,8 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-358 | U | RF-053 | **Dado** uma carta só na mão, na minha vez, **então** ela sai sozinha depois de 1,5 a 3 s; com duas cartas, nada sai sozinho |
 | CA-359 | U | RF-050 | **Dado** a fase de apostas, **então** quem inicia a mão é quem abre a rodada (RJ-038); **dado** a fase de vazas, é o líder da vaza corrente (RJ-065), que muda de mão em mão |
 | CA-361 | U | RF-056, RF-058 | **Dado** a tela montada, **então** o áudio fica pendurado em toque **e** teclado; o primeiro gesto solta os dois ouvintes, desmontar sem gesto também solta, e gestos seguintes não quebram |
+| CA-374 | U | `04` §2 | **Dado** oito pessoas pedindo o mesmo apelido, emoji e cor, **quando** entram, **então** todas entram e as três coisas ficam distintas; quem chegou primeiro fica com o que pediu, e só a metade que colide é trocada |
+| CA-375 | U | `04` §2 | **Dado** um jogador editando o perfil no lobby, **quando** pede apelido, emoji ou cor de outra pessoa presente, **então** o comando é recusado com `APELIDO_TOMADO`, `EMOJI_TOMADO` ou `COR_TOMADA`; manter a própria identidade não é conflito, e quem saiu da sala não segura mais nada |
 | CA-362 | U | RF-059 | **Dado** o aviso "É A SUA VEZ!" no feltro, **então** ele não cruza as cartas jogadas (com a mesa cheia), nem os assentos de cima, nem o contador do centro, nem o meu assento — com 2 a 8 jogadores —, e fica dentro do pano |
 
 CA-356 mede o defeito que consertou: a barra normalizava pelo prazo da aposta em todos os

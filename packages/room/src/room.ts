@@ -2,6 +2,7 @@
  * Ciclo de vida da sala, conexão e comandos (`03` §1 e §2).
  */
 
+import { apelidoLivre, avatarLivre, conflitosDe } from './identidade.js';
 import {
   AVATAR_COLORS,
   AVATAR_EMOJIS,
@@ -132,13 +133,11 @@ function newBot(
   ctx: RoomCtx,
 ): RoomPlayer {
   const usados = new Set(room.players.filter(isPresent).map((p) => p.nickname));
-  const nickname = NOMES_DE_BOT.find((n) => !usados.has(n)) ?? `Bot ${String(usados.size + 1)}`;
-
-  const tomados = new Set(
-    room.players.filter(isPresent).map((p) => `${p.avatar.emoji}|${p.avatar.color}`),
+  const nickname = apelidoLivre(
+    room,
+    NOMES_DE_BOT.find((n) => !usados.has(n)) ?? `Bot ${String(usados.size + 1)}`,
   );
-  const avatar =
-    AVATARES.find((a) => !tomados.has(`${a.emoji}|${a.color}`)) ?? AVATARES[0]!;
+  const avatar = avatarLivre(room, undefined);
 
   // `newId` e não `randomSeed`: semente é para embaralhar e pode repetir entre
   // chamadas. Ainda assim o id passa por conferência — dois jogadores com o
@@ -195,7 +194,19 @@ export function join(room: Room, params: JoinParams, ctx: RoomCtx): RoomResult {
     return failWith('ROOM_FULL', 'SALA_LOTADA');
   }
 
-  const player = newPlayer(params, ctx.now, asSpectator);
+  // A sala é a autoridade sobre quem está nela, então é aqui que a identidade
+  // fica única — e não na fronteira HTTP, onde estava. Havia três cópias desta
+  // regra (entrada, bot e nenhuma no perfil), e a que faltava era a que
+  // deixava dois "Ana" de mesma cor na mesa.
+  const player = newPlayer(
+    {
+      ...params,
+      nickname: apelidoLivre(room, params.nickname),
+      avatar: avatarLivre(room, params.avatar),
+    },
+    ctx.now,
+    asSpectator,
+  );
   const next: Room = { ...room, players: [...room.players, player] };
   return commit(next, ctx, [all({ type: 'room:playerJoined', payload: { player: toPublicPlayer(player) } })]);
 }
@@ -434,6 +445,17 @@ export function applyCommand(
 
     case 'player:setProfile': {
       if (room.status !== 'LOBBY') return failWith('WRONG_STATUS', 'SO_NO_LOBBY');
+
+      // A escolha aqui é deliberada e a tela mostra o que está tomado, então
+      // recusar é a resposta honesta — diferente da ENTRADA, onde o servidor
+      // desempata sozinho (CA-006) porque quem chegou depois não escolheu
+      // colidir. Sem esta checagem, bastava abrir o perfil no lobby para a
+      // mesa ter dois "Ana" da mesma cor: o dedupe só existia na porta.
+      const conflito = conflitosDe(room, playerId, command.payload.nickname, command.payload.avatar);
+      if (conflito.apelido) return failWith('VALIDATION_FAILED', 'APELIDO_TOMADO');
+      if (conflito.emoji) return failWith('VALIDATION_FAILED', 'EMOJI_TOMADO');
+      if (conflito.cor) return failWith('VALIDATION_FAILED', 'COR_TOMADA');
+
       const players = replace(room.players, playerId, {
         nickname: command.payload.nickname,
         avatar: command.payload.avatar,

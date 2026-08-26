@@ -13,10 +13,12 @@ import type { PublicPlayer } from '../state/tipos';
  * chegar) e já dentro da sala (trocando de ideia). A diferença é o botão e o
  * fato de que, dentro da sala, dá para saber quais cores já são de alguém.
  */
-export function Perfil({ inicial, jaNaMesa, aoConfirmar, aoVoltar }: {
+export function Perfil({ inicial, jaNaMesa, eu, aoConfirmar, aoVoltar }: {
   inicial?: { nickname: string; avatar: AvatarProto } | undefined;
   /** Quem já está na sala, para não escolher a cara de outro. */
   jaNaMesa?: PublicPlayer[] | undefined;
+  /** Meu id na sala, quando já estou nela: é por ele que eu me excluo. */
+  eu?: string | undefined;
   aoConfirmar: (nickname: string, avatar: AvatarProto) => void;
   aoVoltar: () => void;
 }) {
@@ -30,11 +32,19 @@ export function Perfil({ inicial, jaNaMesa, aoConfirmar, aoVoltar }: {
   const limpo = apelido.trim();
   const valido = limpo.length >= NICKNAME_MIN;
 
-  // Cor de outra pessoa não é proibida pelo servidor — ele reacomoda quem
-  // colidir. Mas escolher a cara de alguém que está na mesa é uma má ideia com
-  // consequência prática: dois avatares iguais destroem o "de relance".
-  const donoDaCor = (c: string) =>
-    (jaNaMesa ?? []).find((p) => p.avatar.color === c && p.nickname !== inicial?.nickname);
+  // Identidade é única na mesa, e o SERVIDOR recusa (CA-375) — antes ele
+  // reacomodava, e por isso esta tela só marcava as cores sem impedir nada.
+  // Marcar e deixar clicar era o pior dos dois mundos: o toque parecia ter
+  // funcionado e o erro só aparecia ao salvar.
+  //
+  // Eu me excluo pelo ID, não pelo apelido: comparar por nome fazia quem tinha
+  // apelido igual ao de outro se ver como dono da cor alheia.
+  const demais = (jaNaMesa ?? []).filter((p) => p.id !== eu);
+  const donoDaCor = (c: string) => demais.find((p) => p.avatar.color === c);
+  const donoDoEmoji = (e: string) => demais.find((p) => p.avatar.emoji === e);
+  const donoDoApelido = demais.find(
+    (p) => p.nickname.trim().toLocaleLowerCase('pt-BR') === limpo.toLocaleLowerCase('pt-BR'),
+  );
 
   return (
     <div className="pilha">
@@ -78,9 +88,15 @@ export function Perfil({ inicial, jaNaMesa, aoConfirmar, aoVoltar }: {
           placeholder="Como te chamam"
           autoComplete="nickname"
         />
-        <span className="fraco">
-          {limpo.length} de {NICKNAME_MAX} caracteres · mínimo {NICKNAME_MIN}
-        </span>
+        {donoDoApelido ? (
+          <span style={{ color: 'var(--vidas)', fontSize: 12 }}>
+            Esse apelido já é de alguém nesta mesa.
+          </span>
+        ) : (
+          <span className="fraco">
+            {limpo.length} de {NICKNAME_MAX} caracteres · mínimo {NICKNAME_MIN}
+          </span>
+        )}
       </div>
 
       <div className="cartao pilha" style={{ gap: 10 }}>
@@ -94,6 +110,7 @@ export function Perfil({ inicial, jaNaMesa, aoConfirmar, aoVoltar }: {
                 role="radio"
                 aria-checked={c === cor}
                 aria-label={dono ? `cor ${c}, já é de ${dono.nickname}` : `cor ${c}`}
+                disabled={dono !== undefined}
                 onClick={() => setCor(c)}
                 style={{
                   width: 44, height: 44, padding: 0, position: 'relative',
@@ -120,27 +137,36 @@ export function Perfil({ inicial, jaNaMesa, aoConfirmar, aoVoltar }: {
       <div className="cartao pilha" style={{ gap: 10 }}>
         <span className="rotulo">emoji</span>
         <div role="radiogroup" aria-label="emoji do avatar" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {AVATAR_EMOJIS.map((e) => (
-            <button
-              key={e}
-              role="radio"
-              aria-checked={e === emoji}
-              aria-label={`emoji ${e}`}
-              onClick={() => setEmoji(e)}
-              style={{
-                width: 44, height: 44, padding: 0, fontSize: 20,
-                background: e === emoji ? 'rgba(145,132,217,0.18)' : 'transparent',
-                boxShadow: `inset 0 0 0 ${e === emoji ? 2 : 1}px ${e === emoji ? 'var(--acento)' : 'var(--linha)'}`,
-              }}
-            >
-              {e}
-            </button>
-          ))}
+          {AVATAR_EMOJIS.map((e) => {
+            const dono = donoDoEmoji(e);
+            return (
+              <button
+                key={e}
+                role="radio"
+                aria-checked={e === emoji}
+                aria-label={dono ? `emoji ${e}, já é de ${dono.nickname}` : `emoji ${e}`}
+                disabled={dono !== undefined}
+                onClick={() => setEmoji(e)}
+                style={{
+                  width: 44, height: 44, padding: 0, fontSize: 20, position: 'relative',
+                  background: e === emoji ? 'rgba(145,132,217,0.18)' : 'transparent',
+                  boxShadow: `inset 0 0 0 ${e === emoji ? 2 : 1}px ${e === emoji ? 'var(--acento)' : 'var(--linha)'}`,
+                  opacity: dono ? 0.4 : 1,
+                }}
+              >
+                {e}
+                {/* Símbolo junto da opacidade: apagado sozinho não diz por quê. */}
+                {dono && (
+                  <span aria-hidden style={{ position: 'absolute', right: 2, bottom: 0, fontSize: 10 }}>✕</span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       <button
-        disabled={!valido}
+        disabled={!valido || donoDoApelido !== undefined}
         onClick={() => {
           localStorage.setItem('fdp.apelido', limpo);
           aoConfirmar(limpo, avatar);
