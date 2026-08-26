@@ -77,7 +77,7 @@ describe('o caminho feliz', () => {
     expect(a.hash).not.toBe(b.hash);
   });
 
-  it('aceita os quatro formatos que a câmera e a web produzem', async () => {
+  it('aceita os formatos que a câmera e a web produzem', async () => {
     const base = { create: { width: 300, height: 300, channels: 3 as const, background: '#123456' } };
     const formatos = [
       await sharp(base).jpeg().toBuffer(),
@@ -87,6 +87,57 @@ describe('o caminho feliz', () => {
     ];
     for (const bytes of formatos) {
       expect((await processarAvatar(bytes, { diretorio: dir })).ok).toBe(true);
+    }
+  });
+
+  it('CA-388: AVIF entra, que é o HEIF que este servidor sabe abrir', async () => {
+    const avif = await sharp({ create: { width: 400, height: 300, channels: 3, background: '#3a7d44' } })
+      .avif()
+      .toBuffer();
+    expect(avif.toString('ascii', 4, 12)).toBe('ftypavif');
+
+    const r = await processarAvatar(avif, { diretorio: dir });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const saida = await sharp(join(dir, `${r.hash}.webp`)).metadata();
+    expect(saida.format).toBe('webp');
+    expect(saida.width).toBe(256);
+  });
+});
+
+/**
+ * HEIC recusado com nome próprio.
+ *
+ * O `sharp` empacotado traz libheif SEM decodificador de HEVC: AVIF abre, HEIC
+ * não. Medido com um arquivo de verdade (`sips -s format heic`), e não deduzido
+ * — libvips responde `Decoder plugin generated an error`.
+ *
+ * Como é a foto padrão do iPhone, ela chega o tempo todo, e o que a pessoa lê
+ * precisa dizer o que fazer. `NAO_E_IMAGEM` seria mentira: é imagem, e é uma
+ * que não sabemos abrir.
+ */
+describe('CA-389: HEIC é recusado dizendo o que fazer', () => {
+  it('as marcas de HEIC têm motivo próprio, diferente de "não é imagem"', async () => {
+    for (const marca of ['heic', 'heix', 'mif1', 'msf1']) {
+      const bytes = Buffer.concat([
+        Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftyp'), Buffer.from(marca, 'ascii'),
+        Buffer.alloc(64, 7),
+      ]);
+      expect(await processarAvatar(bytes, { diretorio: dir }))
+        .toEqual({ ok: false, motivo: 'HEIC_NAO_SUPORTADO' });
+    }
+  });
+
+  it('MP4 e MOV usam a mesma caixa `ftyp` e não viram nem uma coisa nem outra', async () => {
+    // A caixa é a mesma; a marca não. Aceitar a caixa abriria o decodificador
+    // para vídeo, que é exatamente o que a lista fechada impede.
+    for (const marca of ['mp42', 'isom', 'qt  ', 'M4V ']) {
+      const bytes = Buffer.concat([
+        Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftyp'), Buffer.from(marca, 'ascii'),
+        Buffer.alloc(64, 7),
+      ]);
+      expect(await processarAvatar(bytes, { diretorio: dir }))
+        .toEqual({ ok: false, motivo: 'NAO_E_IMAGEM' });
     }
   });
 });

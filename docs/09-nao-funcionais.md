@@ -10,6 +10,7 @@ Status: **ESTÁVEL**
 | RNF-051 | Tempo até jogável (LCP + WS conectado) na home: ≤ 2,0 s em 4G simulado | Lighthouse mobile + teste sintético |
 | RNF-052 | Reconexão completa (socket + snapshot aplicado): ≤ 1,5 s p95 | Métrica de cliente |
 | RNF-053 | Snapshot de sala com 8 jogadores: ≤ 32 KB serializado | Teste unitário sobre a projeção |
+| RNF-017 | Envio de avatar: orçamento próprio de 30/h **por conta**, nunca o de cadastro por IP | Teste de integração (CA-390) |
 | RNF-054 | Interface a 60 fps durante animações em aparelho de gama média | Perfil manual |
 | RNF-055 | Bundle JS inicial: ≤ 180 KB comprimido | Orçamento verificado no CI |
 

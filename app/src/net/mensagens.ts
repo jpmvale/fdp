@@ -50,8 +50,15 @@ const FRASES: Record<string, string> = {
   SEM_FIM_DE_PARTIDA: 'A partida ainda não acabou.',
   JOGADOR_SAIU: 'Esse jogador saiu da sala.',
 
+  // O cliente é velho demais para este servidor. Quem mostra isto é o
+  // bloqueio de conexão; a frase fica aqui para o caso de o quadro chegar por
+  // um caminho que não passe por ele.
+  PROTOCOL_VERSION: 'Esta página está desatualizada. Recarregue para continuar.',
+
   // Limites de `05` §7.
   RATE_LIMITED: 'Devagar — muitos comandos de uma vez.',
+  MENSAGEM_INVALIDA: 'Essa mensagem não vai: vazia ou longa demais.',
+  RAPIDO_DEMAIS: 'Espere um segundo entre uma mensagem e outra.',
 };
 
 export const frase = (motivo: string | undefined, codigo: string): string =>

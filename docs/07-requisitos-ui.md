@@ -167,6 +167,8 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 | RF-064 | Jogar sem conta **DEVE** continuar completo: entrar por link, jogar e ver o fim de partida sem cadastro, mesmo com o banco fora do ar |
 | RF-072 | Duas contas de mesmo apelido na mesma sala desempatam na **entrada**, nunca são recusadas na porta |
 | RF-073 | O editor de perfil de quem tem conta edita **a conta**, e parte do apelido dela — nunca do desempatado pela mesa |
+| RF-078 | O editor de perfil **DEVE** estar acessível na **home**, com conta, fora de qualquer sala. Apelido, cor, emoji e foto são da conta, e exigir estar numa mesa para trocá-los deixava a conta sem dono |
+| RF-079 | O balão que sai do assento **DEVE** compactar a mensagem que não couber nele. O balão avisa que fulano falou; o texto inteiro vive no painel do chat, que é onde se lê |
 | RF-061 | Entrar com Google ou GitHub. Só provedor **configurado** vira botão: um botão que devolve 503 é pior que nenhum |
 | RF-062 | SSO com e-mail **verificado pelo provedor** assume a conta de senha, apaga a senha e derruba as sessões |
 | RF-063 | Entrar com senha numa conta assumida por SSO **DEVE** dizer o que houve — *"esta conta agora entra pelo Google"* —, nunca "senha inválida" |

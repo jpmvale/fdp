@@ -14,7 +14,7 @@ import { enviarAvatar, removerAvatar, ErroApi } from '../net/sessao';
  * chegar) e já dentro da sala (trocando de ideia). A diferença é o botão e o
  * fato de que, dentro da sala, dá para saber quais cores já são de alguém.
  */
-export function Perfil({ inicial, jaNaMesa, eu, aoConfirmar, aoVoltar, comConta }: {
+export function Perfil({ inicial, jaNaMesa, eu, aoConfirmar, aoVoltar, comConta, rotulo, subtitulo }: {
   inicial?: { nickname: string; avatar: AvatarProto } | undefined;
   /** Quem já está na sala, para não escolher a cara de outro. */
   jaNaMesa?: PublicPlayer[] | undefined;
@@ -24,6 +24,16 @@ export function Perfil({ inicial, jaNaMesa, eu, aoConfirmar, aoVoltar, comConta 
   aoVoltar: () => void;
   /** Foto só existe com conta (RF-070). */
   comConta?: boolean | undefined;
+  /**
+   * O que o botão do fim promete.
+   *
+   * Antes era derivado de `jaNaMesa`, e por isso a tela só sabia dizer duas
+   * coisas: "Entrar na mesa" ou "Salvar". Editando a conta fora de qualquer
+   * sala nenhuma das duas serve — não há mesa para entrar, e a pessoa não está
+   * a caminho de lugar nenhum (RF-078).
+   */
+  rotulo?: string | undefined;
+  subtitulo?: string | undefined;
 }) {
   const [apelido, setApelido] = useState(
     inicial?.nickname ?? localStorage.getItem('fdp.apelido') ?? '',
@@ -58,7 +68,7 @@ export function Perfil({ inicial, jaNaMesa, eu, aoConfirmar, aoVoltar, comConta 
         </button>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 500 }}>Perfil</h1>
-          <span className="fraco">quem você é na mesa</span>
+          <span className="fraco">{subtitulo ?? 'quem você é na mesa'}</span>
         </div>
       </div>
 
@@ -192,7 +202,7 @@ export function Perfil({ inicial, jaNaMesa, eu, aoConfirmar, aoVoltar, comConta 
           aoConfirmar(limpo, avatar);
         }}
       >
-        {jaNaMesa ? 'Salvar' : 'Entrar na mesa'}
+        {rotulo ?? (jaNaMesa ? 'Salvar' : 'Entrar na mesa')}
       </button>
     </div>
   );
@@ -243,7 +253,11 @@ function FotoDoAvatar({ atual, aoTrocar }: {
       <input
         ref={campo}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        /* HEIC/HEIF junto: é o formato padrão da câmera do iPhone, e sem ele
+           no `accept` a foto da pessoa nem aparecia como escolhível. */
+        /* Sem HEIC: o servidor não sabe abrir esse formato (ver `avatar.ts`),
+           e oferecê-lo aqui só levaria a pessoa até a recusa. */
+        accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
         onChange={(e) => void escolheu(e.target.files?.[0])}
         style={{ display: 'none' }}
       />
@@ -282,7 +296,11 @@ function FotoDoAvatar({ atual, aoTrocar }: {
 function mensagemDaFoto(codigo: string): string {
   switch (codigo) {
     case 'GRANDE_DEMAIS': return 'A imagem passa de 5 MB.';
-    case 'NAO_E_IMAGEM': return 'Esse arquivo não é uma imagem (JPEG, PNG, WebP ou GIF).';
+    case 'NAO_E_IMAGEM': return 'Esse arquivo não é uma imagem (JPEG, PNG, WebP, AVIF ou GIF).';
+    // É imagem, e é a que o iPhone tira por padrão. A frase diz o que fazer,
+    // porque "não é uma imagem" seria falso e não levaria a lugar nenhum.
+    case 'HEIC_NAO_SUPORTADO':
+      return 'Ainda não abrimos foto HEIC do iPhone. Mande como JPEG — em Ajustes › Câmera › Formatos, escolha "Mais compatível".';
     case 'IMAGEM_ABSURDA': return 'Essa imagem tem pixels demais. Reduza antes de enviar.';
     case 'FALHA_AO_PROCESSAR': return 'Não consegui abrir essa imagem. Ela pode estar corrompida.';
     case 'AVATAR_INDISPONIVEL': return 'O envio de foto está fora do ar.';

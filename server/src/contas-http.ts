@@ -105,6 +105,22 @@ export function montarRotasDeConta(
    */
   const limiteCadastro = createRateLimiter({ limit: 10, windowMs: 60 * 60_000 });
   const limiteLogin = createRateLimiter({ limit: 20, windowMs: 15 * 60_000 });
+  /**
+   * Orçamento PRÓPRIO do envio de foto (RNF-017).
+   *
+   * Antes o avatar gastava `limiteCadastro`, e as duas coisas erradas nisso se
+   * somavam. A primeira: são 10 por hora no TOTAL, então quem trocava a foto
+   * três vezes tentando um enquadramento melhor comia o orçamento de cadastro
+   * da própria casa — e, como o limite é checado antes da validação, cada
+   * tentativa RECUSADA custava um slot também. A segunda: é por IP, e quem
+   * envia foto tem sessão. Punir o endereço quando se sabe o dono é castigar
+   * os vizinhos: uma república, um escritório ou um CGNAT de operadora móvel
+   * dividem o contador, e quem nunca tentou nada é quem descobre isso.
+   *
+   * Por conta, e mais folgado: trocar de foto é uma coisa que se faz várias
+   * vezes seguidas até acertar, e nenhuma dessas vezes é abuso.
+   */
+  const limiteAvatar = createRateLimiter({ limit: 30, windowMs: 60 * 60_000 });
 
   /** RNF-001: toda resposta de erro é `{ code, params? }`, sem embrulho. */
   const semBanco = () => ({ code: 'CONTAS_INDISPONIVEIS' as const });
@@ -275,7 +291,9 @@ export function montarRotasDeConta(
     const conta = await contaDoPedido(c.req.header('cookie'));
     if (!conta) return c.json({ code: 'SEM_SESSAO' }, 401);
 
-    const passe = limiteCadastro.check(opcoes.clientIp(c), agora());
+    // Pela CONTA, e não pelo IP: esta rota exige sessão, então o dono é
+    // conhecido e não há razão para cobrar de quem divide o endereço com ele.
+    const passe = limiteAvatar.check(`conta:${conta.id}`, agora());
     if (!passe.allowed) {
       return c.json({ code: 'RATE_LIMITED' }, 429, {
         'retry-after': String(Math.ceil(passe.retryAfterMs / 1000)),

@@ -41,6 +41,19 @@ export interface RoomPlayer {
   /** Quando o socket caiu. Base de `TRANSPORT_GRACE`. */
   socketLostAt: number | null;
   /**
+   * Quando esta pessoa falou pela última vez. `null` = ainda não falou.
+   *
+   * Vive no jogador, e não numa tabela ao lado, porque é assim que ele
+   * atravessa o Redis junto com o resto da sala: um contador em memória do
+   * processo perderia a conta a cada reinício e a cada troca de nó, e a
+   * primeira coisa que um deploy faria seria liberar a rajada que o limite
+   * existe para conter (RNF-016).
+   *
+   * Sala gravada antes deste campo volta do Redis sem ele; ler como
+   * `?? null` trata isso como "nunca falou", que é a leitura segura.
+   */
+  lastChatAt: number | null;
+  /**
    * Presente só em bot (RF-018). Um bot é um jogador como outro qualquer para
    * o motor de regras: senta, aposta, joga e perde vida do mesmo jeito. O que
    * muda é quem decide — e que ele nunca cai, então nunca pausa a mesa.

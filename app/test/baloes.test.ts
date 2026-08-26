@@ -7,7 +7,7 @@
  * quem fala demais ocupa o mesmo espaço de quem fala pouco.
  */
 import { describe, expect, it } from 'vitest';
-import { comTeto, type BalaoNaMesa } from '../src/components/Balao';
+import { BALAO_TEXTO_MAX, comTeto, resumoDoBalao, type BalaoNaMesa } from '../src/components/Balao';
 
 const balao = (playerId: string, n: number, tipo: 'chat' | 'vida' = 'chat'): BalaoNaMesa =>
   ({ id: `${playerId}-${n}`, playerId, texto: `${n}`, tipo });
@@ -53,5 +53,46 @@ describe('CA-346: no máximo 4 balões por pessoa na mesa', () => {
   it('abaixo do teto, nada é descartado e a ordem é preservada', () => {
     const poucos = [balao('ana', 1), balao('beto', 1), balao('ana', 2)];
     expect(comTeto(poucos)).toEqual(poucos);
+  });
+});
+
+
+/**
+ * Compactação do texto no balão.
+ *
+ * O teto de mensagem é 280 (RNF-014) e o balão tem 132 px: uma mensagem no
+ * limite vira uma coluna de umas onze linhas que sai do assento e cobre as
+ * cartas. O balão avisa; o painel do chat é que guarda o texto inteiro.
+ */
+describe('CA-385: mensagem grande é compactada no balão', () => {
+  it('mensagem curta passa inteira, só aparada', () => {
+    expect(resumoDoBalao('  boa jogada  ')).toBe('boa jogada');
+  });
+
+  it('no limite exato ainda não corta', () => {
+    const justa = 'x'.repeat(BALAO_TEXTO_MAX);
+    expect(resumoDoBalao(justa)).toBe(justa);
+  });
+
+  it('mensagem no teto de RNF-014 cabe no balão', () => {
+    const enorme = 'palavra '.repeat(60).trim();
+    const cortada = resumoDoBalao(enorme);
+
+    expect(enorme.length).toBeGreaterThan(280 - 8);
+    // Uma reticência a mais que o teto, e nada além disso.
+    expect(cortada.length).toBeLessThanOrEqual(BALAO_TEXTO_MAX + 1);
+    expect(cortada.endsWith('…')).toBe(true);
+    // Corta no fim de uma palavra: o pedaço que sobra continua legível.
+    expect(cortada.endsWith('palavra…')).toBe(true);
+  });
+
+  it('palavra única gigante é cortada mesmo assim', () => {
+    // Um link colado não tem espaço nenhum. Recuar até o último espaço aqui
+    // devolveria reticências sozinhas, que não dizem nada.
+    const link = `https://exemplo.com/${'a'.repeat(200)}`;
+    const cortada = resumoDoBalao(link);
+
+    expect(cortada).toHaveLength(BALAO_TEXTO_MAX + 1);
+    expect(cortada.startsWith('https://exemplo.com/')).toBe(true);
   });
 });

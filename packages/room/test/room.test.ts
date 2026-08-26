@@ -750,8 +750,11 @@ describe('CA-330 a CA-341: chat da mesa', () => {
 
   it('CA-333: no teto, a mais antiga cai', () => {
     let room = roomWith(2);
+    // Espaçadas pelo intervalo mínimo (RNF-016): o teto do histórico é sobre
+    // quantidade, e mandar 205 mensagens no mesmo milissegundo deixou de ser
+    // uma forma válida de chegar lá.
     for (let i = 0; i < LIMITS.chatHistoryMax + 5; i++) {
-      room = ok(applyCommand(room, 'p1', dizer(`msg ${i}`), ctxAt(100 + i))).room;
+      room = ok(applyCommand(room, 'p1', dizer(`msg ${i}`), ctxAt(100 + i * LIMITS.chatMinIntervalMs))).room;
     }
     expect(mensagens(room)).toHaveLength(LIMITS.chatHistoryMax);
     expect(mensagens(room)[0]!.text).toBe('msg 5');
@@ -770,6 +773,50 @@ describe('CA-330 a CA-341: chat da mesa', () => {
     expect(retrato.payload.chat).toHaveLength(1);
     // E o espectador pode escrever.
     expect(applyCommand(comEspectador, 'p9', dizer('cheguei'), ctxAt(80)).ok).toBe(true);
+  });
+
+  it('CA-384: menos de um segundo entre duas mensagens da mesma pessoa é recusado', () => {
+    const room = roomWith(2);
+    const t0 = 10_000;
+    const { room: falou } = ok(applyCommand(room, 'p1', dizer('primeira'), ctxAt(t0)));
+
+    // Um milissegundo antes do prazo ainda é cedo; no prazo exato, já vale.
+    const cedo = applyCommand(falou, 'p1', dizer('segunda'), ctxAt(t0 + LIMITS.chatMinIntervalMs - 1));
+    expect(cedo.ok).toBe(false);
+    if (!cedo.ok) expect(cedo.motivo).toBe('RAPIDO_DEMAIS');
+    expect(mensagens(falou)).toHaveLength(1);
+
+    const naHora = applyCommand(falou, 'p1', dizer('segunda'), ctxAt(t0 + LIMITS.chatMinIntervalMs));
+    expect(naHora.ok).toBe(true);
+
+    // O limite é POR PESSOA: o silêncio de p1 não cala p2.
+    expect(applyCommand(falou, 'p2', dizer('e eu'), ctxAt(t0 + 1)).ok).toBe(true);
+  });
+
+  it('CA-384: a tentativa recusada não empurra o próprio prazo', () => {
+    // Quem insiste a cada 200 ms não pode ficar mudo para sempre: só a
+    // mensagem ACEITA move o relógio.
+    let room = roomWith(2);
+    const t0 = 10_000;
+    room = ok(applyCommand(room, 'p1', dizer('primeira'), ctxAt(t0))).room;
+
+    for (let t = t0 + 200; t < t0 + LIMITS.chatMinIntervalMs; t += 200) {
+      expect(applyCommand(room, 'p1', dizer('deixa eu falar'), ctxAt(t)).ok).toBe(false);
+    }
+
+    expect(applyCommand(room, 'p1', dizer('agora vai'), ctxAt(t0 + LIMITS.chatMinIntervalMs)).ok).toBe(true);
+  });
+
+  it('CA-384: sala vinda do Redis sem o campo é tratada como quem nunca falou', () => {
+    // Sala gravada antes de RNF-016 volta sem `lastChatAt`. Ler isso como
+    // "agora" deixaria a mesa inteira muda por um segundo depois do deploy;
+    // ler como `null` só custa uma mensagem a mais de folga.
+    const room = roomWith(2);
+    const antiga = {
+      ...room,
+      players: room.players.map(({ lastChatAt: _, ...resto }) => resto as typeof room.players[number]),
+    };
+    expect(applyCommand(antiga, 'p1', dizer('oi de novo'), ctxAt(50)).ok).toBe(true);
   });
 
   it('CA-336: bot não fala', () => {
@@ -793,13 +840,15 @@ describe('CA-330 a CA-341: chat da mesa', () => {
     room = ok(applyCommand(
       room, 'p2', { type: 'player:setProfile', payload: { nickname: 'OutroNome', avatar: meuAvatar } }, ctxAt(60),
     )).room;
-    room = ok(applyCommand(room, 'p2', dizer('agora sou OutroNome'), ctxAt(70))).room;
+    // Um segundo depois da primeira: o intervalo de RNF-016 é incidental aqui,
+    // e o que este teste mede é o apelido, não o relógio.
+    room = ok(applyCommand(room, 'p2', dizer('agora sou OutroNome'), ctxAt(50 + LIMITS.chatMinIntervalMs))).room;
 
     expect(mensagens(room)[0]!.nickname).toBe('J2');
     expect(mensagens(room)[1]!.nickname).toBe('OutroNome');
 
     // E sair não reescreve o que já foi dito.
-    const depoisDeSair = ok(leave(room, 'p2', ctxAt(80))).room;
+    const depoisDeSair = ok(leave(room, 'p2', ctxAt(50 + LIMITS.chatMinIntervalMs + 10))).room;
     expect(mensagens(depoisDeSair)[0]!.nickname).toBe('J2');
   });
 

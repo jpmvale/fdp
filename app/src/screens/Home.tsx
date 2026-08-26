@@ -11,6 +11,7 @@ import { ROOM_CODE_LENGTH } from '@fdp/protocol';
  */
 export function Home({
   aoCriar, aoEntrar, aoAbrirRegras, codigoInicial, conta, aoAbrirConta, aoSairDaConta,
+  aoEditarPerfil,
 }: {
   aoCriar: () => void;
   aoEntrar: (codigo: string) => void;
@@ -20,6 +21,8 @@ export function Home({
   conta: { slug: string; apelido: string } | null;
   aoAbrirConta: () => void;
   aoSairDaConta: () => void;
+  /** Só com conta: sem ela não há nada que sobreviva ao fim da sala. */
+  aoEditarPerfil: () => void;
 }) {
   const [codigo, setCodigo] = useState(codigoInicial.toUpperCase());
   const completo = codigo.length === ROOM_CODE_LENGTH;
@@ -69,13 +72,23 @@ export function Home({
           e pôr "Entrar na conta" acima de "Criar sala" faria o jogo parecer
           que pede cadastro (plano 01, I-1). É oferta, não portão. */}
       {conta ? (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+        <div className="pilha" style={{ gap: 6, alignItems: 'center' }}>
           <span className="fraco" style={{ fontSize: 13 }}>
             entrando como <b style={{ color: 'var(--texto)' }}>{conta.apelido}</b>
           </span>
-          <button className="fantasma" onClick={aoSairDaConta} style={{ minHeight: 36, padding: '0 12px' }}>
-            sair
-          </button>
+          {/* RF-078. Editar o perfil só existia DENTRO da sala, e isso deixava
+              a conta sem dono: o apelido e a cara com que a pessoa entra em
+              toda mesa só podiam ser trocados estando numa — e a foto, que é
+              da conta e não da sala, junto. Aqui é o único lugar fora da
+              partida em que a conta aparece, então é aqui que ela se edita. */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="fantasma" onClick={aoEditarPerfil} style={{ minHeight: 36, padding: '0 12px' }}>
+              editar perfil
+            </button>
+            <button className="fantasma" onClick={aoSairDaConta} style={{ minHeight: 36, padding: '0 12px' }}>
+              sair
+            </button>
+          </div>
         </div>
       ) : (
         <button

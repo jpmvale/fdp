@@ -52,7 +52,9 @@ export function App() {
   const [perfilPublico, setPerfilPublico] = useState<string | null>(null);
   // O que o Perfil vai fazer ao confirmar: criar sala, entrar numa, ou só
   // salvar (quando já se está na mesa).
-  const [intencao, setIntencao] = useState<{ tipo: 'CRIAR' } | { tipo: 'ENTRAR'; codigo: string } | null>(null);
+  const [intencao, setIntencao] = useState<
+    { tipo: 'CRIAR' } | { tipo: 'ENTRAR'; codigo: string } | { tipo: 'SO_SALVAR' } | null
+  >(null);
   const [perfilAberto, setPerfilAberto] = useState(false);
 
   const entrar = (s: sessao.Sessao) => {
@@ -248,6 +250,7 @@ export function App() {
             aoAbrirRegras={() => setRegrasAbertas(true)}
             conta={estado.conta}
             aoAbrirConta={() => setConta({ tela: 'entrar' })}
+            aoEditarPerfil={() => { setIntencao({ tipo: 'SO_SALVAR' }); definir({ tela: 'perfil' }); }}
             aoSairDaConta={() => {
               void sairDaConta().catch(() => {});
               definir({ conta: null });
@@ -295,8 +298,29 @@ export function App() {
 
         {estado.tela === 'perfil' && (
           <Perfil
-            aoVoltar={() => definir({ tela: 'home' })}
+            /* Editando a conta, a tela parte da identidade DELA — mesmo motivo
+               de R-4 do plano 01 §5.1 dentro da sala: o que se edita aqui é o
+               que sobrevive à mesa. Nos outros dois caminhos não há conta, e o
+               formulário começa vazio como sempre começou. */
+            inicial={intencao?.tipo === 'SO_SALVAR' && estado.conta
+              ? { nickname: estado.conta.apelido, avatar: estado.conta.avatar as AvatarProto }
+              : undefined}
+            comConta={intencao?.tipo === 'SO_SALVAR' && estado.conta !== null}
+            {...(intencao?.tipo === 'SO_SALVAR'
+              ? { rotulo: 'Salvar', subtitulo: 'quem você é em toda mesa' }
+              : {})}
+            aoVoltar={() => { setIntencao(null); definir({ tela: 'home' }); }}
             aoConfirmar={(apelido, avatar) => {
+              if (intencao?.tipo === 'SO_SALVAR') {
+                void salvarPerfilDaConta(apelido, avatar)
+                  .then((r) => {
+                    definir({ conta: r.conta, tela: 'home' });
+                    setIntencao(null);
+                    avisar('Perfil salvo');
+                  })
+                  .catch(() => errar('Não deu para salvar o seu perfil.'));
+                return;
+              }
               if (intencao?.tipo === 'ENTRAR') juntar(intencao.codigo, apelido, avatar, entrar);
               else criar(apelido, avatar, entrar);
             }}
@@ -556,6 +580,16 @@ function receber(
 ): void {
   if (msg.type === 'error') {
     const p = msg.payload as { code: string; params?: { motivo?: string } };
+
+    // Versão de protocolo não é um erro de jogada: é o cliente inteiro velho
+    // demais para falar com este servidor, e não há comando que vá funcionar
+    // depois dele. Vira bloqueio de conexão — que é a tela que manda recarregar
+    // — em vez de mais um aviso vermelho no rodapé (`05` §3).
+    if (p.code === 'PROTOCOL_VERSION') {
+      definir({ conexao: 'DESATUALIZADO' });
+      return;
+    }
+
     errar(frase(p.params?.motivo, p.code));
     return;
   }

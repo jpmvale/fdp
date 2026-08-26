@@ -9,6 +9,9 @@
 
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createMemoryStore } from '@fdp/store';
 import { applyCommand, snapshotFor } from '@fdp/room';
@@ -74,6 +77,12 @@ function montar(comBanco: boolean): void {
 }
 
 const CADASTRO = { apelido: 'Ana', email: 'ana@exemplo.com', senha: 'umaSenhaBoaAqui' };
+
+/** PNG 1×1 de verdade: o servidor decide pelos BYTES, e este teste é sobre o limite. */
+const PNG_MINIMO = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64',
+);
 
 beforeEach(() => {
   agora = 1_700_000_000_000;
@@ -248,6 +257,70 @@ describe('limite de tentativas', () => {
       method: 'POST', body: { email: 'ana@exemplo.com', senha: CADASTRO.senha },
       ip: '203.0.113.77' });
     expect(outra.status).toBe(200);
+  });
+});
+
+/**
+ * CA-390: o envio de foto tem orçamento PRÓPRIO.
+ *
+ * Ele gastava o de cadastro, e as duas coisas erradas nisso se somavam: eram
+ * 10 por hora no total, então trocar a foto três vezes procurando um
+ * enquadramento melhor comia o direito de criar conta — e, como o limite é
+ * conferido antes da validação, cada tentativa RECUSADA custava um slot
+ * também. Pior, era por IP: uma república, um escritório ou um CGNAT de
+ * operadora dividem o contador, e quem descobria isso era o vizinho que nunca
+ * tentou nada.
+ */
+describe('CA-390: o avatar não gasta o orçamento do cadastro', () => {
+  let dirDeAvatares: string;
+
+  const enviarFoto = async (cookie: string, ip = '203.0.113.1'): Promise<Response> =>
+    app.fetch(new Request('http://fdp.test/api/eu/avatar', {
+      method: 'POST',
+      headers: { 'content-type': 'image/png', host: 'fdp.test', cookie },
+      body: PNG_MINIMO,
+    }), env(ip));
+
+  beforeEach(async () => {
+    dirDeAvatares = await mkdtemp(join(tmpdir(), 'fdp-avatar-lim-'));
+    app = createHttpApp({
+      hub, signer, clientPath: CLIENT, now: () => agora, dados,
+      cookieSeguro: false, diretorioDeAvatares: dirDeAvatares,
+    });
+  });
+
+  it('vários envios seguidos passam, e o cadastro do mesmo IP continua de pé', async () => {
+    const criada = await chamar('/api/contas', { method: 'POST', body: CADASTRO });
+    const cookie = cookieDe(criada);
+
+    // Doze é mais que o teto antigo de cadastro (10). Antes, o oitavo já vinha
+    // 429 — porque o cadastro em si já tinha comido um slot.
+    for (let i = 0; i < 12; i++) {
+      expect((await enviarFoto(cookie)).status).toBe(200);
+    }
+
+    // E o vizinho de IP ainda consegue criar a conta dele.
+    const outra = await chamar('/api/contas', {
+      method: 'POST',
+      body: { apelido: 'Beto', email: 'beto@exemplo.com', senha: 'outraSenhaBoa' },
+    });
+    expect(outra.status).toBe(201);
+  });
+
+  it('o teto é por CONTA: quem divide o IP não paga pelos envios do outro', async () => {
+    const umaConta = cookieDe(await chamar('/api/contas', { method: 'POST', body: CADASTRO }));
+    const outraConta = cookieDe(await chamar('/api/contas', {
+      method: 'POST',
+      body: { apelido: 'Beto', email: 'beto@exemplo.com', senha: 'outraSenhaBoa' },
+    }));
+
+    // A primeira conta estoura o próprio orçamento, do mesmo endereço.
+    let ultima: Response | null = null;
+    for (let i = 0; i < 40; i++) ultima = await enviarFoto(umaConta);
+    expect(ultima!.status).toBe(429);
+
+    // A segunda, no MESMO IP, não paga por isso.
+    expect((await enviarFoto(outraConta)).status).toBe(200);
   });
 });
 

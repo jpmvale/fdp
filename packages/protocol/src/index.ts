@@ -321,6 +321,18 @@ export const LIMITS = {
   /** RNF-014: tamanho da mensagem de chat, depois de aparada. */
   chatTextMax: 280,
   /**
+   * RNF-016: intervalo mínimo entre duas mensagens da MESMA pessoa.
+   *
+   * RNF-010 já limita a 20 comandos por 10 s, e por muito tempo isso bastou —
+   * o argumento era que quem inunda o chat gasta o próprio direito de jogar.
+   * O argumento estava certo sobre o abuso e errado sobre a mesa: 2 mensagens
+   * por segundo não é ataque, é uma pessoa animada, e mesmo assim enche o
+   * feltro de balões e empurra a conversa para fora do painel no meio de uma
+   * mão. Uma por segundo é folgado para quem conversa e é o suficiente para
+   * que nenhuma rajada tape o jogo.
+   */
+  chatMinIntervalMs: 1_000,
+  /**
    * RNF-015: teto do histórico por sala. O histórico vive dentro do valor que
    * o Redis lê e escreve a cada mudança de estado — sem teto, uma sala de 4
    * horas com gente falante cresce sem limite.

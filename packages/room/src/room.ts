@@ -116,6 +116,7 @@ function newPlayer(params: JoinParams, now: number, isSpectator: boolean): RoomP
     joinedAt: now,
     lastSeenAt: now,
     socketLostAt: null,
+    lastChatAt: null,
     bot: null,
     conta: params.conta ?? null,
     contaId: params.contaId ?? null,
@@ -160,6 +161,9 @@ function newBot(
     joinedAt: now,
     lastSeenAt: now,
     socketLostAt: null,
+    // Bot não fala (CA-336), então este campo nunca sai de `null` nele. Está
+    // aqui porque o tipo é um só: um jogador da sala é um jogador da sala.
+    lastChatAt: null,
     bot: { difficulty },
     // Bot nunca tem conta. Não é descuido: é o que impede uma mesa só de bots
     // de fazer uma partida entrar no histórico de alguém (RF-068).
@@ -489,6 +493,14 @@ export function applyCommand(
         return failWith('VALIDATION_FAILED', 'MENSAGEM_INVALIDA');
       }
 
+      // Intervalo mínimo, POR PESSOA (RNF-016). Recusar é melhor que enfileirar:
+      // a mensagem atrasada chegaria fora do momento que a motivou, e no chat
+      // de uma mesa o momento é metade do sentido.
+      const ultima = player.lastChatAt ?? null;
+      if (ultima !== null && ctx.now - ultima < LIMITS.chatMinIntervalMs) {
+        return failWith('VALIDATION_FAILED', 'RAPIDO_DEMAIS');
+      }
+
       const mensagem: ChatMessage = {
         id: ctx.newId(),
         playerId,
@@ -501,7 +513,12 @@ export function applyCommand(
       // A mais antiga cai quando entra a que passa do teto (RNF-015).
       const chat = [...room.chat, mensagem].slice(-LIMITS.chatHistoryMax);
 
-      return commit({ ...room, chat }, ctx, [
+      // O relógio anda com a mensagem ACEITA, nunca com a tentativa: se a
+      // recusada também marcasse, quem insiste a cada 200 ms empurraria o
+      // próprio prazo para frente e ficaria mudo para sempre.
+      const players = replace(room.players, playerId, { lastChatAt: ctx.now });
+
+      return commit({ ...room, chat, players }, ctx, [
         all({ type: 'chat:message', payload: { message: mensagem } }),
       ]);
     }

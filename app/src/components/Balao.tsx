@@ -35,6 +35,40 @@ const DURACAO = { chat: 5_000, vida: 1_600 } as const;
  */
 const TETO_POR_PESSOA = 4;
 
+/**
+ * Quanto de uma mensagem cabe no balão.
+ *
+ * O balão tem 132 px de largura, então 280 caracteres — o teto de RNF-014 —
+ * viram uma coluna de umas onze linhas saindo do assento e cobrindo metade do
+ * feltro, cartas inclusive. O balão nunca foi o lugar de LER a mensagem: ele
+ * diz que fulano falou e dá o começo do que ele disse. O texto inteiro está no
+ * painel do chat, que é onde se lê, e é para lá que o balão manda quem se
+ * interessou.
+ *
+ * Setenta caracteres é o que dá umas três linhas nessa largura — o bastante
+ * para uma frase de mesa caber inteira, e pouco o suficiente para que nenhum
+ * balão tape o jogo.
+ */
+export const BALAO_TEXTO_MAX = 70;
+
+/**
+ * Corta a mensagem no tamanho do balão, preferindo o fim de uma palavra.
+ *
+ * Cortar no meio de uma palavra é legível, mas parece defeito; recuar até o
+ * último espaço parece decisão. Só recua enquanto sobrar mensagem de verdade —
+ * uma palavra única de 200 caracteres (que existe, e é justamente o que alguém
+ * colando um link produz) não pode virar reticências sozinhas.
+ */
+export function resumoDoBalao(texto: string, limite = BALAO_TEXTO_MAX): string {
+  const limpo = texto.trim();
+  if (limpo.length <= limite) return limpo;
+
+  const bruto = limpo.slice(0, limite);
+  const espaco = bruto.lastIndexOf(' ');
+  const corte = espaco >= Math.floor(limite * 0.6) ? bruto.slice(0, espaco) : bruto;
+  return `${corte.trimEnd()}…`;
+}
+
 /** Mantém só os últimos `TETO_POR_PESSOA` balões de cada jogador. */
 export function comTeto(baloes: BalaoNaMesa[]): BalaoNaMesa[] {
   const contagem = new Map<string, number>();
@@ -172,7 +206,14 @@ export function useBaloes(chat: ChatMessage[], partida: PlayerView | null): {
     chatVisto.current = chat.length;
     setBaloes((atuais) => comTeto([
       ...atuais,
-      ...novas.map((m) => ({ id: `chat-${m.id}`, playerId: m.playerId, texto: m.text, tipo: 'chat' as const })),
+      ...novas.map((m) => ({
+        id: `chat-${m.id}`,
+        playerId: m.playerId,
+        // Compactado AQUI, e não na hora de desenhar: o balão carrega o que
+        // vai mostrar, e o teste consegue perguntar isso sem montar a tela.
+        texto: resumoDoBalao(m.text),
+        tipo: 'chat' as const,
+      })),
     ]));
   }, [chat]);
 

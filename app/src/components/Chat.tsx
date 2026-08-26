@@ -24,8 +24,25 @@ export function Chat({ mensagens, eu, aoEnviar, inicialmenteAberto = false }: {
   const fim = useRef<HTMLDivElement>(null);
   const vistas = useRef(mensagens.length);
 
+  /**
+   * Trava local de RNF-016.
+   *
+   * O servidor é quem manda — ele recusa com `RAPIDO_DEMAIS` de qualquer jeito.
+   * Isto aqui existe para que a recusa não CHEGUE: apertar Enviar, ver a
+   * mensagem sumir do campo e depois receber um erro vermelho é pior que o
+   * botão simplesmente não estar disponível ainda. A margem de 150 ms cobre a
+   * diferença entre o relógio desta aba e o do servidor, que é justamente onde
+   * um envio no limite exato viraria erro.
+   */
+  const [emEspera, setEmEspera] = useState(false);
+  useEffect(() => {
+    if (!emEspera) return;
+    const t = setTimeout(() => setEmEspera(false), LIMITS.chatMinIntervalMs + 150);
+    return () => clearTimeout(t);
+  }, [emEspera]);
+
   const limpo = texto.trim();
-  const podeEnviar = limpo.length > 0 && limpo.length <= LIMITS.chatTextMax;
+  const podeEnviar = !emEspera && limpo.length > 0 && limpo.length <= LIMITS.chatTextMax;
 
   // Rola para a última só com o painel aberto: rolar um painel fechado não faz
   // nada, e mexer no scroll da página por baixo seria pior que não fazer nada.
@@ -43,6 +60,7 @@ export function Chat({ mensagens, eu, aoEnviar, inicialmenteAberto = false }: {
     if (!podeEnviar) return;
     aoEnviar(limpo);
     setTexto('');
+    setEmEspera(true);
   };
 
   return (
@@ -114,7 +132,12 @@ export function Chat({ mensagens, eu, aoEnviar, inicialmenteAberto = false }: {
               aria-label="Mensagem para a mesa"
               style={{ flex: 1 }}
             />
-            <button onClick={enviar} disabled={!podeEnviar} style={{ minWidth: 64 }}>
+            <button
+              onClick={enviar}
+              disabled={!podeEnviar}
+              aria-label={emEspera ? 'Espere um segundo para enviar de novo' : 'Enviar mensagem'}
+              style={{ minWidth: 64 }}
+            >
               Enviar
             </button>
           </div>

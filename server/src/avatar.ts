@@ -35,6 +35,8 @@ const LADO_PEQUENO = 64;
 export type FalhaDeAvatar =
   | 'GRANDE_DEMAIS'
   | 'NAO_E_IMAGEM'
+  /** É imagem, e é uma que não sabemos abrir. Diferente de "não é imagem". */
+  | 'HEIC_NAO_SUPORTADO'
   | 'IMAGEM_ABSURDA'
   | 'FALHA_AO_PROCESSAR';
 
@@ -52,12 +54,46 @@ export type ResultadoDeAvatar =
  * SVG fica de fora por isso mesmo. Ele é um documento executável, não uma
  * imagem, e `sharp` o renderiza com uma biblioteca que já teve furo.
  */
-function formatoPelosBytes(b: Buffer): 'jpeg' | 'png' | 'webp' | 'gif' | null {
+/**
+ * Marcas de `ftyp` que este servidor SABE decodificar.
+ *
+ * Só AVIF, e a ausência do HEIC aqui é a parte importante. O `sharp` que a
+ * gente usa traz libheif, e libheif sem decodificador de HEVC: AVIF (que é
+ * AV1) abre, HEIC (que é HEVC) não — é `Decoder plugin generated an error`,
+ * medido com um arquivo de verdade, não deduzido da documentação. HEVC é
+ * patenteado, e por isso o binário pronto não o inclui.
+ *
+ * A lista é fechada também contra vídeo: a mesma caixa `ftyp` embrulha MP4 e
+ * MOV, e aceitar a caixa em vez das marcas seria abrir o decodificador para
+ * eles.
+ */
+const MARCAS_AVIF = new Set(['avif', 'avis']);
+
+/**
+ * Marcas de HEIC. **Reconhecidas para poder recusar direito**, não para aceitar.
+ *
+ * Esta é a foto que o iPhone tira desde 2017, então é o arquivo que a pessoa
+ * escolhe sem saber que escolheu nada. Ela precisa ler o que fazer — *"mande
+ * como JPEG"* — e não *"esse arquivo não é uma imagem"*, que é falso e não diz
+ * o que ela deve fazer em seguida.
+ *
+ * Para de fato ACEITAR HEIC é preciso um libvips com decodificador de HEVC,
+ * que é decisão de licença e de imagem de container, não de código.
+ */
+const MARCAS_HEIC = new Set(['heic', 'heix', 'heim', 'heis', 'hevc', 'hevx', 'mif1', 'msf1']);
+
+function formatoPelosBytes(b: Buffer): 'jpeg' | 'png' | 'webp' | 'gif' | 'avif' | 'heic' | null {
   if (b.length < 12) return null;
   if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'jpeg';
   if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'png';
   if (b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP') return 'webp';
   if (b.toString('ascii', 0, 3) === 'GIF') return 'gif';
+  // ISO-BMFF: os 4 bytes de tamanho, `ftyp`, e então a marca.
+  if (b.toString('ascii', 4, 8) === 'ftyp') {
+    const marca = b.toString('ascii', 8, 12);
+    if (MARCAS_AVIF.has(marca)) return 'avif';
+    if (MARCAS_HEIC.has(marca)) return 'heic';
+  }
   return null;
 }
 
@@ -80,9 +116,9 @@ export async function processarAvatar(
   if (bytes.length === 0 || bytes.length > TAMANHO_MAX) {
     return { ok: false, motivo: 'GRANDE_DEMAIS' };
   }
-  if (formatoPelosBytes(bytes) === null) {
-    return { ok: false, motivo: 'NAO_E_IMAGEM' };
-  }
+  const formato = formatoPelosBytes(bytes);
+  if (formato === 'heic') return { ok: false, motivo: 'HEIC_NAO_SUPORTADO' };
+  if (formato === null) return { ok: false, motivo: 'NAO_E_IMAGEM' };
 
   try {
     const entrada = sharp(bytes, {

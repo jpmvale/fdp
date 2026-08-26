@@ -1,4 +1,4 @@
-import { CLOSE_CODES, shouldReconnect, type Command } from '@fdp/protocol';
+import { CLOSE_CODES, PROTOCOL_VERSION, shouldReconnect, type Command } from '@fdp/protocol';
 
 /**
  * Camada de rede: um WebSocket que se reconecta sozinho quando faz sentido.
@@ -78,7 +78,21 @@ export function conectar(wsUrl: string, token: string, ouvintes: Ouvintes): Cone
   return {
     enviar(tipo, payload = {}) {
       if (ws?.readyState !== WebSocket.OPEN) return;
-      ws.send(JSON.stringify({ v: 1, id: crypto.randomUUID(), type: tipo, ts: Date.now(), payload }));
+      // `PROTOCOL_VERSION`, e NUNCA um número escrito à mão.
+      //
+      // Aqui estava `v: 1`, desde o dia em que o cliente nasceu. Quando o
+      // protocolo virou 2, o servidor passou a recusar TODO comando deste
+      // cliente com `PROTOCOL_VERSION` — sentar bot, começar partida, apostar,
+      // jogar carta, falar no chat. A tela continuava carregando, a sala
+      // continuava sendo criada por HTTP, e o único sinal era um "Não deu
+      // certo. Tente de novo." vermelho, porque `PROTOCOL_VERSION` nem estava
+      // traduzido. O jogo ficou inteiro fora do ar parecendo um erro qualquer.
+      //
+      // A constante é a mesma que o servidor valida, do mesmo módulo. As duas
+      // pontas não têm mais como discordar.
+      ws.send(JSON.stringify({
+        v: PROTOCOL_VERSION, id: crypto.randomUUID(), type: tipo, ts: Date.now(), payload,
+      }));
     },
     fechar() {
       vivo = false;

@@ -252,6 +252,25 @@ interface ErrorPayload { code: string; params?: Record<string, unknown>; }
 | ERR-409 | `SESSION_TAKEN` | Sessão assumida por outra aba | Exibir "aberto em outra aba" |
 | ERR-410 | `STALE_MOVE` | Jogada de rodada/partida já encerrada | Descartar silenciosamente |
 | ERR-426 | `PROTOCOL_VERSION` | `v` incompatível | Pedir recarregar a página |
+
+> **O `v` do cliente é `PROTOCOL_VERSION`, nunca um número escrito à mão.**
+>
+> CA-373 sempre cobriu este erro pelo lado do SERVIDOR: cliente em 1 contra
+> servidor em 2 é recusado com `ERR-426`. O teste passava. E enquanto ele
+> passava, o cliente de verdade era exatamente esse cliente em 1 — o `v: 1`
+> estava escrito à mão em `app/src/net/socket.ts` desde o primeiro dia, e
+> ninguém o trocou quando o protocolo virou 2 junto com as contas.
+>
+> O jogo inteiro ficou fora do ar em produção sem parecer que estava: a sala
+> era criada (isso é HTTP), a tela desenhava, o socket abria e recebia o
+> retrato — e todo COMANDO era recusado. Sentar bot, começar partida, apostar,
+> jogar carta e falar no chat pararam juntos, e o que aparecia era um "Não deu
+> certo. Tente de novo." vermelho, porque `PROTOCOL_VERSION` nem tinha
+> tradução no cliente.
+>
+> A lição não é sobre este campo. É que testar a REJEIÇÃO não testa o EMISSOR:
+> CA-373 provava que um cliente errado seria recusado, e o que faltava era
+> alguém perguntar se o nosso era o errado. CA-387 pergunta.
 | ERR-423 | `MATCH_PAUSED` | Jogada enviada com a partida em `PAUSADA` | Descartar; aguardar `EV-033` |
 | ERR-425 | `DECISION_LOCKED` | `resolveAbsence` antes de `decisionUnlockedAt` | Manter botão desabilitado |
 
@@ -278,16 +297,34 @@ sua frequência **DEVERIA** ser monitorada.
 | RNF-013 | Comandos com o mesmo `id` dentro de 30 s são idempotentes: reenvio devolve o `ack` original sem reexecutar |
 | RNF-014 | Mensagem de chat: 1–280 caracteres depois de aparada; vazia ou só espaço é recusada |
 | RNF-015 | Histórico de chat da sala: no máximo 200 mensagens; a mais antiga cai quando entra a 201ª |
+| RNF-016 | Intervalo mínimo de 1 s entre duas mensagens da **mesma pessoa**; a de dentro do intervalo é recusada com `RAPIDO_DEMAIS`, e a recusa **não** move o prazo |
 
 RNF-013 é o que torna seguro o cliente reenviar um comando após reconectar sem saber se ele
 chegou. Sem idempotência, uma jogada pode ser aplicada duas vezes.
 
-`chat:send` **conta no orçamento de RNF-010** como qualquer outro comando, e não
-tem cota própria. A consequência é deliberada e vale dizer em voz alta: quem
-inunda o chat gasta o próprio direito de jogar, e o limite se paga sozinho sem
-mecanismo novo. Vinte comandos por 10 s é folgado para quem digita e apertado
-para quem automatiza. Se um dia isso incomodar alguém digitando rápido no meio
-de uma vaza, a saída é cota separada — não teto maior.
+`chat:send` **conta no orçamento de RNF-010** como qualquer outro comando, e
+ainda assim tem cota própria em RNF-016. As duas medem coisas diferentes, e é
+por isso que as duas existem: RNF-010 protege o SERVIDOR de quem automatiza, e
+RNF-016 protege a MESA de quem só está animado.
+
+A versão anterior deste parágrafo dizia que RNF-010 bastava, no argumento de que
+quem inunda o chat gasta o próprio direito de jogar. O argumento continua certo
+sobre o abuso e estava errado sobre a tela: 20 comandos por 10 s são duas
+mensagens por segundo, que não é ataque nenhum e mesmo assim enche o feltro de
+balões e empurra a conversa para fora do painel no meio de uma mão. Uma por
+segundo é folgado para quem conversa — ninguém digita uma frase em menos que
+isso — e é o suficiente para que nenhuma rajada tape o jogo.
+
+Dois detalhes de RNF-016 não são cosméticos. Ele é **por pessoa**, e não por
+sala: o silêncio de quem acabou de falar não pode calar a mesa inteira. E a
+tentativa recusada **não** marca o relógio — se marcasse, quem insistisse a cada
+200 ms empurraria o próprio prazo para frente e ficaria mudo indefinidamente.
+
+O instante da última mensagem vive no jogador da sala (`lastChatAt`), e não em
+memória do processo: um contador local perderia a conta a cada reinício e a cada
+troca de nó, e a primeira coisa que um deploy faria seria liberar exatamente a
+rajada que o limite existe para conter. Sala gravada antes deste campo volta do
+Redis sem ele, e é lida como "nunca falou".
 
 RNF-015 existe porque o histórico vive na sala e a sala vive em Redis: sem teto,
 uma sala de 4 horas com gente falante cresce sem limite dentro do valor que é
