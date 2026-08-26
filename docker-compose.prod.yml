@@ -79,6 +79,14 @@ services:
       # depende de conta (plano 01, I-1) —, mas em produção queremos as duas
       # coisas de pé.
       DATABASE_URL: postgres://fdp:${FDP_DB_PASSWORD:?defina FDP_DB_PASSWORD no .env}@postgres:5432/fdp
+      # SSO (P11, F3). **Opcionais de propósito**, sem `:?`: faltando, o app
+      # sobe, `/api/sso` devolve lista vazia e a tela não desenha botão — um
+      # botão que responde 503 é pior que nenhum. Exigi-los aqui faria o jogo
+      # depender de dois terceiros para subir.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
       ALLOWED_ORIGIN: https://fdp.imp-software.cloud
       # Só é seguro PORQUE o Caddy está na frente e sobrescreve
       # X-Forwarded-For. Nenhuma porta deste stack sai da máquina; se um dia
