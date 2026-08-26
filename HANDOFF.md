@@ -392,13 +392,35 @@ onde mora quase todo o trabalho restante.
 - **Recuperação de senha** (D-10): decidida — envio de e-mail comum —, não construída. Falta
   escolher o provedor. Enquanto não existir, o cadastro por senha precisa dizer isso na tela.
 
-### Lacuna de esteira
+### A esteira, e as duas formas de ela falhar (resolvido em 26/08/2026)
 
-`deploy.yml` **não tem `workflow_dispatch`**. O gatilho é `workflow_run` do CI, e quando esse
-evento não chega — aconteceu em 26/08, produção ficou 8 minutos atrás de `main` — não há como
-publicar à mão. A saída foi reexecutar o CI. Acrescentar o disparo manual exige decidir qual sha
-ele publica, porque o workflow hoje lê `github.event.workflow_run.head_sha`, que não existe num
-dispatch.
+O deploy falhou de **duas maneiras diferentes no mesmo dia**, e nas duas a única saída foi
+reexecutar o CI inteiro para provocar o gatilho de novo:
+
+1. O evento `workflow_run` simplesmente **não chegou**. CI verde, nenhum deploy criado;
+   produção ficou 8 minutos atrás de `main`.
+2. O SSH do runner para a VPS **estourou o tempo** — `connect to host port 22: Connection timed
+   out`, depois de 2min17s. A aplicação seguiu servindo o tempo todo.
+
+As duas ganharam resposta:
+
+- **`workflow_dispatch`** com entrada opcional de sha (vazio = topo da `main`). A garantia que o
+  gatilho automático dava — publicar só o que o CI aprovou — **não foi abandonada, mudou de
+  lugar**: o passo `CI verde neste commit` vai buscar o veredito pela API e recusa publicar um
+  commit sem CI verde. Escotilha de emergência não pode virar atalho para pular a suíte.
+- **Repetição no SSH, três tentativas, só em falha de conexão.** O `ssh` devolve 255 quando não
+  conecta ou não autentica, e o código do comando remoto em qualquer outro caso — é esse o
+  discriminador. Repetir um deploy que falhou de verdade atropelaria a reversão automática do
+  `deploy.sh` e poderia rodar duas publicações ao mesmo tempo. `ConnectTimeout=20` para errar
+  rápido em vez de esperar dois minutos em silêncio.
+
+**Sobre a causa do timeout, o que se sabe e o que não se sabe.** A porta 22 responde da internet
+(conferido de fora), o host não está numa rede local, e os deploys do mesmo dia funcionaram com
+a mesma configuração. Sobram duas hipóteses e não dá para separá-las sem entrar na máquina:
+instabilidade de rota entre o runner (Azure) e a VPS, ou `fail2ban` banindo o IP daquele runner.
+**Se repetir, o jeito de decidir é `fail2ban-client status sshd` na VPS logo depois da falha** —
+o IP do runner lá dentro é ban; ausente é rota. Vale notar que o IP do host está num bloco de
+ISP brasileiro, não de datacenter, o que casa com "funciona do Brasil, falha de fora".
 
 ### Escolha, não dívida
 

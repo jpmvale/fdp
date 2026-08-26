@@ -12,6 +12,18 @@ on:
     types: [completed]
     branches: [main]
 
+  # Escotilha de emergência. O gatilho automático já falhou de duas formas
+  # diferentes — o evento `workflow_run` não chegou (26/08) e o SSH estourou o
+  # tempo (26/08) —, e nas duas a única saída foi reexecutar o CI inteiro para
+  # provocar o deploy de novo. Publicar não deveria depender de reprovar 500
+  # testes.
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Commit a publicar. Vazio = topo da main.'
+        required: false
+        type: string
+
 concurrency:
   # Dois deploys ao mesmo tempo disputariam o mesmo diretório na VPS, que faz
   # `git checkout --detach` — o segundo trocaria o commit debaixo do primeiro.
@@ -21,14 +33,19 @@ concurrency:
 
 jobs:
   publicar:
-    # Só com o CI verde. Um `workflow_run` dispara também em falha.
-    if: github.event.workflow_run.conclusion == 'success'
+    # Só com o CI verde. Um `workflow_run` dispara também em falha; o disparo
+    # manual não traz veredito nenhum e é conferido no passo `CI verde`.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
 
     permissions:
       contents: read
       # Para empurrar a imagem para o GHCR com o token da própria execução.
       packages: write
+      # Para o disparo manual conferir se o CI passou naquele commit.
+      actions: read
 
     steps:
       - uses: actions/checkout@v4
@@ -36,11 +53,32 @@ jobs:
           # O commit que o CI aprovou, e não o topo do branch: entre o CI e o
           # deploy pode ter entrado outro push, e publicar o que não foi
           # testado é exatamente o que este gatilho existe para evitar.
-          ref: ${{ github.event.workflow_run.head_sha }}
+          #
+          # No disparo manual não há run de CI para herdar, então vale o que a
+          # pessoa pediu — ou o topo da main. A garantia não é abandonada: ela
+          # se muda para o passo seguinte.
+          ref: ${{ github.event.workflow_run.head_sha || inputs.sha || github.sha }}
 
       - name: Sha curto
         id: sha
         run: echo "tag=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+
+      # A escotilha não pode virar um jeito de publicar o que não foi testado.
+      # O gatilho automático herda o veredito do CI; o manual vai buscá-lo.
+      - name: CI verde neste commit
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SHA=$(git rev-parse HEAD)
+          VEREDITO=$(gh api "repos/${{ github.repository }}/actions/runs?head_sha=$SHA" \
+            --jq '[.workflow_runs[] | select(.name=="CI")] | first | .conclusion // "nenhum"')
+
+          echo "CI em $SHA: $VEREDITO"
+          if [ "$VEREDITO" != "success" ]; then
+            echo "::error::o CI não passou neste commit ($VEREDITO). Publicar daqui pularia a suíte inteira — rode o CI antes."
+            exit 1
+          fi
 
       - uses: docker/setup-buildx-action@v3
 
@@ -96,7 +134,44 @@ jobs:
       # nem roda comando arbitrário.
       - name: Publicar na VPS
         run: |
-          ssh -i ~/.ssh/id_deploy \
-            -o IdentitiesOnly=yes \
-            deploy@${{ secrets.VPS_HOST }} \
-            "fdp ${{ steps.sha.outputs.tag }}"
+          # Repete APENAS falha de conexão. O `ssh` devolve 255 quando não
+          # consegue conectar ou autenticar, e o código do comando remoto em
+          # qualquer outro caso — o que dá o discriminador exato de que se
+          # precisa aqui. Repetir um deploy que falhou de verdade atropelaria
+          # a reversão automática do `deploy.sh` e poderia rodar duas
+          # publicações ao mesmo tempo.
+          #
+          # `ConnectTimeout`: a falha de 26/08 levou 2min17s para desistir.
+          # Errar rápido e tentar de novo vale mais que esperar em silêncio.
+          for tentativa in 1 2 3; do
+            set +e
+            ssh -i ~/.ssh/id_deploy \
+              -o IdentitiesOnly=yes \
+              -o ConnectTimeout=20 \
+              deploy@${{ secrets.VPS_HOST }} \
+              "fdp ${{ steps.sha.outputs.tag }}"
+            CODIGO=$?
+            set -e
+
+            if [ "$CODIGO" -eq 0 ]; then
+              exit 0
+            fi
+
+            if [ "$CODIGO" -ne 255 ]; then
+              echo "::error::o deploy na VPS falhou (código $CODIGO). Não é falha de conexão, então não vou repetir — o deploy.sh já reverteu o que precisava."
+              exit "$CODIGO"
+            fi
+
+            echo "::warning::tentativa $tentativa não conectou na VPS (ssh 255)"
+
+            # `if` em todo lugar, e nunca `[ ... ] && comando`: a forma curta
+            # funciona aqui, mas só porque `set -e` poupa o lado esquerdo de um
+            # `&&`. Depender dessa regra para o passo não abortar sozinho é o
+            # tipo de sutileza que alguém "simplifica" e quebra sem perceber.
+            if [ "$tentativa" -lt 3 ]; then
+              sleep $((tentativa * 15))
+            fi
+          done
+
+          echo "::error::não consegui conectar na VPS em 3 tentativas. A aplicação no ar não foi tocada; verifique rota e fail2ban antes de repetir."
+          exit 255
