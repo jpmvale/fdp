@@ -1,8 +1,10 @@
 # Plano 01 — Contas, perfis e histórico de partidas
 
-Status: **EM EXECUÇÃO** · Aberto em 26/08/2026 · P11 emendada em 26/08/2026
+Status: **ENTREGUE** · Aberto em 26/08/2026 · P11 emendada em 26/08/2026 · F1 a F5
+concluídas em 26/08/2026
 
-Fases: **F1 a F5 concluídas** (26/08/2026). O plano está entregue.
+O que este plano propôs está em produção. Ele fica aqui como registro do porquê de cada
+decisão; o que virou norma vive em `00` §5 (P11), `04`, `07` e `10`.
 
 Cria contas (SSO e e-mail/senha), perfil público de jogador, histórico persistente de
 partidas e avatar por imagem.

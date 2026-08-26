@@ -12,24 +12,38 @@ Da família do **Fodinha** brasileiro, parente do Oh Hell.
 
 ## Estado
 
-Em desenvolvimento. O jogo ainda não é jogável.
+**No ar e jogável em <https://fdp.imp-software.cloud>.** Partida completa, contas, SSO,
+histórico e perfil público.
 
 | Fase | O quê | Status |
 |---|---|---|
 | M0 | Especificação completa | ✅ |
-| M1 | Servidor, sala, WebSocket, persistência | 🚧 completo em código; falta o deploy na VPS |
-| M2 | Lobby jogável | ⬜ |
-| M3 | Partida | ⬜ |
-| M4 | Endurecimento e entrega | ⬜ |
+| M1 | Servidor, sala, WebSocket, persistência | ✅ na VPS, com Redis e desligamento gracioso |
+| M2 | Lobby jogável | ✅ |
+| M3 | Partida | ✅ |
+| M4 | Endurecimento e entrega | 🚧 falta o que define "entregue" — ver abaixo |
 
 ```
 packages/rules/      ✅  motor de regras — puro e determinístico
+packages/bot/        ✅  decisão dos bots, quatro dificuldades
 packages/store/      ✅  RoomStore: interface, memória e Redis — mesma suíte
+packages/contas/     ✅  contas, credenciais, SSO e histórico — memória e Postgres
 packages/protocol/   ✅  contrato cliente ↔ servidor + validação
-packages/room/       ✅  máquina de sala, timers, pausa, auto-play
+packages/room/       ✅  máquina de sala, timers, pausa, auto-play, bots
 server/              ✅  HTTP + WebSocket, sessão assinada, limites, SIGTERM
-app/                 🚧  casca HTML para validar mecânicas; UI real vem depois
+app/                 ✅  cliente Vite + React com o design system Nocturne
 ```
+
+O que falta para o M4 fechar, na ordem em que compra mais confiança:
+
+- **Nenhuma suíte E2E existe.** São 17 critérios de nível `E` que hoje ninguém executa.
+- **Nenhum teste de carga** (RNF-060: 500 salas, 2.000 sockets) nem os de desempenho.
+- Os dois testes manuais de acessibilidade de `08` §5 e a auditoria de segurança de `09` §3.1.
+- O roteiro manual de `10` §8: 4 pessoas reais, 4 dispositivos.
+- **LGPD**: retenção e apagamento de conta. Não bloqueia jogar; bloqueia divulgar o jogo fora
+  do círculo de amigos.
+
+Estado detalhado, decisões e armadilhas em [HANDOFF.md](HANDOFF.md).
 
 ## Como se joga
 
@@ -44,9 +58,12 @@ Regras completas e normativas em [`docs/02-regras-do-jogo.md`](docs/02-regras-do
 
 ## Documentação
 
-O diretório [`docs/`](docs/) é a **fonte da verdade** do projeto — 14 documentos com 110 regras
-de jogo, 139 critérios de aceite testáveis e 18 invariantes de estado, todos com identificador
-estável e rastreados até o teste que os cobre.
+O diretório [`docs/`](docs/) é a **fonte da verdade** do projeto — 14 documentos com 113 regras
+de jogo, 196 critérios de aceite e 18 invariantes de estado, todos com identificador estável e
+rastreados até o teste que os cobre.
+
+Capacidades novas entram por um **plano** em [`docs/plans/`](docs/plans/), que vive lá até
+virar emenda nos normativos. O primeiro — contas, perfis e histórico — está entregue.
 
 Comece pelo [índice](docs/README.md).
 
@@ -56,23 +73,25 @@ Requer Node 24+.
 
 ```bash
 npm install
-npm start         # http://localhost:3000 — abra em 2-3 abas anônimas
-npm test          # 246 testes
+npm run build:client   # OBRIGATÓRIO antes do primeiro `npm start`
+npm start              # http://localhost:3000
+npm test               # 497 testes
 npm run typecheck
 ```
 
-Sem `REDIS_URL` o servidor sobe com store em memória e as salas morrem com o processo.
-Com Redis, elas sobrevivem a reinício — um `SIGTERM` no meio de uma partida devolve a
-mesa exatamente onde estava:
+O servidor serve o cliente de `app/build/`, que o Vite gera e o git não guarda: sem
+`build:client`, a raiz responde 500 sem causa aparente no log.
+
+Os dois bancos são **opcionais em desenvolvimento**, e o que se perde sem eles é explícito:
+sem `REDIS_URL` as salas morrem com o processo; sem `DATABASE_URL` não há contas. Com eles,
+uma partida sobrevive a `SIGTERM` exatamente onde estava.
 
 ```bash
 npm run redis     # noutro terminal
 FDP_SESSION_SECRET=<32+ caracteres> REDIS_URL=redis://127.0.0.1:6379 npm start
 ```
 
-Já dá para jogar uma partida completa local. O cliente atual é uma casca sem build,
-deliberadamente feia: existe para validar as mecânicas no navegador antes de investir
-em design. Ver [HANDOFF.md](HANDOFF.md).
+Para jogar sozinho, o caminho curto é **sentar bots pelo lobby**.
 
 O motor de regras roda sem servidor, sem WebSocket e sem navegador. `npm test` inclui um teste
 de propriedade que simula **1.000 partidas** — 2 a 8 jogadores, ambos os modos de empate — e
@@ -95,7 +114,10 @@ partida *ativa*; o código só verificava se havia partida. Apareceu jogando.
 
 ## Arquitetura
 
-Um processo Node persistente numa VPS, atrás do Caddy, com Redis local para persistência.
+Um processo Node persistente numa VPS, atrás do Caddy, com **dois bancos de papéis opostos**:
+Redis guarda a sala viva — efêmera, com TTL, morre com a mesa — e Postgres guarda o que
+sobrevive a ela: contas, identidades de SSO e histórico de partidas. Confundir os dois é o
+erro que o desenho existe para impedir.
 
 Escolha deliberada: com todas as conexões de uma sala na memória do mesmo processo, o broadcast
 é um laço sobre um `Set` de sockets, e o laço de eventos do Node dá atomicidade de mutação sem

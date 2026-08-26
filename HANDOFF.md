@@ -4,11 +4,15 @@ Estado do projeto para retomar depois.
 
 **O jogo está no ar, jogável, em <https://fdp.imp-software.cloud>.**
 
-Última sessão: 25/08/2026. Cliente React com o design Nocturne, bots, deploy
-automático na VPS, CA-046 verificado em produção, rotação da chave de acesso à
-máquina, paleta de avatares corrigida — e uma leva de ajustes de mesa: a vaza
-acontece no centro, o vencedor fica visível antes de a mesa limpar, balões
-saem do jogador, e o fim de partida virou um resumo com nota de desempenho.
+Última sessão: 26/08/2026. O **plano 01 foi entregue inteiro** — contas por
+e-mail e senha, SSO com Google e GitHub, histórico de partidas, perfil público
+e avatar por imagem, tudo no ar. Antes dele, na mesma leva: identidade única na
+mesa, a vaza acontecendo no centro com pausa para ver quem levou, balões saindo
+do jogador e o fim de partida com nota de desempenho.
+
+Produção responde `protocolVersion: 2`, `contas: true` e `/api/sso` com os dois
+provedores. As seções por assunto abaixo estão em ordem cronológica; a mais
+recente é a última.
 
 ## Como rodar
 
@@ -17,7 +21,7 @@ npm install
 npm run build:client   # OBRIGATÓRIO antes do primeiro `npm start`
 npm run redis          # opcional, noutro terminal
 npm start              # http://localhost:3000
-npm test               # 302 testes
+npm test               # 497 testes
 npm run typecheck
 ```
 
@@ -51,6 +55,7 @@ Para parar: `pkill -f "tsx server"`.
 | `packages/rules` | Motor de regras puro e determinístico. 110 regras `RJ-###` |
 | `packages/bot` | Decisão dos bots — puro, só depende de `rules`. As quatro dificuldades |
 | `packages/store` | `RoomStore` de 6 métodos, em memória **e em Redis**, mesma suíte de contrato |
+| `packages/contas` | Contas, credenciais, identidades de SSO e histórico — memória **e Postgres**, mesma suíte |
 | `packages/protocol` | Contrato cliente ↔ servidor, tipos e validação separados |
 | `packages/room` | Máquina de sala: ciclo de vida, conexão, pausa, timers, auto-play, bots |
 | `server/` | HTTP de `06`, WebSocket de `05`, sessão, limites, persistência, `SIGTERM` |
@@ -364,34 +369,52 @@ printf "\n%s\n" "$(cat chave.pub)" >> ~/.ssh/authorized_keys
 
 ## O que fazer a seguir
 
-**[Plano 01 — Contas, perfis e histórico](docs/plans/01-contas-perfis-e-historico.md)**, status
-`PROPOSTO`. Cinco fases com gate de saída; F1→F3 sequenciais, F4 depende de F1+F2, F5 depende
-de F2. A primeira coisa é a emenda **P11** em `00` §5 — nada do plano vale antes dela.
+O [plano 01](docs/plans/01-contas-perfis-e-historico.md) **está entregue** (F1–F5, 26/08/2026)
+e não há plano aberto. O que sobrou é o **M4 de `12`, que é a definição de "entregue"** — e é
+onde mora quase todo o trabalho restante.
 
-As duas correções que estavam anotadas aqui **já foram aplicadas ao plano** (26/08/2026):
+### Dívida de verdade
 
-- A checagem de `PROTOCOL_VERSION` **existe** — `validate.ts` recusa `v` diferente, `ws.ts`
-  emite, e há teste de integração em `server/test/ws.test.ts`. O plano afirmava o contrário e
-  mandava implementá-la como primeira tarefa da F2; §5 agora traz a correção e diz de onde veio
-  o engano (a busca original passou ao lado de `protocol/src/validate.ts`). Subir para a versão
-  2 já faz o cliente velho pedir recarregar, e CA-373 é um teste que só precisa seguir verde.
-- A pendência de apelido duplicado virou **§5.1 do plano**, com sete regras, RF-072/RF-073 e
-  CA-376 a CA-379, dentro da F2.
+| O quê | Onde | Por que importa |
+|---|---|---|
+| **Nenhuma suíte E2E existe** | `11` §8 previa Playwright; não há `test/e2e/` nem a dependência | 17 dos 196 critérios são de nível `E`. Ninguém os executa hoje, e o gate do M4 exige 100% dos `CA` de v1 passando |
+| **Nenhum teste de carga** | RNF-060: 500 salas, 2.000 sockets | Junto vão CA-160 a CA-164 (desempenho). Nada disso foi medido contra a VPS |
+| **Auditoria de segurança** | `09` §3.1 | A tabela de ameaças nunca foi percorrida em bloco |
+| **Os dois testes manuais de a11y** | `08` §5 — CA-141 (teclado) e CA-142 (leitor de tela) | São manuais por natureza e obrigatórios para o M4 |
+| **Roteiro de aceitação** | `10` §8 | 4 pessoas reais, 4 dispositivos |
+| **LGPD** | §13.3 do plano 01 | Contas guardam e-mail; o histórico guarda apelido de convidado. Falta retenção e apagamento de conta. Não bloqueia jogar — **bloqueia divulgar o jogo fora do círculo de amigos** |
 
-Reserva de IDs, para não colidir de novo: `CA-363` a `CA-373` e `CA-376+` são do plano; 374 e
-375 foram para a unicidade de identidade na mesa. `RF-060+` e `RNF-105+` estão livres.
+### Herdado do plano 01, com risco aceito
 
-O resto continua sendo escolha, não dívida:
+- **Moderação de avatar e apelido** (§13.2): não há caminho de denúncia. Mitigado por restringir
+  envio a contas e guardar o hash, o que permite banir um arquivo. Vira urgente se a mesa deixar
+  de ser um grupo de amigos.
+- **Recuperação de senha** (D-10): decidida — envio de e-mail comum —, não construída. Falta
+  escolher o provedor. Enquanto não existir, o cadastro por senha precisa dizer isso na tela.
 
-- **Reduzir as fronteiras de rodada** (os 16% restantes), se algum dia
-  incomodarem. Custaria engordar `round:started`/`round:resolved` com quase o
-  retrato inteiro, e provavelmente não vale.
-- **Alertas de saturação** (CPU, memória, disco) ficaram de fora de propósito:
-  numa VPS com quatro apps eles sobem por motivo legítimo e treinam a pessoa a
-  ignorar notificação.
-- **A mesa inteira sob daltonismo**, que CA-344 não cobre — ele valida a paleta
-  de avatares isolada, não feltro contra carta contra texto de estado. Continua
-  como checagem manual em `08` §5.
+### Lacuna de esteira
+
+`deploy.yml` **não tem `workflow_dispatch`**. O gatilho é `workflow_run` do CI, e quando esse
+evento não chega — aconteceu em 26/08, produção ficou 8 minutos atrás de `main` — não há como
+publicar à mão. A saída foi reexecutar o CI. Acrescentar o disparo manual exige decidir qual sha
+ele publica, porque o workflow hoje lê `github.event.workflow_run.head_sha`, que não existe num
+dispatch.
+
+### Escolha, não dívida
+
+- **Reduzir as fronteiras de rodada** (os 16% restantes), se algum dia incomodarem. Custaria
+  engordar `round:started`/`round:resolved` com quase o retrato inteiro, e provavelmente não
+  vale.
+- **Alertas de saturação** (CPU, memória, disco) ficaram de fora de propósito: numa VPS com
+  quatro apps eles sobem por motivo legítimo e treinam a pessoa a ignorar notificação.
+- **A mesa inteira sob daltonismo**, que CA-344 não cobre — ele valida a paleta de avatares
+  isolada, não feltro contra carta contra texto de estado. Continua manual em `08` §5.
+
+### Reserva de IDs
+
+Para não colidir: `CA-363` a `CA-373` e `CA-376` a `CA-379` são do plano 01; `CA-374` e
+`CA-375` são da unicidade de identidade na mesa. Livres a partir de `CA-380`, `RF-074` e
+`RNF-106`.
 
 ## Postgres e o pacote `@fdp/contas` (26/08/2026)
 
