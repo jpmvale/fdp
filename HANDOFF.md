@@ -392,3 +392,35 @@ O resto continua sendo escolha, não dívida:
 - **A mesa inteira sob daltonismo**, que CA-344 não cobre — ele valida a paleta
   de avatares isolada, não feltro contra carta contra texto de estado. Continua
   como checagem manual em `08` §5.
+
+## Postgres e o pacote `@fdp/contas` (26/08/2026)
+
+F1 do [plano 01](docs/plans/01-contas-perfis-e-historico.md). São **dois** bancos agora, com
+papéis opostos: Redis guarda sala viva (efêmera, TTL, morre com a mesa), Postgres guarda o que
+sobrevive a ela (contas, credenciais, identidades de SSO, histórico). Confundir os dois é o erro
+tentador, e `11` §4 explica por quê.
+
+O acesso fica atrás da interface `Dados`, com duas implementações e **uma** suíte de contrato —
+mesma ideia do `RoomStore`. Ela já provou o valor na primeira execução: o esquema dependia de
+`citext`, o que passava em memória e quebrava no Postgres, e teria quebrado de novo em qualquer
+Postgres gerenciado, onde `CREATE EXTENSION` pede superusuário. Virou índice único sobre
+`lower(email)` — mesma garantia, do lado do banco.
+
+O CI sobe os dois serviços e **falha se qualquer uma das suítes for pulada**. Pular é o pior
+resultado possível: verde sem ter testado.
+
+Para rodar a suíte do Postgres na mão:
+
+```bash
+docker run -d --rm --name fdp-postgres -p 5433:5432 -e POSTGRES_PASSWORD=fdp postgres:17-alpine
+DATABASE_URL='postgres://postgres:fdp@127.0.0.1:5433/postgres' npm test
+```
+
+**Backup.** `deploy/backup-postgres.sh` e `deploy/restaurar-postgres.sh`. A restauração recusa
+destino que já tenha a tabela `contas` — `--clean` sobre a base errada apaga o que estava lá, e
+a hora de descobrir isso não é durante um incidente. O ciclo foi exercitado de verdade em
+26/08/2026: banco semeado, dump, restauração num banco vazio, contagens idênticas nas cinco
+tabelas, e a aplicação lendo o restaurado. Backup que nunca foi restaurado não é backup.
+
+**Ainda não está na VPS.** O container, o cron do backup e o alerta no Grafana ficam para quando
+a F2 precisar do banco de pé.

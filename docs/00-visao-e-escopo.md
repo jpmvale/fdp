@@ -67,7 +67,7 @@ O produto vive ou morre por três atributos, nesta ordem de prioridade:
 
 Registrado explicitamente para não haver ambiguidade — **não implementar**:
 
-- Contas, login, senha, OAuth ou perfil persistente entre sessões.
+- ~~Contas, login, senha, OAuth ou perfil persistente entre sessões.~~ — entraram no escopo em 26/08/2026, ver a decisão **P11** e o [plano 01](./plans/01-contas-perfis-e-historico.md). Continua fora o que seria **obrigação**: nada do jogo pode exigir conta, e entrar por link sem cadastro segue sendo o caminho principal.
 - Matchmaking público, salas abertas ou lista de partidas.
 - Chat de **voz**. (O grupo já está em chamada ou na mesma sala.) O chat de **texto** entrou no escopo em 25/08/2026 — ver RF-017 e a decisão P9.
 - Ranking global, conquistas, progressão, moeda ou cosméticos.
@@ -98,6 +98,7 @@ completar mesa, e persistência de histórico de partidas.
 | P6 | Português do Brasil é o único idioma da v1 | Textos centralizados mesmo assim, ver `08` |
 | P9 | Chat de texto entra na v1 (decisão de 25/08/2026, revertendo a exclusão original) | RF-017; contrato em `05`, critérios em `10` §4.9; na Mesa não pode roubar altura das cartas nem do cartão de adversário (`07`) |
 | P10 | Bots entram na v1, com dificuldade declarada (decisão de 25/08/2026) | RF-018; decisão em `packages/bot`, pura e determinística, alimentada pela MESMA projeção de um humano |
+| P11 | Contas entram na v1 — SSO e e-mail/senha —, com perfil público, histórico persistente e avatar por imagem (decisão de 26/08/2026, revertendo a exclusão original) | [Plano 01](./plans/01-contas-perfis-e-historico.md). **Conta é acréscimo, nunca pedágio**: jogar sem conta continua inteiro (§4.2). Persistência em Postgres, separada do Redis das salas; o motor de regras não aprende o que é conta |
 
 ## 6. Riscos
 

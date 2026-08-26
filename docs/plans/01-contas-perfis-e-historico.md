@@ -1,6 +1,8 @@
 # Plano 01 — Contas, perfis e histórico de partidas
 
-Status: **PROPOSTO** · Aberto em 26/08/2026
+Status: **EM EXECUÇÃO** · Aberto em 26/08/2026 · P11 emendada em 26/08/2026
+
+Fases: **F1 concluída** (26/08/2026) · F2 a F5 não começaram.
 
 Cria contas (SSO e e-mail/senha), perfil público de jogador, histórico persistente de
 partidas e avatar por imagem.
@@ -15,7 +17,10 @@ partidas e avatar por imagem.
 
 A reversão é deliberada e segue o mesmo caminho do chat (decisão P9) e dos bots (P10): a
 linha sai de §4.2, entra a decisão **P11** em `00` §5, e os requisitos novos passam a viver em
-`07` como qualquer outro. Nada aqui vale enquanto essa emenda não estiver escrita.
+`07` como qualquer outro.
+
+**Feito em 26/08/2026.** §4.2 traz a linha riscada com a data, e P11 está na tabela de decisões.
+A exclusão que sobrevive é a que importa: nada do jogo pode **exigir** conta.
 
 `00` §4.3 já previa a porta: *"persistência de histórico de partidas"* estava na lista do que
 não entra na v1 mas **não pode ser impossibilitado** pelo desenho de dados. É essa porta que
@@ -388,10 +393,25 @@ rápido.
 
 Cada fase tem gate de saída, no formato de `12`.
 
-**F1 — Fundação de persistência.** Postgres em container, migrações versionadas, repositórios e
-a suíte de contrato dupla. Backup do volume e alerta no Grafana junto dos que já existem.
+**F1 — Fundação de persistência.** ✅ **Concluída em 26/08/2026.** Postgres em container,
+migrações versionadas, repositórios e a suíte de contrato dupla.
 *Gate:* a suíte de contrato passa nas duas implementações; o backup é restaurado uma vez, para
 valer, num banco vazio.
+
+*Cumprido:* `@fdp/contas` com `Dados` (memória + Postgres), 22 testes de contrato passando nas
+duas, obrigatórios no CI — que falha se qualquer uma das duas suítes for pulada. Backup
+(`deploy/backup-postgres.sh`) e restauração (`deploy/restaurar-postgres.sh`) exercitados de
+verdade: dump de um banco semeado, restauração num banco vazio, contagens idênticas nas cinco
+tabelas, índice funcional e `ON DELETE SET NULL` sobreviveram, e **a aplicação leu o banco
+restaurado** com os mesmos dados.
+
+*O que a suíte dupla pegou de imediato:* o esquema dependia da extensão `citext`, que passava em
+memória e quebrava no Postgres. Trocada por índice único sobre `lower(email)` — mesma garantia,
+do lado do banco, sem exigir `CREATE EXTENSION` (que pede superusuário em boa parte dos Postgres
+gerenciados). Era exatamente o tipo de defeito que só apareceria em produção.
+
+*Fica para quando o Postgres subir na VPS:* alerta no Grafana junto dos que já existem, e o
+backup no cron.
 
 **F2 — Contas por e-mail e senha.** Cadastro, login, sessão em cookie, token de sala derivado,
 limites de tentativa, `PROTOCOL_VERSION` 2 e `PublicPlayer.conta` — mais o desempate de apelido

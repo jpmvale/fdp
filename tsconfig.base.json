@@ -38,6 +38,12 @@
       ],
       "@fdp/bot": [
         "./packages/bot/src/index.ts"
+      ],
+      "@fdp/contas": [
+        "./packages/contas/src/index.ts"
+      ],
+      "@fdp/contas/postgres": [
+        "./packages/contas/src/postgres.ts"
       ]
     }
   }

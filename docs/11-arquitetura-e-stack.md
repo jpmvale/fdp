@@ -50,6 +50,7 @@ O motor de regras continua sendo o núcleo e **não conhece** nada acima dele (R
 | Processo | **Node 24 LTS** sob **systemd** | Reinício automático, logs no journal, sem gerenciador extra |
 | Borda | **Caddy** | TLS automático, proxy de WebSocket em duas linhas |
 | Persistência | **Redis** em `127.0.0.1`, auto-hospedado | TTL nativo; salas sobrevivem a deploy e crash. Custo zero |
+| Persistência durável | **Postgres 17** em `127.0.0.1`, auto-hospedado | Contas, perfis e histórico (P11). Transação e chave estrangeira, que o Redis não tem — e dado que **não** pode expirar |
 | Validação | **zod**, só no servidor | RNF-072, sem custo no bundle do cliente |
 | Estilo | CSS Modules + tokens | Zero runtime |
 | Testes | Vitest + Playwright | `U`/`I` e `E` de `10` |
@@ -111,6 +112,12 @@ Honestidade de contrapartida — a troca não é grátis:
 
 ## 4. Persistência
 
+São **dois** bancos com dois papéis, e nenhum invade o do outro. Confundi-los é o erro
+tentador: dá para guardar conta no Redis e sala no Postgres, e os dois ficam ruins. A sala é
+efêmera, quer TTL e morre com a mesa; a conta é permanente, quer transação e não pode expirar.
+
+### 4.1 Redis — a sala viva
+
 Redis auto-hospedado, escutando **apenas** em `127.0.0.1:6379` — nunca exposto à internet.
 
 | Uso | Como |
@@ -126,6 +133,29 @@ duas implementações** — o que a versão em memória passa, a de Redis precis
 Nota de projeto: como o estado vivo mora na memória do processo, o Redis aqui é **write-behind**,
 não fonte da verdade em tempo de jogo. Isso mantém a leitura de estado em nanossegundos e usa o
 Redis só como durabilidade. O `RoomStore` esconde essa diferença.
+
+### 4.2 Postgres — o que sobrevive à sala
+
+Postgres 17 em container, escutando **apenas** em `127.0.0.1:5432`. Guarda contas, credenciais,
+identidades de SSO e histórico de partidas (plano 01, decisão D-1).
+
+Aqui é o contrário do Redis em tudo o que importa: nada expira, a escrita é transacional, e a
+integridade é do banco — `UNIQUE`, chave estrangeira, índice funcional. Onde o Redis usa TTL
+para descartar, o Postgres usa `ON DELETE` para preservar o que precisa sobreviver ao dono.
+
+O acesso fica atrás da interface `Dados` de `@fdp/contas`, com implementação em memória para
+teste e desenvolvimento. **A suíte de contrato é a mesma para as duas** — o que a memória
+passa, o Postgres passa. Foi ela que pegou, na primeira execução, uma dependência de `citext`
+que só falharia em Postgres gerenciado.
+
+| Uso | Como |
+|---|---|
+| Migração | SQL versionado em `packages/contas/src/migracoes/`, aplicado na subida sob `pg_advisory_xact_lock` |
+| Backup | `deploy/backup-postgres.sh`, `pg_dump --format=custom`, com descarte por idade |
+| Restauração | `deploy/restaurar-postgres.sh`, que **recusa** destino que já tenha a tabela `contas` |
+
+Backup que nunca foi restaurado não é backup, é esperança — por isso a restauração está no gate
+de saída da F1, e não numa lista de intenções.
 
 ## 5. Concorrência
 

@@ -37,7 +37,7 @@ nada.
 
 | Plano | O que propõe | Status |
 |---|---|---|
-| [plans/01-contas-perfis-e-historico.md](./plans/01-contas-perfis-e-historico.md) | Contas (SSO e e-mail/senha), perfil público, histórico persistente e avatar por imagem. Reverte `00` §4.2 | PROPOSTO |
+| [plans/01-contas-perfis-e-historico.md](./plans/01-contas-perfis-e-historico.md) | Contas (SSO e e-mail/senha), perfil público, histórico persistente e avatar por imagem. Reverteu `00` §4.2 pela decisão P11 | EM EXECUÇÃO (F1 ✅, F2 a seguir) |
 
 ## Por onde começar
 

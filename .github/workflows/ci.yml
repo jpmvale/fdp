@@ -9,14 +9,25 @@ jobs:
   verify:
     runs-on: ubuntu-latest
 
-    # Sem Redis de pé, a suíte de contrato do RoomStore se pula sozinha e o CI
-    # daria verde sem ter testado a implementação que vai para produção.
+    # Sem os serviços de pé, as suítes de contrato se pulam sozinhas e o CI
+    # daria verde sem ter testado as implementações que vão para produção.
     services:
       redis:
         image: redis:7-alpine
         ports: ['6379:6379']
         options: >-
           --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+      postgres:
+        image: postgres:17-alpine
+        ports: ['5432:5432']
+        env:
+          POSTGRES_PASSWORD: fdp
+        options: >-
+          --health-cmd "pg_isready -U postgres"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 5
@@ -60,17 +71,22 @@ jobs:
         run: npm test
         env:
           REDIS_URL: redis://127.0.0.1:6379
+          DATABASE_URL: postgres://postgres:fdp@127.0.0.1:5432/postgres
 
-      # A suíte de Redis se pula sem REDIS_URL; aqui ela é obrigatória.
-      - name: O contrato do RoomStore rodou contra Redis
+      # As duas suítes se pulam sem a variável; aqui elas são obrigatórias.
+      # Pular no CI é o pior resultado possível: verde sem ter testado.
+      - name: Os contratos rodaram contra Redis e Postgres de verdade
         run: |
-          if npm test -- packages/store 2>&1 | grep -q "skipped"; then
-            echo "::error::a suíte de contrato do Redis foi pulada no CI"
-            exit 1
-          fi
-          echo "contrato verificado contra Redis"
+          for pacote in packages/store packages/contas; do
+            if npm test -- "$pacote" 2>&1 | grep -q "skipped"; then
+              echo "::error::a suíte de contrato de $pacote foi pulada no CI"
+              exit 1
+            fi
+            echo "contrato de $pacote verificado contra o serviço real"
+          done
         env:
           REDIS_URL: redis://127.0.0.1:6379
+          DATABASE_URL: postgres://postgres:fdp@127.0.0.1:5432/postgres
 
       # Compilado dentro de `src/` faz o Vite resolver o `.js` em vez do `.ts`
       # (os imports são `'./room.js'`, convenção ESM do TypeScript), e a suíte
