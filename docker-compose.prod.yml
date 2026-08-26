@@ -30,6 +30,34 @@ services:
       timeout: 3s
       retries: 5
 
+  postgres:
+    image: postgres:17-alpine
+    container_name: fdp-postgres
+    restart: unless-stopped
+    # Contas, credenciais, identidades de SSO e histórico (`11` §4.2). É o
+    # OPOSTO do Redis ao lado em tudo que importa: nada expira, a escrita é
+    # transacional, e a integridade é do banco.
+    environment:
+      POSTGRES_USER: fdp
+      POSTGRES_DB: fdp
+      POSTGRES_PASSWORD: ${FDP_DB_PASSWORD:?defina FDP_DB_PASSWORD no .env}
+      # Sem isto o initdb usa `trust` para conexões locais dentro do container.
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+    # Usuário próprio, e não `postgres` superusuário: a aplicação não precisa
+    # de superusuário, e foi por isso que o esquema deixou de depender da
+    # extensão `citext` (que exigiria).
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    # Só na `internal`: nem o Caddy o enxerga, e nenhuma porta sai da máquina.
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fdp -d fdp"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
   api:
     # `image` + `build` juntos, como nos outros apps da máquina: local,
     # `docker compose build` constrói e marca com este nome; na VPS,
@@ -47,6 +75,10 @@ services:
       # as partidas em curso.
       FDP_SESSION_SECRET: ${FDP_SESSION_SECRET:?defina FDP_SESSION_SECRET no .env}
       REDIS_URL: redis://redis:6379
+      # Contas (P11). A aplicação sobe SEM isto e sem o banco no ar — jogar não
+      # depende de conta (plano 01, I-1) —, mas em produção queremos as duas
+      # coisas de pé.
+      DATABASE_URL: postgres://fdp:${FDP_DB_PASSWORD:?defina FDP_DB_PASSWORD no .env}@postgres:5432/fdp
       ALLOWED_ORIGIN: https://fdp.imp-software.cloud
       # Só é seguro PORQUE o Caddy está na frente e sobrescreve
       # X-Forwarded-For. Nenhuma porta deste stack sai da máquina; se um dia
@@ -77,6 +109,20 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      # Postgres é `service_started`, e NÃO `service_healthy`, de propósito.
+      #
+      # Com `healthy`, um banco que não sobe impede a API de subir — e o jogo
+      # ficaria refém da parte opcional dele. É exatamente a invariante I-1 do
+      # plano 01 invertida: conta é acréscimo, nunca pedágio, e banco fora do
+      # ar não pode tirar do ar um jogo que funciona por link e sem cadastro.
+      # `main.ts` já trata a conexão que falha subindo sem contas.
+      postgres:
+        condition: service_started
+
+volumes:
+  # Nomeado, e não bind mount: é o que o `pg_dump` de `deploy/backup-postgres.sh`
+  # protege, e o que sobrevive a `docker compose down`.
+  postgres-data:
 
 networks:
   internal:
