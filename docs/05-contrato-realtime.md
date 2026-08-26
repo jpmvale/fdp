@@ -185,6 +185,7 @@ tentativa de trapaça nunca seja mascarada por um erro de regra.
 | EV-032 | `match:decisionUnlocked` | `{}` | todos (só o host age) |
 | EV-033 | `match:resumed` | `{ phase, activePlayerId, deadline }` | todos |
 | EV-034 | `round:aborted` | `{ roundNumber, withdrawnPlayerIds }` | todos |
+| EV-035 | `system:notice` `MATCH_DECIDED_EARLY` | `{ trickNumber, skippedTricks }` — a rodada foi cortada por RJ-014 | todos |
 | EV-040 | `chat:message` | `{ message: ChatMessage }` | todos, **idêntico para todos** |
 
 Regras de projeção:

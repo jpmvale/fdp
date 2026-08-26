@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { LIMITS } from '@fdp/protocol';
+import { deveAvisarVez, fracaoDaBarra, intervaloDoTique, urgenciaDoTique, verPrazo } from '../avisos';
+import type { PrazoVisto } from '../avisos';
+import { tocarSuaVez, tocarTique } from '../som';
 import { Carta } from '../components/Carta';
 import { Chat } from '../components/Chat';
 import { Historico } from '../components/Historico';
@@ -7,7 +10,7 @@ import { Feltro } from '../components/Feltro';
 import { Vidas } from '../components/Vidas';
 import type { Retrato, PlayerView } from '../state/tipos';
 
-export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoApostar, aoJogar, aoAbrirRegras, aoEnviarChat }: {
+export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoApostar, aoJogar, aoAbrirRegras, aoEnviarChat, preJogada, aoPreJogar }: {
   retrato: Retrato;
   eu: string;
   partida: PlayerView;
@@ -17,8 +20,12 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
   aoJogar: (cardId: string) => void;
   aoAbrirRegras: () => void;
   aoEnviarChat: (texto: string) => void;
+  preJogada: string | null;
+  aoPreJogar: (id: string | null) => void;
 }) {
   const nome = (id: string) => retrato.players.find((p) => p.id === id)?.nickname ?? '—';
+
+  useAvisosSonoros(retrato, eu);
   const ausentes = new Set(retrato.pause?.absentPlayerIds ?? []);
   const minhaVez = partida.activePlayerId === eu;
   const pausada = retrato.status === 'PAUSADA';
@@ -38,7 +45,7 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
       {!pausada && minhaVez && (
         partida.phase === 'APOSTAS'
           ? <Apostas partida={partida} aoApostar={aoApostar} />
-          : <Jogar selecionada={selecionada} aoJogar={aoJogar} />
+          : <Jogar selecionada={selecionada} aoJogar={aoJogar} unica={partida.hand.length === 1} />
       )}
 
       {!pausada && !minhaVez && partida.activePlayerId && (
@@ -51,7 +58,14 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
       )}
 
       {!partida.isForeheadRound && partida.hand.length > 0 && (
-        <Mao partida={partida} selecionada={selecionada} aoSelecionar={aoSelecionar} podeJogar={minhaVez && partida.phase === 'VAZAS'} />
+        <Mao
+          partida={partida}
+          selecionada={selecionada}
+          preJogada={preJogada}
+          aoSelecionar={aoSelecionar}
+          aoPreJogar={aoPreJogar}
+          podeJogar={minhaVez && partida.phase === 'VAZAS'}
+        />
       )}
 
       <Chat mensagens={retrato.chat} eu={eu} aoEnviar={aoEnviarChat} />
@@ -107,6 +121,53 @@ function Cabecalho({ partida, retrato, aoAbrirRegras }: {
 }
 
 /**
+ * Os dois avisos sonoros da vez: quando ela chega, e quando está acabando.
+ *
+ * Vive aqui, e não dentro da barra, porque o som não depende de a barra estar
+ * na tela — e porque um efeito que toca som escondido dentro de um componente
+ * de desenho é o tipo de coisa que ninguém acha depois.
+ */
+function useAvisosSonoros(retrato: Retrato, eu: string): void {
+  const daVez = retrato.match?.activePlayerId ?? null;
+  const anterior = useRef<string | null>(null);
+  const prazo = retrato.phaseDeadline;
+  // Mesma dedução de duração que a barra usa, e de propósito a mesma função:
+  // com duas cópias da conta, o tique e a barra acabariam discordando sobre
+  // quanto tempo resta, e o som avisaria de um aperto que a barra não mostra.
+  const inicio = useRef<PrazoVisto>({ prazo: 0, total: 1 });
+
+  useEffect(() => {
+    if (deveAvisarVez(anterior.current, daVez, eu, retrato.status === 'PAUSADA')) tocarSuaVez();
+    anterior.current = daVez;
+  }, [daVez, eu, retrato.status]);
+
+  useEffect(() => {
+    if (prazo === null || daVez !== eu || retrato.status === 'PAUSADA') return;
+
+    inicio.current = verPrazo(inicio.current, prazo, Date.now());
+
+    let vivo = true;
+    let timer: ReturnType<typeof setTimeout>;
+
+    // O intervalo é recalculado a cada tique, e é isso que produz a
+    // aceleração: um `setInterval` fixo daria um metrônomo, que não comunica
+    // que o tempo está acabando.
+    const proximo = () => {
+      if (!vivo) return;
+      const fracao = fracaoDaBarra(inicio.current, prazo, Date.now());
+      const espera = intervaloDoTique(fracao);
+      if (espera === null) { timer = setTimeout(proximo, 250); return; }
+      if (fracao <= 0) return;
+      tocarTique(urgenciaDoTique(fracao));
+      timer = setTimeout(proximo, espera);
+    };
+
+    timer = setTimeout(proximo, 250);
+    return () => { vivo = false; clearTimeout(timer); };
+  }, [prazo, daVez, eu, retrato.status]);
+}
+
+/**
  * Timer como barra, nunca número em contagem (RF-027): mesma informação, muito
  * menos ansiedade. Some quando não há prazo — barra parada mente sobre o que
  * está acontecendo.
@@ -114,6 +175,22 @@ function Cabecalho({ partida, retrato, aoAbrirRegras }: {
 function BarraDoTurno({ retrato }: { retrato: Retrato }) {
   const [agora, setAgora] = useState(Date.now());
   const prazo = retrato.phaseDeadline;
+
+  /**
+   * Quanto durava este prazo quando ele apareceu.
+   *
+   * A barra normalizava pelo prazo da APOSTA (45 s) sempre — então uma vez de
+   * jogar carta (30 s) nascia em 67% e a vez de um bot (900 ms) nascia em 2%.
+   * O cliente não recebe a duração, só o instante final; guardar o maior
+   * restante já visto para cada prazo dá a duração sem inventar tabela de
+   * fases, e funciona igual para prazo que ainda não existe hoje.
+   *
+   * Se a tela só vir o prazo no meio dele — depois de um resync, por exemplo —,
+   * a barra começa cheia e esvazia até o fim. É o comportamento certo: ela
+   * mostra o tempo que RESTA, não o que já passou.
+   */
+  const duracao = useRef<PrazoVisto>({ prazo: 0, total: 1 });
+  if (prazo !== null) duracao.current = verPrazo(duracao.current, prazo, Date.now());
 
   useEffect(() => {
     if (prazo === null) return;
@@ -125,17 +202,22 @@ function BarraDoTurno({ retrato }: { retrato: Retrato }) {
     return <div style={{ height: 4, margin: '10px 14px 14px' }} />;
   }
 
-  const restante = Math.max(0, prazo - agora);
-  // A fração é do prazo mais longo do jogo (a aposta). Não é precisão de
-  // cronômetro — é a sensação de tempo passando, que é o que a barra entrega.
-  const fracao = Math.min(1, restante / LIMITS.betTimeoutMs);
+  const fracao = fracaoDaBarra(duracao.current, prazo, agora);
+  // Só o dono da vez precisa se apressar; para os outros a barra é informação,
+  // não pressão. Sem isto a mesa inteira ficaria vermelha ao mesmo tempo.
+  const minhaVez = retrato.match?.activePlayerId === retrato.match?.viewerId;
+  const apertando = minhaVez && fracao <= 0.25;
 
   return (
     <div style={{ height: 4, borderRadius: 2, background: 'var(--superficie-2)', margin: '10px 14px 14px', overflow: 'hidden' }}>
-      <span style={{
-        display: 'block', height: '100%', width: `${fracao * 100}%`,
-        background: 'var(--acento)', transition: 'width 250ms linear',
-      }} />
+      <span
+        className={apertando ? 'barra-apertando' : undefined}
+        style={{
+          display: 'block', height: '100%', width: `${fracao * 100}%`,
+          background: apertando ? 'var(--vidas)' : 'var(--acento)',
+          transition: 'width 250ms linear, background 400ms ease',
+        }}
+      />
     </div>
   );
 }
@@ -281,7 +363,23 @@ function Apostas({ partida, aoApostar }: { partida: PlayerView; aoApostar: (v: n
   );
 }
 
-function Jogar({ selecionada, aoJogar }: { selecionada: string | null; aoJogar: (id: string) => void }) {
+function Jogar({ selecionada, aoJogar, unica }: {
+  selecionada: string | null;
+  aoJogar: (id: string) => void;
+  /** Só resta uma carta: ela sai sozinha, e o botão vira aviso. */
+  unica: boolean;
+}) {
+  if (unica) {
+    return (
+      <div className="cartao" style={{ textAlign: 'center' }}>
+        <p className="fraco">Sua última carta — ela sai sozinha.</p>
+      </div>
+    );
+  }
+  return <JogarBotao selecionada={selecionada} aoJogar={aoJogar} />;
+}
+
+function JogarBotao({ selecionada, aoJogar }: { selecionada: string | null; aoJogar: (id: string) => void }) {
   return (
     <button disabled={!selecionada} onClick={() => selecionada && aoJogar(selecionada)}>
       {selecionada ? 'Jogar esta carta' : 'Escolha uma carta abaixo'}
@@ -289,29 +387,63 @@ function Jogar({ selecionada, aoJogar }: { selecionada: string | null; aoJogar: 
   );
 }
 
-function Mao({ partida, selecionada, aoSelecionar, podeJogar }: {
+function Mao({ partida, selecionada, preJogada, aoSelecionar, aoPreJogar, podeJogar }: {
   partida: PlayerView;
   selecionada: string | null;
+  preJogada: string | null;
   aoSelecionar: (id: string | null) => void;
+  aoPreJogar: (id: string | null) => void;
   podeJogar: boolean;
 }) {
+  // Fora da vez, na fase de vazas, o toque deixa a carta engatilhada.
+  const podePreJogar = !podeJogar && partida.phase === 'VAZAS' && partida.hand.length > 0;
+
   return (
     <div className="pilha" style={{ gap: 6 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
         <span className="rotulo">suas cartas</span>
-        {/* RJ-023: nenhuma carta fica desabilitada — todas são sempre jogáveis. */}
-        <span className="fraco">toda carta é jogável</span>
+        {preJogada
+          ? <span className="fraco" style={{ color: 'var(--acento-claro)' }}>sai sozinha na sua vez</span>
+          /* RJ-023: nenhuma carta fica desabilitada — todas são sempre jogáveis. */
+          : <span className="fraco">{podePreJogar ? 'toque para deixar engatilhada' : 'toda carta é jogável'}</span>}
       </div>
       <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '10px 2px 4px' }}>
-        {partida.hand.map((carta) => (
-          <div key={carta.id} style={{ flex: '0 0 auto' }}>
-            <Carta
-              carta={carta}
-              selecionada={selecionada === carta.id}
-              aoClicar={podeJogar ? () => aoSelecionar(selecionada === carta.id ? null : carta.id) : undefined}
-            />
-          </div>
-        ))}
+        {partida.hand.map((carta) => {
+          const engatilhada = preJogada === carta.id;
+          return (
+            <div key={carta.id} style={{ flex: '0 0 auto', position: 'relative' }}>
+              <Carta
+                carta={carta}
+                selecionada={selecionada === carta.id || engatilhada}
+                rotulo={engatilhada
+                  ? `${carta.rank} de ${carta.suit}, engatilhada para a sua vez`
+                  : undefined}
+                aoClicar={
+                  podeJogar
+                    ? () => aoSelecionar(selecionada === carta.id ? null : carta.id)
+                    : podePreJogar
+                      ? () => aoPreJogar(engatilhada ? null : carta.id)
+                      : undefined
+                }
+              />
+              {/* A marca é o que separa "escolhida" de "vai sair sozinha".
+                  Sem ela, as duas se parecem e a segunda surpreende. */}
+              {engatilhada && (
+                <span
+                  aria-hidden
+                  style={{
+                    position: 'absolute', top: -6, right: -4,
+                    background: 'var(--acento)', color: '#12101d',
+                    fontSize: 9, fontWeight: 700, lineHeight: 1,
+                    padding: '2px 4px', borderRadius: 6,
+                  }}
+                >
+                  ⏱
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

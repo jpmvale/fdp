@@ -66,11 +66,13 @@ queda se torna inevitável** é registrado vaza a vaza. É esse instante que des
 |---|---|
 | RJ-007 | O **desvio mínimo garantido** de um jogador, a qualquer momento da rodada, é: se `vazasGanhas > aposta`, vale `vazasGanhas − aposta`; se `vazasGanhas + vazasRestantes < aposta`, vale `aposta − (vazasGanhas + vazasRestantes)`; caso contrário, `0`. |
 | RJ-008 | Um jogador **morre** na primeira vaza cuja resolução torna seu desvio mínimo garantido `≥` suas vidas correntes. O número dessa vaza é gravado em `mortoEmVaza`. |
-| RJ-009 | Um jogador morto **continua jogando** todas as vazas restantes da rodada, normalmente. A morte é um registro, não uma saída antecipada. |
+| RJ-009 | Um jogador morto **continua jogando** todas as vazas restantes da rodada, normalmente. A morte é um registro, não uma saída antecipada. Exceção: RJ-014, quando não sobra ninguém para quem essas vazas ainda importem. |
 | RJ-010 | Em RJ-005, vencem os jogadores com o **maior** `mortoEmVaza`. Se dois ou mais morreram na **mesma** vaza, todos eles vencem e `winnerIds` os contém. |
 | RJ-011 | Todo jogador eliminado ao fim de uma rodada tem, necessariamente, `mortoEmVaza` preenchido. |
 | RJ-012 | Na classificação final, jogadores eliminados na mesma rodada são ordenados por `mortoEmVaza` decrescente. |
 | RJ-013 | `mortoEmVaza` é informação **pública**: qualquer um pode derivá-la das apostas e vazas, que já são públicas. |
+| RJ-014 | **Vitória matemática.** Se, ao fim da pausa de uma vaza, restar **no máximo 1** jogador ativo ainda não morto (RJ-008), a rodada encerra ali: as vazas restantes não são jogadas e a rodada vai direto ao débito de vidas. |
+| RJ-015 | Numa rodada encerrada por RJ-014, o débito de cada jogador é seu **desvio mínimo garantido** (RJ-007), e não `\|aposta − vazasGanhas\|`. |
 
 **Exemplo (RJ-005).** Rodada de 7 cartas, três jogadores restantes, todos com 1 vida. Ana
 aposta 0 e ganha uma vaza logo na primeira → morre na vaza 1. Beto aposta 3 e, na vaza 5, já
@@ -79,6 +81,26 @@ aposta 0 e ganha uma vaza logo na primeira → morre na vaza 1. Beto aposta 3 e,
 
 RJ-009 importa para o resto da mesa: as cartas de um jogador já condenado continuam
 disputando vazas e ainda decidem a vida dos outros.
+
+**Por que RJ-014 não muda o vencedor.** É a única justificativa que sustenta a regra, então
+fica escrita. O desvio mínimo garantido nunca diminui quando uma vaza é jogada (RJ-007):
+ultrapassada a aposta, o excesso só cresce; ficando inalcançável, a falta só cresce. Logo,
+quem morreu não ressuscita. Suponha que sobre um único vivo, P. Ou P chega vivo ao fim da
+rodada, e vence por RJ-004 — todos os outros zeram as vidas; ou P também morre, numa vaza
+necessariamente **posterior** à de todos os demais, e vence por RJ-010, por ter segurado a
+última vida por mais tempo. Nos dois caminhos, P. Se não sobra vivo nenhum, a rodada já está
+inteiramente decidida e RJ-010 aponta o vencedor pelo `mortoEmVaza` já gravado.
+
+**Por que RJ-015 existe.** Cortada a rodada, cobrar `|aposta − vazasGanhas|` debitaria vazas
+que ninguém teve a chance de disputar. O desvio mínimo garantido é o piso já provado, e é o
+que se cobra. RJ-002 é o **caso particular** de RJ-015 com a rodada inteira jogada: ali
+`vazasRestantes` é 0 e as duas fórmulas dão o mesmo número, sempre (CA-354). Uma consequência
+útil: o único sobrevivente nunca é eliminado pelo corte, porque não estar morto significa,
+por definição, piso menor que as vidas.
+
+RJ-014 é regra de jogo, e não corte de tela: muda o estado da partida no servidor, e por isso
+vive aqui. A mesa **DEVE** dizer que a rodada foi encerrada por decisão (`07` §2.4) — partida
+que acaba com cartas na mão de todo mundo, sem explicação, parece defeito.
 
 ### 3.2 Composição do baralho
 
@@ -380,6 +402,7 @@ dispara sem que ninguém possa fazer nada.
 | RJ-120 | Restam 2 jogadores | Tudo se aplica sem alteração. Na rodada de 1 carta, a aposta do segundo é frequentemente forçada por RJ-054 — comportamento correto, não bug. |
 | RJ-121 | Jogadores ativos caem a 1 | Partida encerra com esse jogador como vencedor (RJ-004). |
 | RJ-122 | Todos os ativos zeram vidas na mesma rodada | Vence quem morreu por último (RJ-005, RJ-010). |
+| RJ-158 | Resta 1 ou 0 ativos ainda não mortos, com vazas por jogar | A rodada encerra na hora (RJ-014); o débito sai pelo piso de RJ-015. |
 | RJ-123 | Todos morrem na mesma vaza | Todos vencem, `winnerIds` os contém (RJ-010). |
 | RJ-124 | Todas as vazas de uma rodada são anuladas | Todos ganharam 0 vazas; quem apostou 0 não perde vida. Situação legítima e comum com múltiplos baralhos. |
 | RJ-125 | Sabot insuficiente | Impossível por RJ-024. **DEVE** haver asserção defensiva (RJ-043). |

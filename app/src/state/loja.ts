@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { Retrato } from './tipos';
 import type { EstadoConexao } from '../net/socket';
+import type { PreJogada } from '../jogada';
 
 /**
  * Estado local do cliente. **Só reflete o retrato do servidor** (`11` §6): não
@@ -26,6 +27,19 @@ export interface Estado {
   erro: string | null;
   avisos: Aviso[];
   cartaSelecionada: string | null;
+  /**
+   * Escolhida ANTES da vez chegar: assim que ela chega, é jogada sozinha.
+   *
+   * Separada da selecionada de propósito. Na minha vez, escolher e jogar são
+   * dois toques — o segundo é a confirmação, e é ela que impede a carta errada
+   * de sair num toque torto. Fora da vez não há o que confirmar: o gesto
+   * inteiro é "quando chegar, jogue esta", e um segundo toque depois anularia
+   * a razão de existir da pré-jogada.
+   *
+   * Guarda a rodada e a mão junto do id: o gatilho vale para aquela mão e
+   * só — o baralho é redistribuído e o mesmo id volta a existir noutra.
+   */
+  cartaPreJogada: PreJogada | null;
 }
 
 const inicial: Estado = {
@@ -37,6 +51,7 @@ const inicial: Estado = {
   erro: null,
   avisos: [],
   cartaSelecionada: null,
+  cartaPreJogada: null,
 };
 
 let estado = inicial;

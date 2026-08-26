@@ -5,6 +5,8 @@ import { createReconciler } from './net/reconcile';
 import { reduzir } from './state/redutores';
 import * as sessao from './net/sessao';
 import { frase } from './net/mensagens';
+import { jogadaAutomatica } from './jogada';
+import { carregarPreferenciaDeSom, despertarSomNoPrimeiroGesto } from './som';
 import { useEstado, definir, ler, avisar, errar } from './state/loja';
 import type { Retrato } from './state/tipos';
 import type { Reconciler } from './net/reconcile';
@@ -88,6 +90,60 @@ export function App() {
     document.addEventListener('visibilitychange', aoVoltar);
     return () => document.removeEventListener('visibilitychange', aoVoltar);
   }, []);
+
+  /**
+   * A carta engatilhada sai sozinha quando a vez chega.
+   *
+   * Roda no cliente, e não no servidor, de propósito: é uma comodidade de
+   * quem está jogando, não uma regra. Se a aba fechar, se a rede cair, se a
+   * pessoa mudar de ideia — não há nada engatilhado do outro lado, e o que
+   * acontece é o mesmo de sempre: o prazo corre e o auto-play resolve.
+   *
+   * A decisão em si mora em `jogadaAutomatica`, fora daqui e testável; o que
+   * sobra neste efeito é o envio e o relógio.
+   */
+  /**
+   * O áudio da mesa, ligado uma vez por sessão.
+   *
+   * Faltavam as duas pontas: a preferência salva nunca era lida de volta — quem
+   * desligava o som ouvia tudo de novo ao recarregar —, e o contexto de áudio
+   * nascia dentro de um efeito, que não é gesto do usuário. O navegador cria
+   * esse contexto **suspenso** e não reclama: os avisos saíam mudos a sessão
+   * inteira, sem nada no console para denunciar.
+   */
+  useEffect(() => {
+    carregarPreferenciaDeSom();
+    return despertarSomNoPrimeiroGesto();
+  }, []);
+
+  useEffect(() => {
+    const p = estado.retrato?.match;
+    if (!p) return;
+
+    const decisao = jogadaAutomatica(
+      p,
+      estado.eu,
+      estado.retrato?.status === 'PAUSADA',
+      estado.cartaPreJogada,
+    );
+
+    if (decisao.acao === 'nada') return;
+    if (decisao.acao === 'esquecer') { definir({ cartaPreJogada: null }); return; }
+
+    const mandar = () => {
+      definir({ cartaPreJogada: null, cartaSelecionada: null });
+      enviar('move:playCard', {
+        matchId: p.matchId,
+        roundNumber: p.roundNumber,
+        trickNumber: p.trickNumber,
+        cardId: decisao.cardId,
+      });
+    };
+
+    if (decisao.atrasoMs === 0) { mandar(); return; }
+    const t = setTimeout(mandar, decisao.atrasoMs);
+    return () => clearTimeout(t);
+  }, [estado.retrato, estado.cartaPreJogada, estado.eu]);
 
   const voltarAoInicio = () => {
     if (estado.codigo) sessao.esquecer(estado.codigo);
@@ -249,6 +305,17 @@ export function App() {
             })}
             aoAbrirRegras={() => setRegrasAbertas(true)}
             aoEnviarChat={(text) => enviar('chat:send', { text })}
+            preJogada={estado.cartaPreJogada?.cardId ?? null}
+            aoPreJogar={(cardId) => definir({
+              // `null` é o toque que desarma. Armada, a carta anota a mão em
+              // que foi armada — é o que impede um gatilho esquecido de
+              // disparar numa rodada seguinte.
+              cartaPreJogada: cardId === null ? null : {
+                cardId,
+                roundNumber: partida.roundNumber,
+                trickNumber: partida.trickNumber,
+              },
+            })}
             aoJogar={(cardId) => {
               enviar('move:playCard', {
                 matchId: partida.matchId,
@@ -429,6 +496,10 @@ function narrar(msg: { type: string; payload: unknown }) {
     case 'system:notice':
       if ((p['code'] as unknown as string) === 'PLAYER_DOOMED') {
         avisar(`${nome((p['params'] as unknown as { playerId: string }).playerId)} já era — cai nesta rodada`);
+      }
+      if ((p['code'] as unknown as string) === 'MATCH_DECIDED_EARLY') {
+        const puladas = (p['params'] as unknown as { skippedTricks: number }).skippedTricks;
+        avisar(`Já está decidido — ${puladas === 1 ? 'a última mão não muda' : `as ${puladas} mãos que faltam não mudam`} nada`);
       }
       break;
     default: break;

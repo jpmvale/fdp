@@ -375,3 +375,53 @@ redes móveis diferentes. Todos os passos **DEVEM** passar:
 10. O host inicia revanche — nova partida com o mesmo grupo, vidas restauradas.
 11. Ao fim, ninguém observou tela travada, placar divergente, pausa sem saída, ou informação de
     outro jogador.
+
+### 4.10 Vitória matemática (RJ-014, RJ-015)
+
+| ID | Nível | Regras | Critério |
+|---|---|---|---|
+| CA-353 | U | RJ-007 | **Dado** qualquer aposta, vazas ganhas e vazas restantes, **quando** uma vaza é jogada — levada ou perdida —, **então** o desvio mínimo garantido **nunca** diminui |
+| CA-354 | U | RJ-002, RJ-015 | **Dado** a rodada jogada até a última carta (`vazasRestantes = 0`), **então** o piso de RJ-015 é exatamente `\|aposta − vazasGanhas\|` — RJ-002 é o caso particular, e o débito das rodadas normais não muda |
+| CA-355 | I | RJ-014 | **Dado** partidas completas, **quando** resta no máximo 1 ativo ainda não morto com vazas por jogar, **então** a rodada é cortada, o histórico registra menos vazas que cartas, todo eliminado tem `mortoEmVaza` gravado, e o vencedor é o não-morto (RJ-004) ou quem morreu por último (RJ-010) |
+| CA-360 | U | RJ-012, RJ-129 | **Dado** eliminados com as **mesmas vidas** (zero), **então** a classificação os ordena por rodada de queda e `mortoEmVaza` decrescentes, com retirados abaixo de todos |
+
+CA-353 é o lema de que RJ-014 depende inteiramente. Se o desvio mínimo garantido pudesse
+diminuir, morto ressuscitaria, e cortar a rodada roubaria de alguém uma virada que ainda
+existia. Está testado exaustivamente, e não por amostra: se ele cair, a regra é que está
+errada, e não o código.
+
+CA-355 conta as rodadas cortadas e falha se forem **zero** — sem isso o teste passaria feliz
+num corpus que nunca dispara a regra, provando nada. No corpus atual o corte acontece em mais
+de metade das partidas.
+
+CA-360 existe por um defeito que nenhum teste sobre vidas pegaria: a tela de fim ordenava por
+vidas restantes, e como todo eliminado termina em zero, a comparação empatava sempre e a ordem
+caía no assento. O primeiro a cair podia terminar com medalha de prata. O teste ordena, de
+propósito, gente com exatamente as mesmas vidas.
+
+### 4.11 Ritmo e avisos da mesa (RF-050 a RF-057)
+
+| ID | Nível | Regras | Critério |
+|---|---|---|---|
+| CA-351 | U | RF-056 | **Dado** a vez passando de mão em mão, **então** o aviso sonoro toca na **transição** para mim, não se repete enquanto a vez continua minha, não toca pela vez alheia e não toca com a mesa pausada |
+| CA-352 | U | RF-057 | **Dado** o último quarto do prazo, **então** o intervalo entre tiques só encurta conforme o tempo aperta, a urgência sobe junto, e fora dessa faixa não há tique |
+| CA-356 | U | RF-055 | **Dado** um prazo de 45 s, 30 s ou 900 ms, **então** a barra nasce **cheia** nos três e esvazia proporcionalmente ao prazo que é; prazo visto já correndo parte de cheio e só desce |
+| CA-357 | U | RF-051, RF-052 | **Dado** uma carta engatilhada fora da vez, **quando** a vez chega, **então** ela é enviada sem novo toque; **e** um gatilho de outra rodada, de outra vaza, ou de carta que saiu da mão é descartado sem enviar nada |
+| CA-358 | U | RF-053 | **Dado** uma carta só na mão, na minha vez, **então** ela sai sozinha depois de 1,5 a 3 s; com duas cartas, nada sai sozinho |
+| CA-359 | U | RF-050 | **Dado** a fase de apostas, **então** quem inicia a mão é quem abre a rodada (RJ-038); **dado** a fase de vazas, é o líder da vaza corrente (RJ-065), que muda de mão em mão |
+| CA-361 | U | RF-056, RF-058 | **Dado** a tela montada, **então** o áudio fica pendurado em toque **e** teclado; o primeiro gesto solta os dois ouvintes, desmontar sem gesto também solta, e gestos seguintes não quebram |
+
+CA-356 mede o defeito que consertou: a barra normalizava pelo prazo da aposta em todos os
+casos, então a vez de jogar carta nascia em 67% e a de um bot em 2%.
+
+CA-361 prende o defeito mais silencioso desta leva. `AudioContext` criado fora de um gesto do
+usuário nasce `suspended` e fica assim: **todos** os avisos saem mudos a sessão inteira, e o
+console fica limpo — não há erro, exceção nem aviso para denunciar. Era o que acontecia, porque
+`prepararSom` só era chamado de dentro de um efeito do React, que não é gesto. O teste não prova
+que sai som do alto-falante (isso é do navegador, e só se confere ouvindo); prova que o gancho
+existe, dispara uma vez e se solta.
+
+CA-357 prende um defeito silencioso. O gatilho guardava só o `cardId`, e o baralho é
+redistribuído a cada rodada: o mesmo id volta a existir noutra mão, o gatilho esquecido
+dispara, o servidor aceita a jogada, e nada em lugar nenhum acusa erro — quem jogou só
+descobre olhando a mesa.

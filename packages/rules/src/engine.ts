@@ -13,7 +13,7 @@ import {
   nextFirstBidder,
   orderFrom,
 } from './round.js';
-import { isDoomed, nextLeaderOf, resolveTrick } from './trick.js';
+import { isDoomed, minGuaranteedDeviation, nextLeaderOf, resolveTrick } from './trick.js';
 import {
   type EngineCtx,
   type EngineEvent,
@@ -636,6 +636,45 @@ function collectTrick(state: MatchState): MoveResult {
     };
   }
 
+  // RJ-014: vitória matemática. Se sobrou no máximo um jogador ainda não morto
+  // (RJ-008), as vazas que faltam não mudam mais quem vence — só adiam.
+  //
+  // Que não mudam é demonstrável, e vale a pena escrever porque o contrário
+  // seria um bug silencioso: o desvio mínimo garantido nunca diminui, então
+  // quem morreu não ressuscita. Sobrando um vivo P, ou P chega ao fim da rodada
+  // e vence por RJ-004, ou P também morre numa vaza posterior à de todos os
+  // outros e vence por RJ-010, por ter segurado a última vida por mais tempo.
+  // Nos dois caminhos, P. Sobrando zero, a rodada já está inteiramente decidida
+  // e RJ-010 aponta o vencedor pelo `mortoEmVaza` que já está gravado.
+  //
+  // O corte é aqui, e não na resolução da vaza, de propósito: a vaza que decide
+  // ainda cumpre seu RECOLHIMENTO. A mesa vê quem levou a última carta e o
+  // aviso de morte antes de a tela virar — encerrar no mesmo quadro em que a
+  // carta cai é o defeito que `07` §2.4 proíbe.
+  const vivos = round.bidOrder.filter((id) => round.mortoEmVaza[id] == null);
+  if (vivos.length <= 1 && round.bidOrder.length > 1) {
+    const decidida: MatchState = {
+      ...state,
+      round: { ...round, phase: 'RESOLUCAO', activePlayerId: null },
+    };
+    const resolucao = resolveRound(decidida);
+    // `resolveRound` só devolve sucesso — o tipo é largo, o retorno não. Se um
+    // dia deixar de ser assim, é aqui que se descobre, e não numa mesa travada.
+    if (!resolucao.ok) return resolucao;
+    return {
+      ...resolucao,
+      events: [
+        {
+          type: 'round:decidedEarly',
+          trickNumber: round.trickNumber,
+          skippedTricks: state.cardsThisRound - round.trickNumber,
+        },
+        { type: 'round:phaseChanged', phase: 'RESOLUCAO', activePlayerId: null },
+        ...resolucao.events,
+      ],
+    };
+  }
+
   const nextLeaderId = ultima.nextLeaderId;
   return {
     ok: true,
@@ -663,9 +702,23 @@ function resolveRound(state: MatchState): MoveResult {
   const livesLost: Record<PlayerId, number> = {};
   const lives = { ...state.lives };
 
+  // RJ-015: o débito é o desvio mínimo GARANTIDO (RJ-007), não
+  // `|aposta − vazasGanhas|`. Quase sempre dá no mesmo: com a rodada jogada até
+  // o fim, `vazasRestantes` é 0 e as duas fórmulas coincidem — RJ-002 é o caso
+  // particular desta. A diferença só aparece na rodada encerrada por RJ-014,
+  // onde cobrar `|aposta − vazasGanhas|` debitaria vazas que ninguém teve a
+  // chance de disputar.
+  const vazasRestantes = round.isForeheadRound
+    ? 0
+    : Math.max(0, state.cardsThisRound - round.trickNumber);
+
   // RJ-093: debita todo mundo antes de eliminar ninguém.
   for (const playerId of round.bidOrder) {
-    const lost = Math.abs(round.bets[playerId]! - (round.tricksWon[playerId] ?? 0));
+    const lost = minGuaranteedDeviation(
+      round.bets[playerId]!,
+      round.tricksWon[playerId] ?? 0,
+      vazasRestantes,
+    );
     livesLost[playerId] = lost;
     lives[playerId] = Math.max(0, lives[playerId]! - lost); // RJ-092
   }

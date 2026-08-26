@@ -147,6 +147,7 @@ stateDiagram-v2
     VAZAS --> RECOLHIMENTO: vaza resolvida
     RECOLHIMENTO --> VAZAS: pausa cumprida, ainda restam vazas
     RECOLHIMENTO --> RESOLUCAO: pausa cumprida, era a última vaza
+    RECOLHIMENTO --> RESOLUCAO: rodada já decidida (RJ-014)
     REVELACAO --> RESOLUCAO: pausa cumprida
     RESOLUCAO --> [*]
 ```
@@ -156,7 +157,7 @@ stateDiagram-v2
 | `DISTRIBUICAO` | automática | servidor | nenhum | — | Cartas distribuídas (RJ-041) |
 | `APOSTAS` | **sequencial** | `activePlayerId` | `move:bet` | `BET_TIMEOUT`, só se conectado | Todos os ativos apostaram |
 | `VAZAS` | **sequencial** | `activePlayerId` | `move:playCard` | `PLAY_TIMEOUT`, só se conectado | `cartasNaRodada` vazas resolvidas |
-| `RECOLHIMENTO` | automática | servidor | nenhum | pausa 1,5 s | Próxima vaza aberta pelo puxador de RJ-065, ou `RESOLUCAO` se era a última |
+| `RECOLHIMENTO` | automática | servidor | nenhum | pausa 1,5 s | Próxima vaza aberta pelo puxador de RJ-065; ou `RESOLUCAO`, se era a última **ou** se a rodada já está decidida (RJ-014) |
 | `REVELACAO` | automática | servidor | nenhum | pausa 3 s | Cartas na mesa, à vista de todos — inclusive dos donos |
 | `RESOLUCAO` | automática | servidor | nenhum | pausa 3 s | Vidas debitadas, eliminações aplicadas |
 
@@ -179,6 +180,11 @@ Encerrada a vaza (todos os ativos jogaram), o servidor:
    (RJ-086);
 4. **recalcula o desvio mínimo garantido de todos e grava `mortoEmVaza`** (RJ-095);
 5. entra em `RECOLHIMENTO` e só abre a vaza seguinte quando a pausa vencer.
+
+O corte de RJ-014 acontece **no fim da pausa**, e não no instante em que a vaza resolve. É de
+propósito: a vaza que decide a partida ainda cumpre seu `RECOLHIMENTO` inteiro, então a mesa vê
+quem levou a última carta e o aviso de morte antes de a tela virar. Encerrar no mesmo quadro em
+que a carta cai é exatamente o defeito que a pausa existe para consertar.
 
 O passo 4 é fácil de esquecer e não tem sintoma visível até uma partida terminar com todos
 zerados — quando o desempate de RJ-005 vira impossível.

@@ -163,8 +163,24 @@ export function project(state: MatchState, viewerId: PlayerId): PlayerView {
   };
 }
 
+/**
+ * O mínimo que a classificação precisa saber.
+ *
+ * `MatchState` (servidor) e `PlayerView` (cliente) satisfazem os dois. É de
+ * propósito: a tela de fim ordenava por vidas restantes e reimplementava a
+ * regra por conta própria — o que, com todos os eliminados em zero vida,
+ * deixava a ordem entre eles ao acaso do `playerOrder`. Uma classificação só,
+ * usada dos dois lados, não tem como divergir.
+ */
+export interface ParaRanking {
+  winnerIds: PlayerId[] | null;
+  eliminated: readonly EliminationRecord[];
+  withdrawn: readonly WithdrawalRecord[];
+  playerOrder: readonly PlayerId[];
+}
+
 /** Classificação final (RJ-012, RJ-129). Vencedores primeiro. */
-export function ranking(state: MatchState): PlayerId[] {
+export function ranking(state: ParaRanking): PlayerId[] {
   const winners = state.winnerIds ?? [];
 
   const eliminated = state.eliminated
@@ -184,7 +200,7 @@ export function ranking(state: MatchState): PlayerId[] {
     .sort((a, b) => b.roundNumber - a.roundNumber)
     .map((w) => w.playerId);
 
-  const survivors = state.playerOrder.filter(
+  const survivors = [...state.playerOrder].filter(
     (id) =>
       !winners.includes(id) &&
       !eliminated.includes(id) &&

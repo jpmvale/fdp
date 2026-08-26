@@ -905,6 +905,19 @@ export function translate(events: readonly EngineEvent[], room: Room): Emission[
         }));
         break;
 
+      case 'round:decidedEarly':
+        // Sem isto a mesa pula da vaza para a tela de fim sem explicação, e
+        // quem está jogando conclui que o jogo bugou — a partida acabou com
+        // cartas ainda na mão de todo mundo.
+        emissions.push(all({
+          type: 'system:notice',
+          payload: {
+            code: 'MATCH_DECIDED_EARLY',
+            params: { trickNumber: event.trickNumber, skippedTricks: event.skippedTricks },
+          },
+        }));
+        break;
+
       case 'player:doomed':
         // Derivável de apostas e vazas, que já são públicas (RJ-013).
         emissions.push(all({

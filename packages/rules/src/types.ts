@@ -227,6 +227,7 @@ export type EngineEvent =
   | { type: 'trick:resolved'; trickNumber: number; winnerId: PlayerId | null; annulledValue: number | null; nextLeaderId: PlayerId | null }
   | { type: 'player:doomed'; playerId: PlayerId; trickNumber: number }
   | { type: 'round:revealed'; cards: Record<PlayerId, CardId> }
+  | { type: 'round:decidedEarly'; trickNumber: number; skippedTricks: number }
   | { type: 'round:resolved'; summary: RoundSummary }
   | { type: 'round:aborted'; roundNumber: number; withdrawnPlayerIds: PlayerId[] }
   | { type: 'match:ended'; winnerIds: PlayerId[]; endReason: EndReason };

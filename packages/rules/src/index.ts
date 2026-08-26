@@ -27,6 +27,6 @@ export {
   withdrawPlayers,
   type CreateMatchParams,
 } from './engine.js';
-export { project, ranking, type PlayerView, type PublicTrick } from './projection.js';
+export { project, ranking, type ParaRanking, type PlayerView, type PublicTrick } from './projection.js';
 export { autoBet, autoCard, autoMove } from './autoplay.js';
 export { checkInvariants, checkNoLeak } from './invariants.js';

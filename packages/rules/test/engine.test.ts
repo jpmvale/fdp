@@ -13,6 +13,7 @@ import {
   checkNoLeak,
   createMatch,
   isActive,
+  minGuaranteedDeviation,
   project,
   ranking,
   withdrawPlayers,
@@ -60,7 +61,7 @@ function playMatch(
   options: Partial<MatchOptions>,
   pick: (state: MatchState, legal: Move[]) => Move,
   maxSteps = 20_000,
-): { state: MatchState; violations: string[] } {
+): { state: MatchState; violations: string[]; events: EngineEvent[] } {
   let state = createMatch({
     matchId: `m-${seed}`,
     seed,
@@ -68,6 +69,7 @@ function playMatch(
     options,
   });
   const violations: string[] = [];
+  const events: EngineEvent[] = [];
 
   const audit = (s: MatchState): void => {
     violations.push(...checkInvariants(s));
@@ -79,15 +81,18 @@ function playMatch(
     if (++steps > maxSteps) throw new Error(`partida não terminou em ${maxSteps} passos`);
     const settled = settle(state);
     state = settled.state;
+    events.push(...settled.events);
     audit(state);
     if (state.endReason !== null) break;
 
     const legal = legalMoves(state);
-    state = must(applyMove(state, pick(state, legal), ctx));
+    const applied = applyMove(state, pick(state, legal), ctx);
+    state = must(applied);
+    if (applied.ok) events.push(...applied.events);
     audit(state);
   }
 
-  return { state, violations };
+  return { state, violations, events };
 }
 
 function legalMoves(state: MatchState): Move[] {
@@ -797,4 +802,227 @@ describe('CA-310: teste de propriedade', () => {
     expect(annulled).toBeGreaterThan(0);
     expect(sharedWins).toBeGreaterThan(0);
   }, 120_000);
+});
+
+
+// --- CA-353 a CA-355: vitória matemática (RJ-014, RJ-015) -------------------
+
+describe('CA-353 a CA-355: vitória matemática', () => {
+  /**
+   * O lema em que a regra inteira se apoia: o desvio mínimo garantido NUNCA
+   * diminui quando uma vaza é jogada. É o que garante que morto não ressuscita
+   * — e, portanto, que cortar a rodada não pode roubar de ninguém uma virada
+   * que ainda existia. Se este teste cair, RJ-014 está errada, e não o código.
+   */
+  it('CA-353: desvio mínimo garantido nunca diminui ao longo da rodada', () => {
+    for (let cartas = 1; cartas <= 10; cartas++) {
+      for (let aposta = 0; aposta <= cartas; aposta++) {
+        for (let ganhas = 0; ganhas <= cartas; ganhas++) {
+          for (let restantes = 1; restantes <= cartas - ganhas; restantes++) {
+            const antes = minGuaranteedDeviation(aposta, ganhas, restantes);
+            // A vaza seguinte só tem dois desfechos para este jogador: leva ou
+            // não leva. Nenhum dos dois pode baixar o piso.
+            const levou = minGuaranteedDeviation(aposta, ganhas + 1, restantes - 1);
+            const perdeu = minGuaranteedDeviation(aposta, ganhas, restantes - 1);
+            expect(levou).toBeGreaterThanOrEqual(antes);
+            expect(perdeu).toBeGreaterThanOrEqual(antes);
+          }
+        }
+      }
+    }
+  });
+
+  /**
+   * RJ-015 tem de ser uma GENERALIZAÇÃO de RJ-002, não uma regra concorrente:
+   * com a rodada jogada até a última carta, as duas fórmulas têm de dar o mesmo
+   * número, senão a mudança altera silenciosamente o débito de toda partida
+   * normal.
+   */
+  it('CA-354: com a rodada inteira jogada, RJ-015 coincide com RJ-002', () => {
+    for (let aposta = 0; aposta <= 10; aposta++) {
+      for (let ganhas = 0; ganhas <= 10; ganhas++) {
+        expect(minGuaranteedDeviation(aposta, ganhas, 0)).toBe(Math.abs(aposta - ganhas));
+      }
+    }
+  });
+
+  it('CA-355: a rodada é cortada e o vencedor é o único não-morto', () => {
+    const tieRules = ['EMPATE_ANULA_VAZA', 'EMPATE_ANULA_CARTAS'] as const;
+    let cortadas = 0;
+    let partidasCortadas = 0;
+
+    for (let i = 0; i < 400; i++) {
+      const seed = `antecipada-${i}`;
+      let cursor = 0;
+      const nextIndex = (max: number): number => {
+        cursor = (cursor * 1103515245 + 12345 + i) >>> 0;
+        return cursor % max;
+      };
+
+      const result = playMatch(
+        seed,
+        2 + (i % 7),
+        {
+          vidasIniciais: 1 + (i % 3),
+          // Rodadas longas com poucas vidas é onde a decisão antecipada
+          // acontece: sobra vaza para pular depois de todo mundo já ter caído.
+          maxCartasPorRodada: 4 + (i % 7),
+          regraEmpate: tieRules[i % 2]!,
+        },
+        (_, legal) => legal[nextIndex(legal.length)]!,
+      );
+
+      expect(result.violations).toEqual([]);
+
+      const cortes = result.events.filter((e) => e.type === 'round:decidedEarly');
+      if (cortes.length === 0) continue;
+      partidasCortadas++;
+      cortadas += cortes.length;
+
+      for (const corte of cortes) {
+        // Só se corta o que sobra — cortar zero vaza seria um corte inútil, e
+        // cortar mais do que a rodada tinha seria contabilidade errada.
+        expect(corte.skippedTricks).toBeGreaterThan(0);
+      }
+
+      // A rodada cortada deixa rastro no histórico: menos vazas disputadas do
+      // que cartas distribuídas.
+      const cortada = result.state.history.filter((h) => {
+        const feitas = Object.values(h.tricksWon).reduce((a, b) => a + b, 0);
+        return !h.aborted && feitas + h.annulledTricks < h.cardsThisRound;
+      });
+      expect(cortada.length).toBe(cortes.length);
+
+      // RJ-011/INV-16: quem foi eliminado numa rodada cortada morreu de fato —
+      // aqui não existe o `?? cardsThisRound` de recurso, todo eliminado tem
+      // sua vaza de morte gravada.
+      for (const h of cortada) {
+        for (const id of h.eliminatedThisRound) {
+          expect(h.mortoEmVaza[id]).not.toBeNull();
+          expect(h.mortoEmVaza[id]).toBeGreaterThan(0);
+        }
+      }
+
+      // E o essencial: a partida acabou com vencedor, e ele não é alguém que a
+      // rodada cortada eliminou.
+      expect(result.state.endReason).not.toBeNull();
+      const vencedores = result.state.winnerIds!;
+      expect(vencedores.length).toBeGreaterThan(0);
+      const ultima = cortada[cortada.length - 1];
+      if (ultima && result.state.history[result.state.history.length - 1] === ultima) {
+        for (const v of vencedores) {
+          // Vencer por RJ-004 (sobreviveu) ou por RJ-010 (morreu por último).
+          const morreuNaUltima = ultima.eliminatedThisRound.includes(v);
+          if (morreuNaUltima) {
+            const meu = ultima.mortoEmVaza[v] ?? 0;
+            for (const outro of ultima.eliminatedThisRound) {
+              expect(meu).toBeGreaterThanOrEqual(ultima.mortoEmVaza[outro] ?? 0);
+            }
+          } else {
+            expect(isActive(result.state, v)).toBe(true);
+          }
+        }
+      }
+    }
+
+    // Sem isto o teste passaria feliz num corpus que nunca dispara a regra.
+    expect(partidasCortadas).toBeGreaterThan(0);
+    expect(cortadas).toBeGreaterThan(0);
+  }, 120_000);
+});
+
+// --- CA-360: a classificação é a ordem de vitória (RJ-012, RJ-129) ---------
+
+describe('CA-360: classificação em ordem de vitória', () => {
+  /**
+   * A tela de fim ordenava por vidas restantes. Como todo eliminado termina em
+   * ZERO vida, a comparação empatava sempre e a ordem entre eles caía no
+   * `playerOrder` — o primeiro a cair podia aparecer em segundo lugar, com
+   * medalha de prata. Um teste sobre vidas nunca pegaria isso; este ordena
+   * gente que tem exatamente as mesmas vidas.
+   */
+  it('entre eliminados, quem caiu por último fica na frente', () => {
+    const ordem = ranking({
+      winnerIds: ['ana'],
+      playerOrder: ['ana', 'beto', 'caio', 'dani'],
+      // De propósito fora de ordem, e de propósito com `playerOrder` sugerindo
+      // o contrário do certo.
+      eliminated: [
+        { playerId: 'beto', roundNumber: 2, mortoEmVaza: 1 },
+        { playerId: 'dani', roundNumber: 5, mortoEmVaza: 3 },
+        { playerId: 'caio', roundNumber: 5, mortoEmVaza: 1 },
+      ],
+      withdrawn: [],
+    });
+
+    expect(ordem).toEqual(['ana', 'dani', 'caio', 'beto']);
+  });
+
+  it('quem abandonou fica abaixo de todos, mesmo caindo tarde (RJ-129)', () => {
+    const ordem = ranking({
+      winnerIds: ['ana'],
+      playerOrder: ['ana', 'beto', 'caio'],
+      eliminated: [{ playerId: 'beto', roundNumber: 2, mortoEmVaza: 1 }],
+      // Saiu na rodada 9, muito depois de Beto cair — e ainda assim vem
+      // depois: sair não pode ser um jeito de terminar melhor.
+      withdrawn: [{ playerId: 'caio', roundNumber: 9, livesAtWithdrawal: 4 }],
+    });
+
+    expect(ordem).toEqual(['ana', 'beto', 'caio']);
+  });
+
+  it('vitória compartilhada (RJ-010) põe os dois na frente', () => {
+    const ordem = ranking({
+      winnerIds: ['ana', 'beto'],
+      playerOrder: ['ana', 'beto', 'caio'],
+      eliminated: [
+        { playerId: 'ana', roundNumber: 4, mortoEmVaza: 7 },
+        { playerId: 'beto', roundNumber: 4, mortoEmVaza: 7 },
+        { playerId: 'caio', roundNumber: 4, mortoEmVaza: 2 },
+      ],
+      withdrawn: [],
+    });
+
+    expect(ordem.slice(0, 2).sort()).toEqual(['ana', 'beto']);
+    expect(ordem[2]).toBe('caio');
+  });
+
+  /** Numa partida de verdade: a classificação é o inverso da ordem de queda. */
+  it('em partida completa, a ordem é o inverso exato da ordem de eliminação', () => {
+    let cursor = 0;
+    const result = playMatch(
+      'ordem-vitoria',
+      6,
+      { vidasIniciais: 2, maxCartasPorRodada: 5 },
+      (_, legal) => {
+        cursor = (cursor * 1103515245 + 12345) >>> 0;
+        return legal[cursor % legal.length]!;
+      },
+    );
+
+    const ordem = ranking(result.state);
+    expect(ordem.length).toBe(6);
+    // Ninguém aparece duas vezes nem some da tabela.
+    expect(new Set(ordem).size).toBe(6);
+
+    const vencedores = result.state.winnerIds!;
+    for (const v of vencedores) expect(ordem.indexOf(v)).toBeLessThan(vencedores.length);
+
+    // Para cada par de eliminados, quem caiu depois está mais acima.
+    const caiu = new Map(
+      result.state.eliminated
+        .filter((e) => !vencedores.includes(e.playerId))
+        .map((e) => [e.playerId, e]),
+    );
+    for (const [a, ea] of caiu) {
+      for (const [b, eb] of caiu) {
+        if (a === b) continue;
+        const depois =
+          ea.roundNumber !== eb.roundNumber
+            ? ea.roundNumber > eb.roundNumber
+            : ea.mortoEmVaza > eb.mortoEmVaza;
+        if (depois) expect(ordem.indexOf(a)).toBeLessThan(ordem.indexOf(b));
+      }
+    }
+  });
 });

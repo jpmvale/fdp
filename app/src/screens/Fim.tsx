@@ -1,6 +1,6 @@
 import { Avatar } from '../components/Avatar';
 import { CORES, desempenhoDaPartida } from '../desempenho';
-import { Vidas } from '../components/Vidas';
+import { ranking } from '@fdp/rules';
 import type { EndReason } from '@fdp/rules';
 import type { Retrato, PlayerView } from '../state/tipos';
 
@@ -30,12 +30,12 @@ export function Fim({ retrato, eu, partida, aoRevanche, aoSair, aoVoltarAoLobby 
   const souHost = retrato.hostId === eu;
   const saiu = new Set(partida.withdrawn.map((w) => w.playerId));
 
-  // Quem abandonou fica ABAIXO de todos (RJ-129), independente das vidas com
-  // que saiu: sair não pode ser um jeito de terminar melhor.
-  const ordem = [...partida.playerOrder].sort((a, b) => {
-    if (saiu.has(a) !== saiu.has(b)) return saiu.has(a) ? 1 : -1;
-    return (partida.lives[b] ?? 0) - (partida.lives[a] ?? 0);
-  });
+  // A classificação vem do MOTOR (RJ-012, RJ-129) — vencedor, depois quem caiu
+  // por último, até o primeiro a sair. A tela ordenava por vidas restantes, e
+  // como todo eliminado termina em zero, a ordem entre eles era a de
+  // `playerOrder`: o primeiro a cair podia aparecer em segundo. O motor
+  // desempata por rodada e, dentro dela, pela vaza da morte (RJ-010).
+  const ordem = ranking(partida);
 
   return (
     <div className="pilha">
@@ -155,7 +155,7 @@ function Desempenho({ partida, retrato, eu, ordem, saiu }: {
     <div className="cartao pilha" style={{ gap: 6 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
         <span className="rotulo">desempenho</span>
-        <span className="fraco" style={{ fontSize: 11 }}>na ordem de chegada</span>
+        <span className="fraco" style={{ fontSize: 11 }}>da vitória à primeira queda</span>
       </div>
 
       {/* Cabeçalho de coluna: sem ele os números viram três inteiros soltos que
@@ -183,12 +183,7 @@ function Desempenho({ partida, retrato, eu, ordem, saiu }: {
         return (
           <div key={id} className="pilha" style={{ gap: 2 }}>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
-              <span style={{
-                width: 12, textAlign: 'right', color: 'var(--texto-apagado)',
-                fontVariantNumeric: 'tabular-nums', fontSize: 11,
-              }}>
-                {i + 1}
-              </span>
+              <Posicao lugar={i + 1} />
               <Avatar avatar={jogador.avatar} tamanho={22} />
               <span style={{
                 flex: 1, minWidth: 0, whiteSpace: 'nowrap',
@@ -231,7 +226,7 @@ function Desempenho({ partida, retrato, eu, ordem, saiu }: {
 
             <div style={{
               display: 'flex', gap: 6, alignItems: 'baseline',
-              fontSize: 10, color: 'var(--texto-apagado)', paddingLeft: 40,
+              fontSize: 10, color: 'var(--texto-apagado)', paddingLeft: 46,
             }}>
               <span style={{ flex: 1 }}>
                 {saiu.has(id)
@@ -245,6 +240,52 @@ function Desempenho({ partida, retrato, eu, ordem, saiu }: {
         );
       })}
     </div>
+  );
+}
+
+/**
+ * O lugar na classificação. Pódio ganha medalha desenhada; o resto, o número.
+ *
+ * A medalha é SVG e não emoji: 🥇 muda de desenho a cada plataforma e some em
+ * fonte que não tem o glifo. E ela nunca substitui o número — o algarismo fica
+ * DENTRO da medalha, então quem não distingue ouro de bronze lê a posição do
+ * mesmo jeito (RNF-031: cor nunca é o único canal).
+ */
+function Posicao({ lugar }: { lugar: number }) {
+  if (lugar > 3) {
+    return (
+      <span style={{
+        width: 18, textAlign: 'center', color: 'var(--texto-apagado)',
+        fontVariantNumeric: 'tabular-nums', fontSize: 11,
+      }}>
+        {lugar}
+      </span>
+    );
+  }
+
+  // Ouro, prata, bronze. Cores cruas mesmo: são metais, não papéis do tema, e
+  // não mudam com ele.
+  const { aro, corpo, tinta } = [
+    { aro: '#f0c75e', corpo: '#c8952b', tinta: '#3a2708' },
+    { aro: '#dfe3e8', corpo: '#a8adb6', tinta: '#2b2f36' },
+    { aro: '#dc9a63', corpo: '#a4663a', tinta: '#33200f' },
+  ][lugar - 1]!;
+
+  return (
+    <svg
+      width="18" height="18" viewBox="0 0 18 18"
+      style={{ flexShrink: 0, display: 'block' }}
+      role="img"
+      aria-label={`${lugar}º lugar`}
+    >
+      <circle cx="9" cy="9" r="8" fill={corpo} stroke={aro} strokeWidth="1.5" />
+      <text
+        x="9" y="9" fill={tinta} fontSize="9" fontWeight="700"
+        textAnchor="middle" dominantBaseline="central"
+      >
+        {lugar}
+      </text>
+    </svg>
   );
 }
 

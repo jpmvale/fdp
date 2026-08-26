@@ -207,3 +207,12 @@ input:focus { border-color: var(--acento); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* A barra pulsa quando o tempo aperta — e só para quem está na vez.
+   É o segundo canal do aviso sonoro: quem joga sem som continua avisado
+   (RNF-031, cor nunca é o único canal — aqui há cor, movimento e o som). */
+@keyframes barra-pulsa {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+.barra-apertando { animation: barra-pulsa 520ms ease-in-out infinite; }

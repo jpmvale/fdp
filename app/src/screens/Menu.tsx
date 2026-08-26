@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Folha } from '../components/Folha';
 import { Regras } from './Regras';
 import { Log } from './Log';
+import { alternarSom, somLigado } from '../som';
 import type { PlayerView, Retrato } from '../state/tipos';
 
 /**
@@ -24,6 +25,7 @@ export function Menu({ retrato, partida, eu, aoFechar, aoSair, aoEncerrar }: {
 }) {
   const [aba, setAba] = useState<'log' | 'regras'>(partida ? 'log' : 'regras');
   const [confirmando, setConfirmando] = useState(false);
+  const [som, setSom] = useState(somLigado);
 
   const emPartida = partida !== null && partida.endReason === null;
 
@@ -59,6 +61,20 @@ export function Menu({ retrato, partida, eu, aoFechar, aoSair, aoEncerrar }: {
           : <Regras />}
 
         <button onClick={aoFechar}>Voltar para a mesa</button>
+
+        {/* O som promete ser desligável desde que existe, e não tinha onde.
+            Fica aqui, junto do resto das opções da mesa, e não num ícone
+            solto: é ajuste, não ação de jogo. O rótulo diz o ESTADO atual e o
+            `aria-pressed` repete isso para quem usa leitor de tela — botão que
+            só diz "Som" deixa a pessoa adivinhar se está ligando ou
+            desligando. */}
+        <button
+          className="fantasma"
+          aria-pressed={som}
+          onClick={() => setSom(alternarSom())}
+        >
+          {som ? 'Avisos sonoros: ligados' : 'Avisos sonoros: desligados'}
+        </button>
 
         {/* Sair no meio da partida é RETIRADA (RJ-154): as cartas e as vidas
             vão embora e a rodada é refeita sem a pessoa. Por isso o segundo

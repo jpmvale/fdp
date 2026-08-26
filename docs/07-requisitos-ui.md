@@ -93,6 +93,23 @@ consultada do jogo e **DEVE** ser legível de relance, sem contas mentais.
   mão" e, se aplicável, "{nome} puxa a próxima" (RJ-086). Empate silencioso gera a impressão
   de bug.
 
+| ID | Requisito |
+|---|---|
+| RF-050 | O assento de quem **inicia a mão** aberta **DEVE** estar marcado na mesa — quem abre a aposta (RJ-038) na fase de apostas, o líder da vaza (RJ-065) na fase de vazas. Muda de assento a cada mão. |
+| RF-051 | Fora da própria vez, tocar numa carta **DEVE** engatilhá-la: ela sai sozinha assim que a vez chegar, sem segundo toque. O engatilhamento **DEVE** ser visível na carta e desfeito por outro toque. |
+| RF-052 | O gatilho de RF-051 vale para a **mão em que foi armado**, e só. Mudou a rodada ou a vaza, ele é descartado sem enviar nada. |
+| RF-053 | Restando **uma** carta na mão, ela **DEVE** sair sozinha — não há escolha a fazer. Mas com pausa de 1,5 a 3 s antes, para a mesa acompanhar; a interface diz que a carta sai sozinha em vez de oferecer botão. |
+| RF-054 | A rodada encerrada por RJ-014 **DEVE** ser anunciada ("já está decidido — as mãos que faltam não mudam nada"). Partida que acaba com cartas na mão de todo mundo, sem explicação, é lida como defeito. |
+
+RF-051 a RF-053 são **comodidade de cliente, nunca regra**: tudo o que fazem, o auto-play do
+servidor faria igual quando o prazo vencesse (`02` §3.7). Quem fechar a aba no meio não é
+prejudicado — e é isso que autoriza a decisão a morar no cliente.
+
+RF-052 nasceu de um defeito que não dá erro em lugar nenhum: guardando só o `cardId`, um
+gatilho esquecido volta a casar depois, porque o baralho é redistribuído a cada rodada e o
+mesmo id reaparece noutra mão. A carta sairia sozinha sem ninguém ter escolhido, o servidor
+aceitaria, e o jogador só descobriria olhando a mesa.
+
 #### Rodada de 1 carta (testa)
 
 Esta é a tela mais distintiva do jogo e a mais fácil de errar.
@@ -135,10 +152,35 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 - Transição de rodada **DEVE** ter pausa deliberada de 3 s (`03` §4) para que o resultado seja
   legível antes de a tela mudar.
 
+| ID | Requisito |
+|---|---|
+| RF-055 | A barra de tempo **DEVE** nascer cheia em **qualquer** prazo e esvaziar proporcionalmente à duração daquele prazo, e não a uma duração fixa. O cliente recebe só o instante final; a duração se deduz do maior restante já visto. |
+| RF-056 | A chegada da própria vez **DEVE** ter aviso sonoro, tocado na **transição** e não enquanto a vez dura. Mesa pausada não avisa. |
+| RF-057 | O tempo acabando **DEVE** ter aviso próprio no último quarto do prazo, com frequência crescente — som **e** pulso visual na barra, nunca só um dos dois (RNF-031). Só para quem está na vez: os outros veriam pressão que não é deles. |
+| RF-058 | O áudio **DEVE** ser armado no **primeiro gesto** do jogador (toque ou tecla) e **DEVE** ter interruptor visível no menu ☰, cujo rótulo diz o estado atual. A escolha sobrevive a recarregar a página. |
+
+RF-055 corrige um erro que passava por decoração: a barra normalizava sempre pelo prazo da
+aposta (45 s), então a vez de jogar carta (30 s) nascia em 67% e a vez de um bot (900 ms)
+nascia em 2%. Ela praticamente nunca começava cheia, e a pressa que ela comunicava era falsa.
+
+RF-058 é o que faz RF-056 e RF-057 existirem de fato. Áudio preparado fora de um gesto nasce
+`suspended` e nunca soa, **sem erro nenhum no console** — o jogo parece ter som e não tem. E
+"desligável" só vale com um controle na tela: sem ele a promessa é do código, não do jogador.
+
+O som de RF-056 e RF-057 **NÃO PODE** tocar antes de um gesto do usuário — navegador nenhum
+permite — e **DEVE** ser desligável. Ele nunca é o único canal: RF-057 exige o pulso na barra
+junto, e RF-050 a RF-054 são todos visíveis por conta própria.
+
 ### 2.5 Fim de partida (`/sala/{code}/fim`)
 
 - Classificação final: vencedor no topo; eliminados em ordem inversa de queda, desempatados
   por `mortoEmVaza` decrescente (RJ-012); **retirados por ausência abaixo de todos** (RJ-129).
+  A ordem **DEVE** vir da classificação do motor, não ser recalculada na tela: ordenar por
+  vidas restantes empata todos os eliminados em zero e devolve a ordem de assento, com o
+  primeiro a cair aparecendo em segundo lugar.
+- Pódio: 1º, 2º e 3º **DEVEM** ter medalha desenhada, com o **algarismo dentro dela** — a cor
+  do metal nunca é o único canal (RNF-031), e emoji de medalha muda de desenho a cada
+  plataforma e some em fonte que não tenha o glifo.
 - Vitória por RJ-005 **DEVE** ser explicada, não só exibida: "todos caíram na rodada 9 — Caio
   segurou a última vida até a vaza 7". Sem isso o resultado parece arbitrário.
 - Empate de RJ-010 mostra os vencedores lado a lado.

@@ -153,6 +153,7 @@ export function Feltro({ retrato, eu, partida }: {
               x={x}
               y={y}
               carta={cartaDoAssento(partida, id, souEu)}
+              puxa={id === puxadorDaMao(partida)}
               perdeu={perdasRecentes[id] ?? 0}
             />
           </div>
@@ -211,6 +212,19 @@ const somaDeApostas = (partida: PlayerView) =>
   Object.values(partida.bets).reduce((a, b) => a + b, 0);
 
 /**
+ * Quem começa a mão que está aberta.
+ *
+ * Na fase de vazas é o líder da vaza corrente (RJ-065: quem levou a anterior
+ * puxa a seguinte). Na aposta, é quem abre a rodada. Sem isso a mesa não tem
+ * como saber de quem parte a mão — e é informação que muda a decisão de quem
+ * joga por último.
+ */
+export function puxadorDaMao(partida: PlayerView): string | null {
+  if (partida.phase === 'APOSTAS') return partida.firstBidderId;
+  return partida.currentTrick?.leaderId ?? null;
+}
+
+/**
  * Que carta esse assento mostra: **só** a da testa, na rodada de 1 carta.
  *
  * A carta de testa não é uma carta jogada — está na cabeça da pessoa, à vista
@@ -232,7 +246,7 @@ function cartaDoAssento(partida: PlayerView, id: string, souEu: boolean) {
   return { mostra: true, carta: partida.foreheadCards[id] ?? null };
 }
 
-function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta, perdeu }: {
+function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta, perdeu, puxa }: {
   jogador: PublicPlayer;
   partida: PlayerView;
   souEu: boolean;
@@ -241,6 +255,8 @@ function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta, perdeu
   x: number;
   y: number;
   carta: { mostra: boolean; carta: import('@fdp/rules').Card | null };
+  /** Puxa esta mão: joga primeiro, e a legenda gira com o puxador (RJ-065). */
+  puxa: boolean;
   /** Vidas que acabaram de ser debitadas: caem do próprio contador. */
   perdeu: number;
 }) {
@@ -318,8 +334,11 @@ function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta, perdeu
         </span>
       </div>
 
-      {(ausente || condenado || ehHost) && (
+      {(ausente || condenado || ehHost || puxa) && (
         <div style={{ display: 'flex', gap: 4, fontSize: 9, color: 'var(--texto-fraco)' }}>
+          {/* Quem puxa vem primeiro na linha: é o que muda a leitura da mão em
+              curso, e gira a cada mão (RJ-065). */}
+          {puxa && <span style={{ color: 'var(--acento-claro)' }}>↳ inicia a mão</span>}
           {ehHost && <span>host</span>}
           {ausente && <span style={{ color: 'var(--vidas)' }}>✕ caiu</span>}
           {condenado && <span>☠ já era</span>}
