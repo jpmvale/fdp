@@ -425,6 +425,7 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-383 | E | RF-077 | **Dado** provedores configurados, **então** cada botão de SSO traz a marca do provedor, servida da própria origem |
 | CA-384 | U | RNF-016 | **Dado** uma mensagem aceita, **quando** a mesma pessoa manda outra antes de 1 s, **então** é recusada com `RAPIDO_DEMAIS`, nada é publicado, e a recusa **não** move o prazo; no prazo exato passa, e o limite não alcança as outras pessoas da mesa |
 | CA-385 | U | RF-079 | **Dado** uma mensagem no teto de RNF-014, **então** o balão mostra no máximo 70 caracteres mais reticências, cortando no fim de uma palavra quando sobra mensagem para isso |
+| CA-391 | U | RF-070 | **Dado** uma foto de celular moderno — 48, 50 ou 108 MP —, **então** entra e sai 256×256 WebP; o teto de pixels barra a bomba de descompressão logo acima dele, e não a câmera de ninguém |
 | CA-388 | U | RF-070 | **Dado** um AVIF, **então** entra como qualquer outra foto e sai 256×256 WebP |
 | CA-389 | U | RF-070 | **Dado** um HEIC — a foto padrão do iPhone —, **então** é recusado com `HEIC_NAO_SUPORTADO` e a frase diz como mandar em JPEG; MP4 e MOV, que usam a mesma caixa `ftyp`, continuam caindo em `NAO_E_IMAGEM` |
 | CA-390 | I | RNF-017 | **Dado** vários envios de foto seguidos, **então** eles gastam o orçamento **do avatar**, contado por conta, e não o de cadastro por IP — criar conta continua possível do mesmo endereço |

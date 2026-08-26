@@ -3,6 +3,8 @@
 Status: **ENTREGUE** · Aberto em 26/08/2026 · P11 emendada em 26/08/2026 · F1 a F5
 concluídas em 26/08/2026
 
+O armazenamento das fotos que este plano criou continua no [plano 02](02-armazenamento-de-avatares.md).
+
 O que este plano propôs está em produção. Ele fica aqui como registro do porquê de cada
 decisão; o que virou norma vive em `00` §5 (P11), `04`, `07` e `10`.
 

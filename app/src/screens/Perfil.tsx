@@ -1,11 +1,14 @@
 import { useRef, useState } from 'react';
 import {
-  AVATAR_COLORS, AVATAR_EMOJIS, NICKNAME_MAX, NICKNAME_MIN,
+  AVATAR_COLORS, AVATAR_EMOJIS, LIMITS, NICKNAME_MAX, NICKNAME_MIN,
   type Avatar as AvatarProto,
 } from '@fdp/protocol';
 import { Avatar } from '../components/Avatar';
 import type { PublicPlayer } from '../state/tipos';
 import { enviarAvatar, removerAvatar, ErroApi } from '../net/sessao';
+
+/** O teto em MB, para a frase — derivado do número, nunca escrito ao lado dele. */
+const TETO_EM_MB = Math.round(LIMITS.avatarBytesMax / (1024 * 1024));
 
 /**
  * Perfil: quem você é na mesa.
@@ -229,10 +232,11 @@ function FotoDoAvatar({ atual, aoTrocar }: {
     if (!arquivo) return;
     setErro(null);
 
-    // Recusa aqui o que o servidor recusaria de qualquer jeito: subir 20 MB
-    // pelo 4G para receber 413 no fim é gastar o dado da pessoa à toa.
-    if (arquivo.size > 5 * 1024 * 1024) {
-      setErro('A imagem passa de 5 MB.');
+    // Recusa aqui o que o servidor recusaria de qualquer jeito: subir um
+    // arquivo enorme pelo 4G para receber 413 no fim é gastar o dado da pessoa
+    // à toa. O teto é o MESMO dos dois lados, de `@fdp/protocol`.
+    if (arquivo.size > LIMITS.avatarBytesMax) {
+      setErro(`A imagem passa de ${TETO_EM_MB} MB.`);
       return;
     }
 
@@ -295,7 +299,7 @@ function FotoDoAvatar({ atual, aoTrocar }: {
 /** Cada motivo do servidor vira uma frase que diz o que fazer. */
 function mensagemDaFoto(codigo: string): string {
   switch (codigo) {
-    case 'GRANDE_DEMAIS': return 'A imagem passa de 5 MB.';
+    case 'GRANDE_DEMAIS': return `A imagem passa de ${TETO_EM_MB} MB.`;
     case 'NAO_E_IMAGEM': return 'Esse arquivo não é uma imagem (JPEG, PNG, WebP, AVIF ou GIF).';
     // É imagem, e é a que o iPhone tira por padrão. A frase diz o que fazer,
     // porque "não é uma imagem" seria falso e não levaria a lugar nenhum.

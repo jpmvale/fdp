@@ -318,6 +318,16 @@ export const LIMITS = {
   maxSpectators: 4,
   /** RNF-013: reenvio do mesmo `id` é idempotente nesta janela. */
   idempotencyWindowMs: 30_000,
+  /**
+   * RF-070: teto de bytes da foto de avatar.
+   *
+   * Vive aqui, e não só no servidor, porque as duas pontas precisam do MESMO
+   * número: o cliente recusa cedo para não gastar o 4G de alguém subindo um
+   * arquivo que vai voltar 413, e o servidor recusa de verdade. Estavam
+   * escritos à mão nos dois lados, com "5 MB" em três lugares — e quando o
+   * teto do servidor subiu, o cliente teria continuado barrando em 5.
+   */
+  avatarBytesMax: 25 * 1024 * 1024,
   /** RNF-014: tamanho da mensagem de chat, depois de aparada. */
   chatTextMax: 280,
   /**

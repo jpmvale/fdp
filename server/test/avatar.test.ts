@@ -13,6 +13,46 @@ import sharp from 'sharp';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { arquivoDoCaminho, processarAvatar, TAMANHO_MAX } from '../src/avatar.js';
 
+/**
+ * Uma bomba de descompressão em duzentos bytes.
+ *
+ * Gera um PNG minúsculo de verdade e reescreve APENAS a largura e a altura no
+ * IHDR, refazendo o CRC do chunk para o arquivo continuar válido. O resultado
+ * é um cabeçalho honesto prometendo uma imagem gigantesca — que é precisamente
+ * o que `limitInputPixels` existe para barrar, e o que um atacante enviaria.
+ *
+ * Gerar a imagem grande de verdade custaria segundos de CPU por teste e não
+ * exercitaria nada a mais: o limite é conferido pelo cabeçalho, antes de
+ * qualquer pixel ser lido.
+ */
+const TABELA_CRC = (() => {
+  const t = new Int32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) !== 0 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c;
+  }
+  return t;
+})();
+
+function crc32(b: Buffer): number {
+  let c = ~0;
+  for (const x of b) c = TABELA_CRC[(c ^ x) & 0xff]! ^ (c >>> 8);
+  return ~c >>> 0;
+}
+
+async function bombaDeCabecalho(largura: number, altura: number): Promise<Buffer> {
+  const base = await sharp({ create: { width: 64, height: 64, channels: 3, background: '#ffffff' } })
+    .png().toBuffer();
+  const forjado = Buffer.from(base);
+  // 8 bytes de assinatura + 4 de tamanho + 4 do tipo `IHDR`, então largura e altura.
+  forjado.writeUInt32BE(largura, 16);
+  forjado.writeUInt32BE(altura, 20);
+  // O CRC do chunk cobre o tipo e os 13 bytes de dados, e vem logo depois deles.
+  forjado.writeUInt32BE(crc32(forjado.subarray(12, 12 + 4 + 13)), 12 + 4 + 13);
+  return forjado;
+}
+
 let dir: string;
 
 beforeEach(async () => {
@@ -87,6 +127,34 @@ describe('o caminho feliz', () => {
     ];
     for (const bytes of formatos) {
       expect((await processarAvatar(bytes, { diretorio: dir })).ok).toBe(true);
+    }
+  });
+
+  /**
+   * O teto de pixels recusava TODA foto de celular moderno.
+   *
+   * Ele estava em 4096² = 16,7 MP, escolhido por suposição sobre o custo de
+   * decodificar. iPhone 14 Pro em diante tira 48 MP; Android de topo, 50, 108
+   * ou 200 MP. A pessoa lia *"essa imagem tem pixels demais"* sobre a foto que
+   * a câmera dela produz por padrão.
+   */
+  it('CA-391: foto de celular moderno entra — 48, 50 e 108 MP', { timeout: 60_000 }, async () => {
+    // Só as dimensões importam aqui; o conteúdo é irrelevante para o teto.
+    const camaras: [string, number, number][] = [
+      ['iPhone 48MP', 8064, 6048],
+      ['Android 50MP', 8160, 6120],
+      ['Android 108MP', 12000, 9000],
+    ];
+
+    for (const [nome, w, h] of camaras) {
+      const foto = await sharp({ create: { width: w, height: h, channels: 3, background: '#8a5a2b' } })
+        .jpeg({ quality: 80 })
+        .toBuffer();
+
+      const r = await processarAvatar(foto, { diretorio: dir });
+      expect(r.ok, `${nome} (${w}×${h}) devia entrar`).toBe(true);
+      if (!r.ok) continue;
+      expect((await sharp(join(dir, `${r.hash}.webp`)).metadata()).width).toBe(256);
     }
   });
 
@@ -175,22 +243,25 @@ describe('CA-370: o que NÃO entra', () => {
   /**
    * A bomba de descompressão, que o teto de BYTES não pega.
    *
-   * Um PNG branco de 20 000 × 20 000 cabe em poucos KB e vira 400 milhões de
-   * pixels ao decodificar. Sem `limitInputPixels`, o processo morre por
-   * memória — e é o mesmo processo que está servindo as partidas.
+   * Um PNG que DECLARA 20 000 × 20 000 vira 400 milhões de pixels ao
+   * decodificar. Sem `limitInputPixels`, o processo morre por memória — e é o
+   * mesmo processo que está servindo as partidas.
+   *
+   * A bomba aqui é **forjada no cabeçalho**, não gerada. As duas versões
+   * anteriores geravam uma imagem enorme de verdade: 20 000² custava segundos
+   * de CPU e empurrou o CA-209 (um teste estatístico noutro pacote) para fora
+   * do timeout do vitest; 8 000² era barata mas ficou ABAIXO do teto novo, e o
+   * teste passou a provar o contrário do que queria.
+   *
+   * Reescrever só o IHDR resolve as duas coisas. São 200 bytes, custa nada, e
+   * é mais fiel ao ataque: quem monta uma bomba de descompressão está
+   * exatamente fabricando um cabeçalho que promete mais do que entrega.
    */
   it('bomba de descompressão é recusada, e o processo sobrevive', async () => {
-    // 8000×8000 são 64 milhões de pixels — quase 4× o teto de 4096². Já foi
-    // 20 000², e era bomba demais: gerar a imagem custava segundos de CPU e
-    // empurrou o CA-209 (um teste estatístico de 2,3 s, noutro pacote) para
-    // fora do timeout de 5 s do vitest. Um teste que derruba o vizinho é pior
-    // que nenhum — ensina a rodar de novo até passar.
-    const bomba = await sharp({
-      create: { width: 8_000, height: 8_000, channels: 3, background: '#ffffff' },
-      limitInputPixels: false,
-    }).png({ compressionLevel: 9 }).toBuffer();
+    const bomba = await bombaDeCabecalho(20_000, 20_000);
 
-    // Cabe folgado no teto de bytes: é exatamente esse o truque.
+    // 400 MP declarados em duzentos bytes: é exatamente esse o truque.
+    expect(bomba.length).toBeLessThan(1_000);
     expect(bomba.length).toBeLessThan(TAMANHO_MAX);
 
     const r = await processarAvatar(bomba, { diretorio: dir });
@@ -200,6 +271,14 @@ describe('CA-370: o que NÃO entra', () => {
     // E o processo continua vivo o bastante para atender o próximo.
     expect((await processarAvatar(await png(300, 300), { diretorio: dir })).ok).toBe(true);
   }, 30_000);
+
+  it('logo acima do teto é recusado, e logo abaixo entra', async () => {
+    // A fronteira em si: 16 000² é o teto, então 16 001² não passa. Serve para
+    // o dia em que alguém mexer no número achando que ninguém está olhando.
+    const acima = await processarAvatar(await bombaDeCabecalho(16_001, 16_001), { diretorio: dir });
+    expect(acima.ok).toBe(false);
+    if (!acima.ok) expect(acima.motivo).toBe('IMAGEM_ABSURDA');
+  });
 
   it('JPEG truncado no meio não derruba nada', async () => {
     const inteiro = await sharp({

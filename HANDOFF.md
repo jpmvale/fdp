@@ -478,11 +478,66 @@ container, não de código. **AVIF entra** (CA-388).
 A lista de marcas é fechada contra vídeo: a mesma caixa `ftyp` embrulha MP4 e
 MOV, e aceitar a caixa em vez das marcas abriria o decodificador para eles.
 
+## O teto que recusava toda foto de celular (26/08/2026)
+
+Depois dos dois consertos de avatar da seção anterior, o envio **continuava
+falhando** — e desta vez para quase todo mundo.
+
+`PIXELS_MAX` estava em 4096² = **16,7 MP**. iPhone 14 Pro em diante tira 48 MP;
+Android de topo, 50, 108 ou 200 MP. A pessoa tirava a foto, escolhia o arquivo e
+lia *"essa imagem tem pixels demais. Reduza antes de enviar"* — sobre a foto que
+a câmera dela produz por padrão. Só 12 MP passava. O teto de bytes, 5 MB, era
+apertado pelo mesmo motivo: um JPEG de 12 MP sai entre 3 e 8 MB.
+
+O teto existia contra a bomba de descompressão, e a bomba é real. O problema é
+que o número veio de uma conta ingênua — largura × altura × 4 bytes — que **não
+descreve como o `libvips` funciona**. Medido:
+
+| Entrada | Tempo | RSS |
+|---|---|---|
+| JPEG 108 MP (foto de 4 MB) | 95 ms | +9 MB |
+| PNG chapado 64 MP (bomba) | 71 ms | +41 MB |
+| PNG chapado 256 MP (bomba) | 249 ms | +45 MB |
+
+O `libvips` processa em **tiles** e nunca segura o bitmap inteiro — 256 MP
+custam 45 MB, não o gigabyte e meio da multiplicação. E o JPEG tem
+**shrink-on-load**: pedindo 256 px de saída, o decodificador lê em escala
+reduzida, e a foto de 108 MP sai **mais barata que a bomba de 64 MP**.
+
+O teto quase não separava o caro do barato. Separava fotos reais de fotos reais.
+
+> Um limite que existe para conter um ataque precisa ser medido contra o ataque
+> **e** contra o uso legítimo. Este não foi medido contra nenhum dos dois.
+
+Agora: 16 000² = 256 MP, 25 MB de bytes, e o teto de bytes mora em
+`LIMITS.avatarBytesMax` — o cliente repetia "5 MB" em três lugares, e era assim
+que ele ficaria para trás quando o servidor subisse.
+
+### A bomba do teste agora é forjada, não gerada
+
+O teste da bomba gerava uma imagem enorme de verdade. A primeira versão, 20 000²,
+custava segundos de CPU e derrubou o CA-209 (§"Um teste derrubou o vizinho"). A
+segunda, 8 000², era barata — e ficou **abaixo do teto novo**, então passou a
+provar o contrário do que queria.
+
+A terceira reescreve só a largura e a altura no **IHDR** de um PNG minúsculo,
+refazendo o CRC do chunk. São 200 bytes declarando 400 MP, custa nada, e é mais
+fiel ao ataque: quem monta uma bomba de descompressão está exatamente fabricando
+um cabeçalho que promete mais do que entrega. O arquivo de testes de avatar
+inteiro caiu para ~1 s.
+
+Junto foi um teste de fronteira (16 001² recusado), para o dia em que alguém
+mexer no número achando que ninguém está olhando.
+
 ## O que fazer a seguir
 
-O [plano 01](docs/plans/01-contas-perfis-e-historico.md) **está entregue** (F1–F5, 26/08/2026)
-e não há plano aberto. O que sobrou é o **M4 de `12`, que é a definição de "entregue"** — e é
-onde mora quase todo o trabalho restante.
+O [plano 01](docs/plans/01-contas-perfis-e-historico.md) **está entregue** (F1–F5, 26/08/2026).
+Há um plano **aberto**: o [plano 02](docs/plans/02-armazenamento-de-avatares.md), que tira as
+fotos do volume do container e as põe no R2. O gatilho dele é simples e não é arquitetura — **os
+avatares não têm backup nenhum**, enquanto o Postgres tem dump diário e restauração testada.
+
+Fora isso, o que sobrou é o **M4 de `12`, que é a definição de "entregue"** — e é onde mora
+quase todo o trabalho restante.
 
 ### Dívida de verdade
 

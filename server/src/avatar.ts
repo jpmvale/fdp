@@ -14,19 +14,56 @@ import { createHash } from 'node:crypto';
 import { mkdir, writeFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import sharp from 'sharp';
+import { LIMITS } from '@fdp/protocol';
 
-/** Cabe uma foto de celular com folga; não cabe um vídeo disfarçado. */
-export const TAMANHO_MAX = 5 * 1024 * 1024;
+/**
+ * Cabe uma foto de celular com folga; não cabe um vídeo disfarçado.
+ *
+ * Eram 5 MB, e "com folga" era falso: um JPEG de 12 MP sai entre 3 e 8 MB, e o
+ * de 48 MP passa disso sozinho. O teto foi escolhido imaginando a foto, não
+ * medindo uma.
+ *
+ * O número mora em `@fdp/protocol` porque o cliente também precisa dele — ele
+ * recusa cedo para não gastar o 4G de alguém subindo o que vai voltar 413. Um
+ * de cada lado, escritos à mão, é como o teto do servidor subiria e o do
+ * cliente ficaria para trás.
+ */
+export const TAMANHO_MAX = LIMITS.avatarBytesMax;
 
 /**
  * Teto de pixels na DECODIFICAÇÃO, que é diferente do teto de bytes.
  *
- * Um PNG de 50 000 × 50 000 cabe em poucos KB — é uma imagem em branco, e o
- * formato comprime isso a quase nada. Ao decodificar viram 2,5 bilhões de
- * pixels e o processo morre por memória. É a bomba de descompressão, e o teto
- * de 5 MB não a pega: só este pega.
+ * A bomba de descompressão é real: um PNG branco de 50 000 × 50 000 cabe em
+ * poucos KB, porque o formato comprime uma imagem chapada a quase nada. O teto
+ * de bytes não a pega, e este pega.
+ *
+ * **Mas ele estava em 4096² = 16,7 MP, e isso recusava toda foto de celular
+ * moderno.** iPhone 14 Pro em diante tira 48 MP; Android de topo, 50, 108 ou
+ * 200 MP. A pessoa tirava a foto, escolhia, e lia *"essa imagem tem pixels
+ * demais"* — sobre a foto que a câmera dela produz por padrão. Só 12 MP
+ * passava.
+ *
+ * O teto antigo vinha de uma suposição sobre o custo, não de uma medição. Medido
+ * (macOS, libvips 8.18, redimensionando para 256):
+ *
+ * | entrada                    | tempo  | RSS   |
+ * |---|---|---|
+ * | JPEG 108 MP (foto de 4 MB) |  95 ms |  +9 MB |
+ * | PNG chapado 64 MP (bomba)  |  71 ms | +41 MB |
+ * | PNG chapado 256 MP (bomba) | 249 ms | +45 MB |
+ *
+ * Duas coisas que a suposição errou. O `libvips` processa em **tiles** e nunca
+ * segura o bitmap inteiro — por isso a bomba de 256 MP custa 45 MB, e não os
+ * gigabytes que a conta ingênua de largura × altura × 4 daria. E no JPEG existe
+ * **shrink-on-load**: pedindo 256 px de saída, o decodificador lê em escala
+ * reduzida e a foto de 108 MP sai mais barata que a bomba de 64 MP.
+ *
+ * Ou seja: o teto de pixels quase não separava o caro do barato — separava
+ * fotos reais de fotos reais. 256 MP cobre qualquer câmera que exista com
+ * folga larga, e o custo medido no pior caso continua sendo um quarto de
+ * segundo e 45 MB.
  */
-const PIXELS_MAX = 4096 * 4096;
+const PIXELS_MAX = 16_000 * 16_000;
 
 /** O que a mesa mostra, e o dobro para tela densa. */
 const LADO = 256;
