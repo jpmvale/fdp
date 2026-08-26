@@ -10,7 +10,7 @@ import { Feltro } from '../components/Feltro';
 import { Vidas } from '../components/Vidas';
 import type { Retrato, PlayerView } from '../state/tipos';
 
-export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoApostar, aoJogar, aoAbrirRegras, aoEnviarChat, preJogada, aoPreJogar }: {
+export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoApostar, aoJogar, aoAbrirRegras, aoEnviarChat, preJogada, aoPreJogar, aoAbrirPerfil }: {
   retrato: Retrato;
   eu: string;
   partida: PlayerView;
@@ -22,6 +22,7 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
   aoEnviarChat: (texto: string) => void;
   preJogada: string | null;
   aoPreJogar: (id: string | null) => void;
+  aoAbrirPerfil?: ((slug: string) => void) | undefined;
 }) {
   const nome = (id: string) => retrato.players.find((p) => p.id === id)?.nickname ?? '—';
 
@@ -38,7 +39,7 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
 
       {partida.isForeheadRound && <FaixaTesta />}
 
-      <Feltro retrato={retrato} eu={eu} partida={partida} />
+      <Feltro retrato={retrato} eu={eu} partida={partida} aoAbrirPerfil={aoAbrirPerfil} />
 
       {!partida.isForeheadRound && <EmpateNaVaza partida={partida} />}
 

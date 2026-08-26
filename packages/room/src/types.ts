@@ -55,6 +55,14 @@ export interface RoomPlayer {
    * (I-2). Ela é um campo a mais no jogador da SALA, e só.
    */
   conta: string | null;
+  /**
+   * O id INTERNO da conta. Nunca sai para o cliente — só o `conta` (slug) sai.
+   *
+   * Existe porque o histórico grava por chave estrangeira, e o slug não é
+   * chave: ele é um endereço, e endereço pode mudar de dono num futuro em que
+   * alguém apague a conta e outra pessoa escolha o mesmo apelido.
+   */
+  contaId: string | null;
 }
 
 export interface PauseState {
@@ -110,6 +118,8 @@ export interface JoinParams {
   avatar: Avatar;
   /** Slug da conta, quando quem entra está logado. */
   conta?: string | null;
+  /** Id interno da conta. NÃO vai para a projeção — ver `RoomPlayer`. */
+  contaId?: string | null;
 }
 
 export function toPublicPlayer(player: RoomPlayer): PublicPlayer {

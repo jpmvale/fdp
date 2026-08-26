@@ -18,7 +18,7 @@ import {
   type RoomCtx,
   type RoomResult,
 } from '@fdp/room';
-import type { PlayerId } from '@fdp/rules';
+import type { MatchState, PlayerId } from '@fdp/rules';
 import type { Persistence } from './persistence.js';
 
 export interface Hub {
@@ -45,16 +45,29 @@ export interface HubOptions {
   now?: () => number;
   randomSeed: () => string;
   newId?: () => string;
+  /**
+   * Chamado quando uma partida termina, com a sala já no estado final.
+   *
+   * É por aqui que o histórico é gravado (plano 01 §9). Fica como gancho, e
+   * não como chamada direta, porque o hub não pode aprender o que é conta —
+   * ele entrega eventos e agenda relógios.
+   *
+   * **Não pode derrubar a partida.** Ver `settle`.
+   */
+  onFimDePartida?: (room: Room, estado: MatchState) => void;
 }
 
 export function createHub({
   persistence,
   now = Date.now,
   randomSeed,
+  onFimDePartida,
   newId = randomUUID,
 }: HubOptions): Hub {
   const rooms = new Map<string, Room>();
   const sockets = new Map<string, Map<PlayerId, WebSocket>>();
+  /** Partidas já registradas, por sala. Ver o `settle`. */
+  const gravadas = new Map<string, string>();
 
   const send: Hub['send'] = (socket, event, stateVersion) => {
     if (!socket || socket.readyState !== socket.OPEN) return;
@@ -75,6 +88,7 @@ export function createHub({
 
   /** Sala encerrada some do processo e do store: não volta num reinício. */
   const retire = (code: string): void => {
+    gravadas.delete(code);
     rooms.delete(code);
     sockets.delete(code);
     persistence.forget(code);
@@ -83,6 +97,31 @@ export function createHub({
   const settle = (room: Room, emissions: Emission[]): void => {
     rooms.set(room.code, room);
     deliver(room, emissions);
+
+    /**
+     * Fim de partida: o histórico é gravado aqui, e o `try` não é decoração.
+     *
+     * RF-071 — falha ao gravar NÃO afeta a partida. Histórico é registro, não
+     * jogo: com o Postgres fora do ar, a mesa termina normalmente e o que se
+     * perde é uma linha no perfil de alguém. Deixar a exceção subir daqui
+     * derrubaria a entrega dos eventos e a mesa junto, trocando uma falha
+     * pequena por uma grande.
+     */
+    if (onFimDePartida && room.match && room.match.endReason !== null) {
+      const jaGravada = gravadas.get(room.code);
+      // A mesma partida passa por `settle` mais de uma vez — o encerramento
+      // emite, e o relógio ainda anda depois. Sem esta marca, a partida
+      // entraria no histórico duas vezes.
+      if (jaGravada !== room.match.id) {
+        gravadas.set(room.code, room.match.id);
+        try {
+          onFimDePartida(room, room.match);
+        } catch (erro) {
+          console.error('falha ao registrar a partida no histórico:', erro);
+        }
+      }
+    }
+
     if (room.status === 'ENCERRADA') retire(room.code);
     else persistence.schedule(room);
   };

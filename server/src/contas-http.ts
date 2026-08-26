@@ -265,7 +265,32 @@ export function montarRotasDeConta(
     // D-4: público para quem tem o link, sem listagem nem busca. O que sai é
     // o que já aparece na mesa, mais o placar de vida inteira.
     const resumo = await dados.partidas.resumoDaConta(conta.id);
-    return c.json({ conta: contaPublica(conta), resumo });
+    const recentes = await dados.partidas.porConta(conta.id, { limite: 10 });
+
+    return c.json({
+      conta: contaPublica(conta),
+      resumo,
+      /**
+       * As partidas recentes, já reduzidas ao que a tela mostra.
+       *
+       * Não sai a partida inteira: ela carrega o apelido e o avatar de todo
+       * mundo que sentou, inclusive convidados, e um perfil público não é
+       * lugar de listar quem jogou com quem. O que sai é o desempenho de QUEM
+       * a página é sobre.
+       */
+      partidas: recentes.map((p) => {
+        const eu = p.jogadores.find((j) => j.contaId === conta.id);
+        return {
+          quando: p.terminouEm,
+          rodadas: p.rodadas,
+          jogadores: p.jogadores.length,
+          colocacao: eu?.colocacao ?? null,
+          nota: eu?.nota ?? null,
+          acertos: eu?.acertos ?? 0,
+          jogadas: eu?.jogadas ?? 0,
+        };
+      }),
+    });
   });
 }
 

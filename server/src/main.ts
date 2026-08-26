@@ -14,6 +14,7 @@ import { createHub, CLOSE_CODES } from './hub.js';
 import { createHttpApp } from './http.js';
 import type { Dados } from '@fdp/contas';
 import { configuracaoDoAmbiente } from './sso.js';
+import { registroDaPartida } from './historico.js';
 import { createPersistence } from './persistence.js';
 import { createSigner } from './session.js';
 import { attachWebSocket } from './ws.js';
@@ -92,6 +93,24 @@ async function main(): Promise<void> {
   const hub = createHub({
     persistence,
     randomSeed: () => randomBytes(16).toString('hex'), // RJ-144
+
+    /**
+     * O histórico (plano 01 §9). `void` deliberado: gravar é assíncrono e a
+     * partida NÃO espera por isso (RF-071).
+     *
+     * Sem banco, nada acontece e ninguém percebe — que é o comportamento
+     * certo. Histórico é registro, não jogo.
+     */
+    onFimDePartida: (room, estado) => {
+      if (!dados) return;
+      const registro = registroDaPartida(room, estado, Date.now());
+      if (!registro) return;
+
+      void dados.partidas.gravar(registro).catch((erro) => {
+        // Vira log, e não exceção: uma linha de perfil vale menos que a mesa.
+        console.error('falha ao gravar partida no histórico:', erro);
+      });
+    },
   });
 
   // RNF-061 / CA-046: as salas vivas voltam antes de aceitar conexão.

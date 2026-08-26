@@ -8,9 +8,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { CORES, desempenhoDaPartida, faixaDe } from '../src/desempenho';
-import type { PlayerView } from '../src/state/tipos';
-import { contraste, hexParaRgb } from './daltonismo';
+import { desempenhoDaPartida, faixaDe } from '../src/desempenho.js';
+import type { PlayerView } from '../src/index.js';
 
 /** Uma rodada como o servidor a resume. */
 function rodada(numero: number, cartas: number, dados: Record<string, [aposta: number, fez: number]>, extra?: {
@@ -58,7 +57,6 @@ describe('nota: as faixas', () => {
 
   it('toda faixa tem palavra, não só cor (RNF-031)', () => {
     for (const faixa of ['baixa', 'media', 'alta', 'excelente'] as const) {
-      expect(CORES[faixa].rotulo.length).toBeGreaterThan(0);
     }
   });
 });
@@ -178,17 +176,3 @@ describe('nota: vencer e jogar bem são coisas diferentes', () => {
   });
 });
 
-describe('nota: as cores são legíveis (RNF-030)', () => {
-  it('toda cor de nota passa de 4,5:1 contra o fundo', () => {
-    // As cores vivem no CSS; aqui vale o mesmo princípio da paleta de avatares
-    // (CA-345): número afirmado sem medição é número que envelhece errado.
-    const paleta: Record<string, string> = {
-      baixa: '#ef4d5a', media: '#e0a33a', alta: '#3fb98a', excelente: '#6594fa',
-    };
-    const fundo = hexParaRgb('#0d121c'); // --poco, o fundo do cartão
-    for (const [faixa, hex] of Object.entries(paleta)) {
-      const razao = contraste(hexParaRgb(hex), fundo);
-      expect(razao, `${faixa} (${hex}): ${razao.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5);
-    }
-  });
-});

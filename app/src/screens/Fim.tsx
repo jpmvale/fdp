@@ -1,6 +1,6 @@
 import { Avatar } from '../components/Avatar';
-import { CORES, desempenhoDaPartida } from '../desempenho';
-import { ranking } from '@fdp/rules';
+import { CORES } from '../desempenho';
+import { desempenhoDaPartida, numerosDaPartida, ranking } from '@fdp/rules';
 import type { EndReason } from '@fdp/rules';
 import type { Retrato, PlayerView } from '../state/tipos';
 
@@ -287,46 +287,4 @@ function Posicao({ lugar }: { lugar: number }) {
       </text>
     </svg>
   );
-}
-
-/**
- * O quanto cada um errou, rodada a rodada.
- *
- * A primeira versão desta tabela mostrava os TOTAIS de aposta e de mãos
- * feitas, e eles enganam: apostar 10 e fazer 10 na partida inteira parece
- * pontaria perfeita e pode ser o contrário — erra-se por 3 numa rodada, por 3
- * para o outro lado na seguinte, os totais fecham e o jogador perdeu 6 vidas
- * no caminho. Soma de aposta contra soma de mãos deixa os erros se cancelarem,
- * que é exatamente o que a vida perdida NÃO faz.
- *
- * O que substitui é o desvio: `|aposta − mãos feitas|` em cada rodada, que é a
- * conta que o jogo cobra (RJ-090). Mostrado como MÉDIA por rodada, e não como
- * total, porque quem caiu na rodada 3 jogou menos que quem chegou na 7 — um
- * total premiaria ser eliminado cedo.
- *
- * Rodada abortada (RJ-155) fica fora dos dois lados da conta: ela é refeita e
- * não debita ninguém, e contá-la puniria quem estava na mesa quando outra
- * pessoa caiu.
- */
-function numerosDaPartida(partida: PlayerView) {
-  const linhas = new Map<string, { erroMedio: number; pior: number; acertos: number; jogadas: number }>();
-
-  for (const id of partida.playerOrder) {
-    let desvio = 0, pior = 0, acertos = 0, jogadas = 0;
-
-    for (const r of partida.history) {
-      const aposta = r.bets[id];
-      if (aposta === undefined || r.aborted) continue;
-      jogadas++;
-      const feitas = r.tricksWon[id] ?? 0;
-      const erro = Math.abs(aposta - feitas);
-      desvio += erro;
-      if (erro > pior) pior = erro;
-      if (erro === 0) acertos++;
-    }
-
-    if (jogadas > 0) linhas.set(id, { erroMedio: desvio / jogadas, pior, acertos, jogadas });
-  }
-
-  return linhas;
 }

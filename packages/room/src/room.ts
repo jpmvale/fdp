@@ -118,6 +118,7 @@ function newPlayer(params: JoinParams, now: number, isSpectator: boolean): RoomP
     socketLostAt: null,
     bot: null,
     conta: params.conta ?? null,
+    contaId: params.contaId ?? null,
   };
 }
 
@@ -163,6 +164,7 @@ function newBot(
     // Bot nunca tem conta. Não é descuido: é o que impede uma mesa só de bots
     // de fazer uma partida entrar no histórico de alguém (RF-068).
     conta: null,
+    contaId: null,
   };
 }
 

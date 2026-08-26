@@ -421,9 +421,16 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-378 | I | RF-073 | **Dado** quem tem conta editando o perfil, **então** grava na conta e o slug não acompanha o apelido |
 | CA-364 | I | RF-061 | **Dado** a volta do provedor, **então** ela é recusada sem `state` na URL, sem o cookie, com os dois diferentes, com `state` de outro provedor, na segunda vez com o mesmo `state`, e depois de dez minutos |
 | CA-365 | I | RF-062 | **Dado** SSO cujo e-mail **não** é verificado pelo provedor, **então** a conta de senha existente NÃO é assumida e nasce conta separada; **dado** e-mail verificado, a conta é assumida e a senha some. No GitHub, só o e-mail `primary` **e** `verified` autoriza |
+| CA-367 | I | RF-068 | **Dado** uma partida sem nenhum jogador sentado com conta, **então** nada é gravado — nem com bot carregando conta por engano |
+| CA-368 | I | — | **Dado** uma partida completa, **então** colocação, nota, cheios, erro médio e pior erro do HISTÓRICO são os mesmos da tela de fim, saídos das mesmas funções do motor |
+| CA-369 | I | RF-071 | **Dado** o gancho de histórico estourando, **então** a sala segue viva e a falha vira log; **e** a mesma partida nunca é gravada duas vezes |
 
 CA-356 mede o defeito que consertou: a barra normalizava pelo prazo da aposta em todos os
 casos, então a vez de jogar carta nascia em 67% e a de um bot em 2%.
+
+CA-368 é o teste que carrega a F4. Não pede números "equivalentes": pede **os mesmos**, saídos
+das mesmas funções. É CA-360 de novo — e pior, porque ali a divergência aparecia na tela e sumia,
+enquanto aqui ela ficaria gravada no banco e sobreviveria à correção.
 
 CA-365 fecha o buraco que transformaria D-3 num sequestro: sem exigir verificação, bastaria pôr
 o e-mail alheio no perfil do provedor para tomar a conta de outra pessoa. No GitHub isso custa

@@ -15,6 +15,7 @@ import { BloqueioConexao, FaixaConexao, bloqueia } from './components/Conexao';
 import { Home } from './screens/Home';
 import { Perfil } from './screens/Perfil';
 import { Conta } from './screens/Conta';
+import { PerfilPublico } from './screens/PerfilPublico';
 import { Folha } from './components/Folha';
 import { Menu } from './screens/Menu';
 import { Regras } from './screens/Regras';
@@ -43,6 +44,7 @@ export function App() {
   const reconciliador = useRef(createReconciler());
   const [regrasAbertas, setRegrasAbertas] = useState(false);
   const [contaAberta, setContaAberta] = useState(false);
+  const [perfilPublico, setPerfilPublico] = useState<string | null>(null);
   // O que o Perfil vai fazer ao confirmar: criar sala, entrar numa, ou só
   // salvar (quando já se está na mesa).
   const [intencao, setIntencao] = useState<{ tipo: 'CRIAR' } | { tipo: 'ENTRAR'; codigo: string } | null>(null);
@@ -327,6 +329,12 @@ export function App() {
 
       {/* Perfil sobre a sala, como as regras: quem troca de cara no lobby
           quer voltar para o lobby, não recomeçar de algum lugar. */}
+      {perfilPublico && (
+        <Sobreposicao>
+          <PerfilPublico slug={perfilPublico} aoFechar={() => setPerfilPublico(null)} />
+        </Sobreposicao>
+      )}
+
       {perfilAberto && (
         <Sobreposicao>
           <Perfil
@@ -385,6 +393,7 @@ export function App() {
             })}
             aoAbrirRegras={() => setRegrasAbertas(true)}
             aoEnviarChat={(text) => enviar('chat:send', { text })}
+            aoAbrirPerfil={(slug) => setPerfilPublico(slug)}
             preJogada={estado.cartaPreJogada?.cardId ?? null}
             aoPreJogar={(cardId) => definir({
               // `null` é o toque que desarma. Armada, a carta anota a mão em

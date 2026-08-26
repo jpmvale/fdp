@@ -81,10 +81,12 @@ export function topoDoMeuAssento(total: number): number {
   return (posicoes(total)[0]!.y / 100) * ALTURA_DO_FELTRO - 22;
 }
 
-export function Feltro({ retrato, eu, partida }: {
+export function Feltro({ retrato, eu, partida, aoAbrirPerfil }: {
   retrato: Retrato;
   eu: string;
   partida: PlayerView;
+  /** Abre o perfil de quem tem conta. Convidado e bot não têm o que abrir. */
+  aoAbrirPerfil?: ((slug: string) => void) | undefined;
 }) {
   const ausentes = new Set(retrato.pause?.absentPlayerIds ?? []);
 
@@ -269,6 +271,7 @@ export function Feltro({ retrato, eu, partida }: {
               carta={cartaDoAssento(partida, id, souEu)}
               puxa={id === puxadorDaMao(partida)}
               perdeu={perdasRecentes[id] ?? 0}
+              aoAbrirPerfil={aoAbrirPerfil}
             />
           </div>
         );
@@ -360,7 +363,7 @@ function cartaDoAssento(partida: PlayerView, id: string, souEu: boolean) {
   return { mostra: true, carta: partida.foreheadCards[id] ?? null };
 }
 
-function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta, perdeu, puxa }: {
+function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta, perdeu, puxa, aoAbrirPerfil }: {
   jogador: PublicPlayer;
   partida: PlayerView;
   souEu: boolean;
@@ -373,6 +376,7 @@ function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta, perdeu
   puxa: boolean;
   /** Vidas que acabaram de ser debitadas: caem do próprio contador. */
   perdeu: number;
+  aoAbrirPerfil?: ((slug: string) => void) | undefined;
 }) {
   const vez = partida.activePlayerId === jogador.id;
   const condenado = partida.mortoEmVaza?.[jogador.id] != null;
@@ -417,13 +421,34 @@ function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta, perdeu
           />
         )}
         <Avatar avatar={jogador.avatar} tamanho={26} />
-        <span style={{
-          fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
-          overflow: 'hidden', textOverflow: 'ellipsis',
-        }}>
-          {vez && <span aria-hidden style={{ color: 'var(--acento)' }}>▸ </span>}
-          {souEu ? 'você' : jogador.nickname}
-        </span>
+        {/* Com conta, o nome vira o botão do perfil (D-4). Sem conta não há
+            o que abrir, e um nome que parece clicável e não abre nada é pior
+            que um nome comum — por isso o `<span>` continua existindo. */}
+        {jogador.conta && aoAbrirPerfil ? (
+          <button
+            className="fantasma"
+            onClick={() => aoAbrirPerfil(jogador.conta!)}
+            aria-label={`Ver o perfil de ${jogador.nickname}`}
+            style={{
+              all: 'unset', cursor: 'pointer',
+              fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
+              overflow: 'hidden', textOverflow: 'ellipsis',
+              textDecoration: 'underline', textDecorationStyle: 'dotted',
+              textUnderlineOffset: 3, textDecorationColor: 'var(--texto-apagado)',
+            }}
+          >
+            {vez && <span aria-hidden style={{ color: 'var(--acento)' }}>▸ </span>}
+            {souEu ? 'você' : jogador.nickname}
+          </button>
+        ) : (
+          <span style={{
+            fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
+            overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {vez && <span aria-hidden style={{ color: 'var(--acento)' }}>▸ </span>}
+            {souEu ? 'você' : jogador.nickname}
+          </span>
+        )}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

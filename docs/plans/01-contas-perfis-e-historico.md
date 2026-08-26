@@ -2,7 +2,7 @@
 
 Status: **EM EXECUÇÃO** · Aberto em 26/08/2026 · P11 emendada em 26/08/2026
 
-Fases: **F1, F2 e F3 concluídas** (26/08/2026) · F4 e F5 não começaram.
+Fases: **F1 a F4 concluídas** (26/08/2026) · F5 não começou.
 
 Cria contas (SSO e e-mail/senha), perfil público de jogador, histórico persistente de
 partidas e avatar por imagem.
@@ -468,10 +468,32 @@ interface consegue fazer.
 `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID` e `GITHUB_CLIENT_SECRET` no ambiente da VPS. Sem
 eles, `/api/sso` devolve lista vazia e a tela não desenha botão nenhum.
 
-**F4 — Histórico e perfil público.** Primeiro mover `desempenho` para `@fdp/rules` (§9.1),
-depois gravar e depois expor.
+**F4 — Histórico e perfil público.** ✅ **Concluída em 26/08/2026.**
 *Gate:* CA-367, CA-368, CA-369. Uma partida real aparece no perfil com os mesmos números da tela
 de fim.
+
+*O pré-requisito de §9.1 foi feito primeiro, e cresceu:* além de `desempenhoDaPartida`, o
+`numerosDaPartida` da tela de fim — `cheios`, `erro/rod`, `pior` — também morava no cliente e
+também foi para `@fdp/rules`. Os dois estão gravados no histórico; deixar qualquer um dos dois
+calculando de novo do lado do servidor repetiria CA-360, e pior: ali a divergência aparecia na
+tela e sumia, aqui ela ficaria GRAVADA. A paleta (`CORES`) ficou no cliente — cor de faixa é
+token de CSS, e o motor não tem opinião sobre tinta.
+
+*A gravação mora no servidor*, num gancho `onFimDePartida` do hub, e não em `@fdp/room`: fazer a
+sala depender de `@fdp/contas` inverteria a direção das camadas por conveniência. `historico.ts`
+**não calcula nada** — colocação sai de `ranking()`, nota de `desempenhoDaPartida()`, o resto de
+`numerosDaPartida()`.
+
+*Duas coisas que só apareceram implementando:* a mesma partida passa por `settle` mais de uma
+vez (o encerramento emite, e o relógio ainda anda depois), então há uma marca por sala para não
+gravar duas vezes; e `RoomPlayer` precisou de `contaId` além do `conta` (slug), porque o
+histórico grava por chave estrangeira e slug é endereço, não chave — o `contaId` **não** vai
+para a projeção, e há teste disso.
+
+*O que NÃO foi feito:* o passeio de navegador até o fim de uma partida real. Não por defeito —
+uma partida de 5 vidas leva minutos, e os roteiros que escrevi para automatizá-la derrubavam a
+própria sessão. O gate está fechado por teste determinístico que joga a partida inteira pelo
+motor de verdade e confere os números contra o banco.
 
 **F5 — Avatar por imagem.** Upload, `sharp`, servir por Caddy, e o `Avatar` em união.
 *Gate:* CA-370, CA-371, e o avatar aparece na mesa em 360 px sem quebrar o assento.

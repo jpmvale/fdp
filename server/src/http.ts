@@ -185,7 +185,7 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
       createRoom(
         code,
         // Sala nova: não há com quem colidir, então o host leva o que pediu.
-        { playerId, nickname, avatar, conta: conta?.slug ?? null },
+        { playerId, nickname, avatar, conta: conta?.slug ?? null, contaId: conta?.id ?? null },
         ctx,
       ),
     );
@@ -263,7 +263,7 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
       room,
       // Sem pré-deduplicar: `join` é quem garante a identidade única agora.
       // Duas checagens do mesmo com regras próprias foi o que criou o buraco.
-      { playerId, nickname, avatar, conta: conta?.slug ?? null },
+      { playerId, nickname, avatar, conta: conta?.slug ?? null, contaId: conta?.id ?? null },
       ctx,
     );
     if (!result.ok) {
