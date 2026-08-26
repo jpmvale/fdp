@@ -424,3 +424,33 @@ tabelas, e a aplicação lendo o restaurado. Backup que nunca foi restaurado nã
 
 **Ainda não está na VPS.** O container, o cron do backup e o alerta no Grafana ficam para quando
 a F2 precisar do banco de pé.
+
+## Contas: F2 no ar (26/08/2026)
+
+Cadastro, login, sessão em cookie e perfil público. `PROTOCOL_VERSION` foi para **2** porque
+`PublicPlayer` ganhou `conta` — o slug público, nunca o id interno.
+
+**O Postgres NÃO está na VPS ainda**, e isso é visível em produção do jeito certo: `/api/eu`
+devolve `{"conta":null}`, `/api/contas` devolve `{"code":"CONTAS_INDISPONIVEIS"}`, e criar sala
+funciona normalmente. Conta é acréscimo, nunca pedágio (plano 01, I-1) — e há teste com o
+servidor rodando sem banco justamente porque a maneira de quebrar isso é silenciosa.
+
+Para ligar contas em produção: subir o container do Postgres na VPS, pôr `DATABASE_URL` no
+ambiente do serviço e reiniciar. O resto já está de pé.
+
+Três armadilhas que apareceram e que vale conhecer antes de mexer:
+
+- **Os dois tokens são HS256 com o mesmo segredo**, então a assinatura de um confere no outro.
+  A claim `tipo` separa os dois, e é obrigatória só no token de conta — token de sala emitido
+  antes do campo existir continua valendo, senão um deploy expulsaria quem está jogando.
+- **`hub.ts` emitia `v: 1` fixo** enquanto a entrada era validada contra a constante. Se você
+  subir a versão de novo, confira os dois lados.
+- **RNF-001** manda toda resposta de erro ser `{ code, params? }`. As rotas novas nasceram com
+  `{ error: { code } }` e o cliente lê `code` do topo — metade das mensagens chegaria vazia.
+
+Rodar local com contas:
+
+```bash
+docker run -d --rm --name fdp-postgres -p 5433:5432 -e POSTGRES_PASSWORD=fdp postgres:17-alpine
+DATABASE_URL='postgres://postgres:fdp@127.0.0.1:5433/postgres' npm run dev
+```
