@@ -29,6 +29,16 @@ ser escrita antes do documento correspondente estar marcado como `ESTÁVEL`.
 | [11-arquitetura-e-stack.md](./11-arquitetura-e-stack.md) | Decisões técnicas e estrutura do repositório | ESTÁVEL |
 | [12-roadmap.md](./12-roadmap.md) | Fases de entrega e gates de qualidade | ESTÁVEL |
 
+### Planos
+
+Os documentos `00`–`12` dizem o que o produto **é**. Um plano diz como uma capacidade nova vai
+entrar, e vive aqui até virar emenda nos normativos — enquanto for `PROPOSTO`, não manda em
+nada.
+
+| Plano | O que propõe | Status |
+|---|---|---|
+| [plans/01-contas-perfis-e-historico.md](./plans/01-contas-perfis-e-historico.md) | Contas (SSO e e-mail/senha), perfil público, histórico persistente e avatar por imagem. Reverte `00` §4.2 | PROPOSTO |
+
 ## Por onde começar
 
 - **Vai implementar as regras?** `02` → `03` §4 → `10` §4. Nada mais é necessário.
