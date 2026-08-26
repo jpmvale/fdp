@@ -11,10 +11,9 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile, access } from 'node:fs/promises';
-import { join } from 'node:path';
 import sharp from 'sharp';
 import { LIMITS } from '@fdp/protocol';
+import type { DepositoDeAvatares } from '@fdp/avatares';
 
 /**
  * Cabe uma foto de celular com folga; não cabe um vídeo disfarçado.
@@ -75,7 +74,16 @@ export type FalhaDeAvatar =
   /** É imagem, e é uma que não sabemos abrir. Diferente de "não é imagem". */
   | 'HEIC_NAO_SUPORTADO'
   | 'IMAGEM_ABSURDA'
-  | 'FALHA_AO_PROCESSAR';
+  | 'FALHA_AO_PROCESSAR'
+  /**
+   * A imagem estava boa; guardá-la é que não deu (RF-082).
+   *
+   * Separado de `FALHA_AO_PROCESSAR` porque as duas frases mandam a pessoa
+   * para lugares opostos. "Não consegui abrir essa imagem" faz ela trocar de
+   * foto — e trocar de foto não vai consertar um bucket fora do ar. O erro é
+   * nosso, e a mensagem precisa dizer isso.
+   */
+  | 'DEPOSITO_INDISPONIVEL';
 
 export type ResultadoDeAvatar =
   | { ok: true; caminho: string; hash: string; bytes: number }
@@ -135,8 +143,15 @@ function formatoPelosBytes(b: Buffer): 'jpeg' | 'png' | 'webp' | 'gif' | 'avif' 
 }
 
 export interface OpcoesDeAvatar {
-  /** Onde os arquivos ficam. Volume próprio em produção. */
-  diretorio: string;
+  /**
+   * Onde os arquivos ficam.
+   *
+   * Era um caminho de diretório. Virou o depósito (plano 02) porque o destino
+   * deixou de ser necessariamente um disco — e porque este módulo nunca teve o
+   * que dizer sobre isso. O que ele faz é decidir o que uma foto VIRA; quem a
+   * guarda é outro problema, e agora é outro objeto.
+   */
+  deposito: DepositoDeAvatares;
 }
 
 /**
@@ -157,6 +172,7 @@ export async function processarAvatar(
   if (formato === 'heic') return { ok: false, motivo: 'HEIC_NAO_SUPORTADO' };
   if (formato === null) return { ok: false, motivo: 'NAO_E_IMAGEM' };
 
+  let processada: { hash: string; grande: Buffer; pequena: Buffer };
   try {
     const entrada = sharp(bytes, {
       limitInputPixels: PIXELS_MAX,
@@ -185,19 +201,7 @@ export async function processarAvatar(
       .webp({ quality: 80 })
       .toBuffer();
 
-    await mkdir(opcoes.diretorio, { recursive: true });
-    const caminhoGrande = join(opcoes.diretorio, `${hash}.webp`);
-    const caminhoPequeno = join(opcoes.diretorio, `${hash}-64.webp`);
-
-    // Conteúdo idêntico já gravado: nada a fazer. Reescrever seria trocar o
-    // arquivo por um byte-a-byte igual, com uma janela em que ele não existe.
-    const existe = await access(caminhoGrande).then(() => true, () => false);
-    if (!existe) {
-      await writeFile(caminhoGrande, grande);
-      await writeFile(caminhoPequeno, pequena);
-    }
-
-    return { ok: true, caminho: `/avatares/${hash}.webp`, hash, bytes: grande.length };
+    processada = { hash, grande, pequena };
   } catch (erro) {
     // `sharp` estoura em imagem corrompida e ao passar do teto de pixels. Os
     // dois são entrada hostil, não defeito nosso, e nenhum pode derrubar o
@@ -212,6 +216,30 @@ export async function processarAvatar(
     }
     return { ok: false, motivo: 'FALHA_AO_PROCESSAR' };
   }
+
+  /**
+   * Guardar é um `try` SEPARADO, e essa separação não é estilo.
+   *
+   * Enquanto a gravação ficava dentro do bloco acima, um bucket fora do ar
+   * saía como `FALHA_AO_PROCESSAR` — *"não consegui abrir essa imagem, ela
+   * pode estar corrompida"*. A pessoa olharia para a foto dela procurando um
+   * defeito que não existe, trocaria de imagem, e a segunda falharia igual.
+   *
+   * O erro é NOSSO, e o motivo próprio é o que permite a mesa continuar com o
+   * emoji no assento em vez de um buraco (RF-082, CA-393).
+   */
+  const { hash, grande, pequena } = processada;
+  try {
+    // Sem checar antes se já existe: o depósito é idempotente pelo nome, e o
+    // nome é o hash do conteúdo — "já existe" só pode significar "com
+    // exatamente estes bytes".
+    await opcoes.deposito.guardar(`${hash}.webp`, grande);
+    await opcoes.deposito.guardar(`${hash}-64.webp`, pequena);
+  } catch {
+    return { ok: false, motivo: 'DEPOSITO_INDISPONIVEL' };
+  }
+
+  return { ok: true, caminho: `/avatares/${hash}.webp`, hash, bytes: grande.length };
 }
 
 /** O nome do arquivo a partir do caminho público, ou `null` se não casar. */

@@ -18,6 +18,39 @@ import { registroDaPartida } from './historico.js';
 import { createPersistence } from './persistence.js';
 import { createSigner } from './session.js';
 import { attachWebSocket } from './ws.js';
+import { comCache, criarDepositoEmDisco, type DepositoDeAvatares } from '@fdp/avatares';
+import { configDoAmbiente as configDeR2, criarDepositoEmR2 } from '@fdp/avatares/r2';
+
+/**
+ * Onde os avatares vão ficar (plano 02).
+ *
+ * A ordem é R2, depois disco, depois nada — e "depois nada" é uma opção de
+ * primeira classe: sem nenhuma variável, o jogo sobe inteiro e o envio de foto
+ * responde 503. Nada do produto pode exigir infraestrutura para rodar na
+ * máquina de alguém (I-1).
+ *
+ * O cache embrulha os dois. Com disco ele economiza pouco e não atrapalha; com
+ * R2 ele é o que torna a coisa viável, porque cada assento na mesa pediria uma
+ * chamada de rede cobrada a cada render (RNF-018).
+ */
+function escolherDeposito(): DepositoDeAvatares | undefined {
+  const r2 = configDeR2(process.env);
+  if (r2) {
+    console.log(`avatares: R2, bucket ${r2.bucket}`);
+    return comCache(criarDepositoEmR2(r2));
+  }
+
+  const dir = process.env['AVATARES_DIR'];
+  if (dir) {
+    console.log(`avatares: disco em ${dir}`);
+    return comCache(criarDepositoEmDisco(dir));
+  }
+
+  // Dito em voz alta, e não em silêncio: um envio devolvendo 503 sem nenhuma
+  // linha no log manda quem está investigando procurar no lugar errado.
+  console.log('avatares: nenhum depósito configurado — o envio de foto responde 503');
+  return undefined;
+}
 
 const PORT = Number(process.env.PORT ?? 3000);
 const REDIS_URL = process.env.REDIS_URL;
@@ -123,6 +156,8 @@ async function main(): Promise<void> {
   // WebSocket, e o sintoma seria "não consigo conectar" sem causa aparente.
   const signer = createSigner(sessionSecret());
 
+  const deposito = escolherDeposito();
+
   const app = createHttpApp({
     hub,
     signer,
@@ -132,9 +167,9 @@ async function main(): Promise<void> {
     version: VERSION,
     dados,
     sso: configuracaoDoAmbiente(process.env),
-    // Sem a variável, o envio de avatar responde 503 e o resto funciona —
+    // Sem depósito, o envio de avatar responde 503 e o resto funciona —
     // mesma lógica das contas e do SSO (I-1).
-    diretorioDeAvatares: process.env['AVATARES_DIR'],
+    ...(deposito ? { depositoDeAvatares: deposito } : {}),
   });
 
   const server = serve({ fetch: app.fetch, port: PORT }, (info) => {

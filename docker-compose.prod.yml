@@ -87,9 +87,22 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
-      # Avatares enviados (F5). Sem a variável, o envio responde 503 e o resto
-      # funciona — mesma lógica das contas e do SSO.
+      # Avatares enviados (F5). Sem nenhum dos dois, o envio responde 503 e o
+      # resto funciona — mesma lógica das contas e do SSO.
       AVATARES_DIR: /var/lib/fdp/avatares
+      # R2 (plano 02). **Opcionais de propósito**, sem `:?`: presentes, o
+      # depósito passa a ser o bucket; ausentes, continua sendo o volume abaixo.
+      # É tudo-ou-nada — meia configuração é ignorada e vale como ausente, para
+      # não existir um depósito que aceita gravar e falha em toda chamada.
+      #
+      # ORDEM DO CORTE (plano 02 §6): pôr estas variáveis ANTES de migrar faz o
+      # app passar a ler do bucket vazio, e toda foto já existente vira 404 até
+      # a cópia terminar. Migre primeiro (`server/src/migrar-avatares.ts`, em
+      # ensaio e depois com `--aplicar`), configure depois.
+      R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_BUCKET: ${R2_BUCKET:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
       ALLOWED_ORIGIN: https://fdp.imp-software.cloud
       # Só é seguro PORQUE o Caddy está na frente e sobrescreve
       # X-Forwarded-For. Nenhuma porta deste stack sai da máquina; se um dia
@@ -101,6 +114,11 @@ services:
       # Os avatares precisam sobreviver ao deploy: a cada publicação o
       # container é RECRIADO, e o que estiver só na camada da imagem some —
       # todo mundo perderia a foto a cada release.
+      #
+      # O volume CONTINUA montado depois do corte para o R2, e de propósito: é
+      # de onde a migração lê, e é a rede de segurança enquanto o bucket ainda
+      # não teve o primeiro backup restaurado (RNF-019). Só sai quando esse
+      # gate fechar.
       - avatares:/var/lib/fdp/avatares
     networks:
       - internal

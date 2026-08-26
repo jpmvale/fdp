@@ -17,6 +17,9 @@
       "path": "./packages/contas"
     },
     {
+      "path": "./packages/avatares"
+    },
+    {
       "path": "./packages/room"
     },
     {

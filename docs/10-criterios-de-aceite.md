@@ -425,6 +425,10 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-383 | E | RF-077 | **Dado** provedores configurados, **então** cada botão de SSO traz a marca do provedor, servida da própria origem |
 | CA-384 | U | RNF-016 | **Dado** uma mensagem aceita, **quando** a mesma pessoa manda outra antes de 1 s, **então** é recusada com `RAPIDO_DEMAIS`, nada é publicado, e a recusa **não** move o prazo; no prazo exato passa, e o limite não alcança as outras pessoas da mesa |
 | CA-385 | U | RF-079 | **Dado** uma mensagem no teto de RNF-014, **então** o balão mostra no máximo 70 caracteres mais reticências, cortando no fim de uma palavra quando sobra mensagem para isso |
+| CA-392 | U/I | RF-080 | **Dado** a suíte de contrato do depósito, **então** ela passa idêntica em disco, disco+cache e R2; o CI recusa o build se a do R2 tiver sido pulada |
+| CA-393 | U/I | RF-082 | **Dado** o depósito fora do ar, **então** o envio responde 503 `DEPOSITO_INDISPONIVEL`, a imagem RUIM continua sendo recusada pelo motivo dela, e criar sala e jogar seguem intactos |
+| CA-394 | U | RF-080 | **Dado** a migração, **quando** o conteúdo de um objeto não bate com o hash do próprio nome, **então** ele é **denunciado e não copiado**; a variante `-64` é isenta da conferência, porque carrega o hash da grande |
+| CA-395 | U | RF-080 | **Dado** duas contas com a mesma foto, **então** elas continuam dividindo um objeto só, e regravar o mesmo nome é inofensivo |
 | CA-391 | U | RF-070 | **Dado** uma foto de celular moderno — 48, 50 ou 108 MP —, **então** entra e sai 256×256 WebP; o teto de pixels barra a bomba de descompressão logo acima dele, e não a câmera de ninguém |
 | CA-388 | U | RF-070 | **Dado** um AVIF, **então** entra como qualquer outra foto e sai 256×256 WebP |
 | CA-389 | U | RF-070 | **Dado** um HEIC — a foto padrão do iPhone —, **então** é recusado com `HEIC_NAO_SUPORTADO` e a frase diz como mandar em JPEG; MP4 e MOV, que usam a mesma caixa `ftyp`, continuam caindo em `NAO_E_IMAGEM` |

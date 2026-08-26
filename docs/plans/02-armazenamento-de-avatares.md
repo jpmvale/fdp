@@ -1,6 +1,11 @@
 # Plano 02 — Armazenamento de avatares
 
-Status: **ABERTO** · Aberto em 26/08/2026
+Status: **F1 a F4 IMPLEMENTADAS** (26/08/2026), **não implantadas** · Aberto em 26/08/2026
+
+O código está pronto e testado localmente contra um MinIO em container. O que
+falta é operacional e só o dono das credenciais pode fazer: criar o bucket no
+R2, pôr as quatro variáveis no compose, rodar `migrar-avatares` em ensaio, depois
+com `--aplicar`, e então fechar o gate de RNF-019 restaurando o backup uma vez.
 
 Tira as fotos de avatar do disco do container e as põe num bucket R2, com backup
 e com o pipeline calibrado por medição em vez de suposição.
@@ -90,12 +95,18 @@ provou pegar divergência entre implementações duas vezes neste projeto.
 ```ts
 export interface DepositoDeAvatares {
   /** Grava, se ainda não existir. Idempotente pelo nome. */
-  guardar(nome: string, bytes: Buffer, tipo: string): Promise<void>;
+  guardar(nome: string, bytes: Buffer): Promise<void>;
   /** `undefined` quando não existe — nunca lança por ausência. */
   ler(nome: string): Promise<Buffer | undefined>;
   apagar(nome: string): Promise<void>;
 }
 ```
+
+> O rascunho deste plano trazia um terceiro parâmetro `tipo` em `guardar`. Ele
+> saiu na implementação: **todo** avatar é WebP por construção, porque
+> `processarAvatar` reescreve tudo nesse formato antes de chegar aqui. Um
+> parâmetro que só admite um valor não é flexibilidade, é um lugar a mais onde
+> alguém pode passar outra coisa.
 
 Três métodos, e `ler` existe por uma razão específica que vale registrar: **a
 alternativa era servir por URL assinada ou por domínio público do R2, e as duas
@@ -168,19 +179,19 @@ IDs livres: **RF-080+**, **RNF-018+**, **CA-392+**. Nenhum `RJ-###` — I-2.
 
 ## 8. Fases
 
-**F1 — A interface e o depósito em disco.** Extrair o que existe para trás de
+**F1 — A interface e o depósito em disco.** ✅ **Implementada.** Extrair o que existe para trás de
 `DepositoDeAvatares`, com a suíte de contrato escrita contra a interface.
 *Gate:* comportamento idêntico ao de hoje, provado pela suíte que já existe;
 nenhuma mudança visível em produção.
 
-**F2 — Cache e servir.** As três camadas da §5, com a resposta `immutable`.
+**F2 — Cache e servir.** ✅ **Implementada.** As três camadas da §5, com a resposta `immutable`.
 *Gate:* um avatar pedido duas vezes não toca o depósito na segunda; medido, não
 suposto.
 
-**F3 — R2.** A segunda implementação, e a escrita dupla da §6.
+**F3 — R2.** ✅ **Implementada.** A segunda implementação, e a escrita dupla da §6.
 *Gate:* CA-392 verde no CI, com a suíte do R2 comprovadamente executada.
 
-**F4 — Migração e corte.** Os passos 2 a 4 da §6.
+**F4 — Migração e corte.** ⚠️ **Escrita e ensaiada; o corte em produção é operacional.** Os passos 2 a 4 da §6.
 *Gate:* RNF-019 — o backup restaurado uma vez, num bucket vazio, com os hashes
 conferidos. Sem isso, F4 não fecha: era exatamente essa a lacuna que abriu este
 plano.
@@ -200,3 +211,67 @@ plano.
   **Não é substituto de nada:** o servidor continua processando e validando
   (D-9). É comodidade, e por isso não entrou nas fases; entra quando alguém
   reclamar da espera.
+
+
+---
+
+## 10. O que a implementação mudou no plano
+
+Três coisas que o plano não previa e a escrita revelou.
+
+**A assinatura é nossa, e a prova dela é um servidor de verdade.** O plano dizia
+"R2 (S3 compatível)" sem dizer como. `@aws-sdk/client-s3` traria dezenas de
+pacotes para três verbos sem query nem listagem, num projeto com oito
+dependências de produção. SigV4 é um procedimento fechado e público, e são umas
+oitenta linhas — mas escrever assinatura à mão só se defende se houver prova.
+
+A prova NÃO é um vetor de referência colado num `expect`. Tentei esse caminho e
+parei: colar um número que eu "lembrava" não prova nada, e a documentação da AWS
+publica o algoritmo com a assinatura substituída por um marcador. A prova é a
+suíte de contrato inteira rodando contra **MinIO**, que fala S3 — um vetor
+confere um caso, um servidor confere o protocolo. Está no CI, e é obrigatória
+(CA-392).
+
+**`ler` não podia ficar dentro do `try` do processamento.** Com a gravação lá
+dentro, um bucket fora do ar saía como `FALHA_AO_PROCESSAR` — *"não consegui
+abrir essa imagem, ela pode estar corrompida"*. A pessoa procuraria o defeito na
+própria foto, trocaria de imagem, e a segunda falharia igual. É a mesma família
+do `PROTOCOL_VERSION` que derrubou o jogo: a mensagem mandava investigar o lugar
+errado. Virou `DEPOSITO_INDISPONIVEL`, com 503 e não 4xx — 4xx diria que o
+problema é do que a pessoa mandou.
+
+**O contrato pegou um bug meu antes de qualquer produção.** O teste de gravações
+simultâneas do mesmo nome derrubou a primeira versão do depósito em disco: o
+rascunho temporário levava o `pid`, e cinco chamadas do mesmo processo dividem o
+pid. Duas fotos chegando juntas numa mesa de oito é o caso comum, não uma corrida
+exótica. O rascunho passou a ser único por chamada.
+
+Fica registrado porque é o argumento inteiro a favor da suíte de contrato: ela
+não existe para provar que o R2 funciona, existe para que a implementação
+**simples** — a que todo mundo assume estar certa — seja cobrada do mesmo jeito.
+
+## 11. Como rodar e migrar
+
+```bash
+# O outro lado, para desenvolver e testar:
+docker run --rm -p 9100:9000 \
+  -e MINIO_ROOT_USER=fdpteste -e MINIO_ROOT_PASSWORD=fdptestesenha \
+  minio/minio server /data
+
+R2_ENDPOINT=http://127.0.0.1:9100 R2_BUCKET=avatares \
+R2_ACCESS_KEY_ID=fdpteste R2_SECRET_ACCESS_KEY=fdptestesenha npm test
+```
+
+Migrar (ensaio primeiro — sem `--aplicar` nada é escrito):
+
+```bash
+AVATARES_DIR=/dados/avatares \
+R2_ENDPOINT=... R2_BUCKET=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... \
+npx tsx server/src/migrar-avatares.ts
+```
+
+O ensaio roda a **conferência inteira** sem tocar no destino, e é essa a
+informação que interessa antes de copiar: se há avatar corrompido no volume, dá
+para saber sem escrever um byte. Corrupção falha o script de propósito, mesmo
+com todo o resto tendo copiado — os íntegros já foram, e rodar de novo é
+inofensivo porque a migração é idempotente.

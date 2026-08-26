@@ -19,6 +19,7 @@ import { avatarSchema, nicknameSchema } from '@fdp/protocol/validate';
 import type { Conta, Dados } from '@fdp/contas';
 import { conferirSenha, gastarComoSeFosse, gerarHash, senhaAceitavel } from './senha.js';
 import { processarAvatar, TAMANHO_MAX } from './avatar.js';
+import type { DepositoDeAvatares } from '@fdp/avatares';
 import { createRateLimiter } from './limits.js';
 import { SESSAO_CONTA_MS, type SessionSigner } from './session.js';
 
@@ -32,7 +33,7 @@ export interface ContasHttpOptions {
   /** Em teste, sem TLS, o cookie não pode exigir `Secure` ou nada funciona. */
   cookieSeguro?: boolean;
   /** Onde os avatares enviados ficam. Ausente = envio desligado. */
-  diretorioDeAvatares?: string | undefined;
+  depositoDeAvatares?: DepositoDeAvatares | undefined;
 }
 
 /** O que sai para o cliente. O `id` interno NUNCA vai junto — só o slug. */
@@ -286,7 +287,8 @@ export function montarRotasDeConta(
    */
   app.post('/api/eu/avatar', async (c) => {
     if (!dados) return c.json(semBanco(), 503);
-    if (!opcoes.diretorioDeAvatares) return c.json({ code: 'AVATAR_INDISPONIVEL' }, 503);
+    const deposito = opcoes.depositoDeAvatares;
+    if (!deposito) return c.json({ code: 'AVATAR_INDISPONIVEL' }, 503);
 
     const conta = await contaDoPedido(c.req.header('cookie'));
     if (!conta) return c.json({ code: 'SEM_SESSAO' }, 401);
@@ -312,8 +314,12 @@ export function montarRotasDeConta(
       return c.json({ code: 'NAO_E_IMAGEM' }, 400);
     }
 
-    const r = await processarAvatar(bytes, { diretorio: opcoes.diretorioDeAvatares });
+    const r = await processarAvatar(bytes, { deposito });
     if (!r.ok) {
+      // O depósito fora do ar é 503, e não 400: 4xx diria que o problema está
+      // no que a pessoa mandou, e ela ficaria trocando de foto sem chance
+      // nenhuma de acertar (RF-082).
+      if (r.motivo === 'DEPOSITO_INDISPONIVEL') return c.json({ code: r.motivo }, 503);
       return c.json({ code: r.motivo }, r.motivo === 'GRANDE_DEMAIS' ? 413 : 400);
     }
 

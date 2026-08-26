@@ -169,6 +169,9 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 | RF-073 | O editor de perfil de quem tem conta edita **a conta**, e parte do apelido dela — nunca do desempatado pela mesa |
 | RF-078 | O editor de perfil **DEVE** estar acessível na **home**, com conta, fora de qualquer sala. Apelido, cor, emoji e foto são da conta, e exigir estar numa mesa para trocá-los deixava a conta sem dono |
 | RF-079 | O balão que sai do assento **DEVE** compactar a mensagem que não couber nele. O balão avisa que fulano falou; o texto inteiro vive no painel do chat, que é onde se lê |
+| RF-080 | Avatares vivem num **depósito** com interface própria; disco e R2 são implementações da mesma, cobradas pela mesma suíte de contrato |
+| RF-081 | A foto **DEVE** ser servida pela nossa origem, nunca por URL do fornecedor: trocar de bucket não pode mudar uma linha do cliente, nem pedir origem nova na CSP |
+| RF-082 | Depósito indisponível **DEVE** ter motivo próprio (`DEPOSITO_INDISPONIVEL`, 503) e a mesa continua com o emoji no assento. Dizer "sua imagem está corrompida" manda a pessoa consertar o que não está quebrado |
 | RF-061 | Entrar com Google ou GitHub. Só provedor **configurado** vira botão: um botão que devolve 503 é pior que nenhum |
 | RF-062 | SSO com e-mail **verificado pelo provedor** assume a conta de senha, apaga a senha e derruba as sessões |
 | RF-063 | Entrar com senha numa conta assumida por SSO **DEVE** dizer o que houve — *"esta conta agora entra pelo Google"* —, nunca "senha inválida" |

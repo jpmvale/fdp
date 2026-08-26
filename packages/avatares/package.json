@@ -1,0 +1,10 @@
+{
+  "name": "@fdp/avatares",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./r2": "./src/r2.ts"
+  }
+}

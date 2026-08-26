@@ -308,6 +308,10 @@ function mensagemDaFoto(codigo: string): string {
     case 'IMAGEM_ABSURDA': return 'Essa imagem tem pixels demais. Reduza antes de enviar.';
     case 'FALHA_AO_PROCESSAR': return 'Não consegui abrir essa imagem. Ela pode estar corrompida.';
     case 'AVATAR_INDISPONIVEL': return 'O envio de foto está fora do ar.';
+    // Distinto de FALHA_AO_PROCESSAR de propósito: a foto está boa, e mandar a
+    // pessoa trocar de imagem seria mandá-la resolver o nosso problema.
+    case 'DEPOSITO_INDISPONIVEL':
+      return 'Não deu para guardar a foto agora — é problema nosso, não da imagem. Tente daqui a pouco.';
     case 'SEM_SESSAO': return 'Sua sessão expirou. Entre de novo.';
     case 'RATE_LIMITED': return 'Muitos envios. Espere um pouco.';
     default: return 'Não deu para enviar.';

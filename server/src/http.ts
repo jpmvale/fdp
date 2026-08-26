@@ -36,6 +36,7 @@ import type { Dados } from '@fdp/contas';
 import { contaDoCookie, montarRotasDeConta } from './contas-http.js';
 import { montarRotasDeSso } from './sso-http.js';
 import { arquivoDoCaminho } from './avatar.js';
+import type { DepositoDeAvatares } from '@fdp/avatares';
 import type { Buscar, ConfigSso } from './sso.js';
 
 export interface HttpOptions {
@@ -58,7 +59,7 @@ export interface HttpOptions {
   /** Sem TLS em teste, o cookie não pode exigir `Secure`. */
   cookieSeguro?: boolean;
   /** Onde os avatares enviados ficam. Ausente = envio desligado. */
-  diretorioDeAvatares?: string | undefined;
+  depositoDeAvatares?: DepositoDeAvatares | undefined;
   /** Provedores de SSO configurados. Vazio = nenhum botão, e nenhuma rota. */
   sso?: ConfigSso;
   /** Injetável para o teste percorrer o fluxo de SSO sem rede. */
@@ -324,8 +325,8 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
     signer,
     now,
     clientIp,
-    ...(options.diretorioDeAvatares === undefined
-      ? {} : { diretorioDeAvatares: options.diretorioDeAvatares }),
+    ...(options.depositoDeAvatares === undefined
+      ? {} : { depositoDeAvatares: options.depositoDeAvatares }),
     ...(options.cookieSeguro === undefined ? {} : { cookieSeguro: options.cookieSeguro }),
   });
 
@@ -380,17 +381,24 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
    * O nome é o sha256 do conteúdo, então o cache pode ser IMUTÁVEL sem risco:
    * conteúdo diferente nunca reusa um nome.
    */
-  app.get('/avatares/:arquivo', (c) => {
-    if (!options.diretorioDeAvatares) return c.notFound();
+  app.get('/avatares/:arquivo', async (c) => {
+    const deposito = options.depositoDeAvatares;
+    if (!deposito) return c.notFound();
 
     // O nome vem do cliente. Só o formato exato passa — sem isto, `..%2f` e
-    // amigos escolheriam qualquer arquivo da máquina.
+    // amigos escolheriam qualquer arquivo da máquina. O depósito confere de
+    // novo, e a repetição é de propósito: cada um dos dois é a única defesa
+    // num caminho que o outro não cobre.
     const arquivo = arquivoDoCaminho(`/avatares/${c.req.param('arquivo')}`);
     if (!arquivo) return c.notFound();
 
     try {
-      const bytes = readFileSync(caminhoDe(options.diretorioDeAvatares, arquivo));
-      return c.body(bytes, 200, {
+      const bytes = await deposito.ler(arquivo);
+      if (!bytes) return c.notFound();
+      // Cópia na saída, e não é só para agradar o tipo do Hono: o cache
+      // devolve a MESMA instância a todo mundo, e entregá-la adiante seria
+      // confiar que ninguém jamais vai escrever nela. Uns 8 KB por resposta.
+      return c.body(new Uint8Array(bytes), 200, {
         'content-type': 'image/webp',
         'cache-control': 'public, max-age=31536000, immutable',
         // O arquivo é reescrito por `sharp` a partir dos pixels: não é o

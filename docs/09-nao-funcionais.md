@@ -11,6 +11,8 @@ Status: **ESTÁVEL**
 | RNF-052 | Reconexão completa (socket + snapshot aplicado): ≤ 1,5 s p95 | Métrica de cliente |
 | RNF-053 | Snapshot de sala com 8 jogadores: ≤ 32 KB serializado | Teste unitário sobre a projeção |
 | RNF-017 | Envio de avatar: orçamento próprio de 30/h **por conta**, nunca o de cadastro por IP | Teste de integração (CA-390) |
+| RNF-018 | `/avatares/:nome` responde `immutable`, com cache em processo limitado **por bytes** | Teste unitário (RNF-018) |
+| RNF-019 | Backup dos avatares com restauração **testada uma vez, para valer** — mesmo gate do Postgres | Manual, no gate de F4 do plano 02 |
 | RNF-054 | Interface a 60 fps durante animações em aparelho de gama média | Perfil manual |
 | RNF-055 | Bundle JS inicial: ≤ 180 KB comprimido | Orçamento verificado no CI |
 

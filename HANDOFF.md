@@ -25,8 +25,9 @@ recente é a última.
 npm install
 npm run build:client   # OBRIGATÓRIO antes do primeiro `npm start`
 npm run redis          # opcional, noutro terminal
+npm run minio          # opcional: o outro lado do depósito de avatares
 npm start              # http://localhost:3000
-npm test               # 511 testes (2 pulados: Redis e Postgres, que só rodam com as env deles)
+npm test               # 550 testes (2 pulados: Redis e Postgres, que só rodam com as env deles)
 npm run typecheck
 ```
 
@@ -61,6 +62,7 @@ Para parar: `pkill -f "tsx server"`.
 | `packages/bot` | Decisão dos bots — puro, só depende de `rules`. As quatro dificuldades |
 | `packages/store` | `RoomStore` de 6 métodos, em memória **e em Redis**, mesma suíte de contrato |
 | `packages/contas` | Contas, credenciais, identidades de SSO e histórico — memória **e Postgres**, mesma suíte |
+| `packages/avatares` | Depósito das fotos — disco **e R2**, mesma suíte. Mais cache, migração e escrita dupla |
 | `packages/protocol` | Contrato cliente ↔ servidor, tipos e validação separados |
 | `packages/room` | Máquina de sala: ciclo de vida, conexão, pausa, timers, auto-play, bots |
 | `server/` | HTTP de `06`, WebSocket de `05`, sessão, limites, persistência, `SIGTERM` |
@@ -529,12 +531,89 @@ inteiro caiu para ~1 s.
 Junto foi um teste de fronteira (16 001² recusado), para o dia em que alguém
 mexer no número achando que ninguém está olhando.
 
+## Plano 02 implementado: os avatares saem do volume (26/08/2026)
+
+F1 a F4 do [plano 02](docs/plans/02-armazenamento-de-avatares.md) estão escritas
+e testadas. **Nada foi implantado** — o que falta é operacional e só quem tem as
+credenciais faz: criar o bucket, pôr as quatro variáveis no `.env` da VPS, rodar
+a migração, e fechar RNF-019 restaurando o backup uma vez.
+
+`packages/avatares` é o pacote novo, no mesmo molde de `store` e `contas`: uma
+interface de três métodos, duas implementações (disco e R2), uma suíte de
+contrato para as duas. Mais o cache, a migração e a escrita dupla.
+
+### A assinatura é nossa, e a prova é um servidor de verdade
+
+`@aws-sdk/client-s3` traria dezenas de pacotes para três verbos sem query nem
+listagem, num projeto com oito dependências de produção. SigV4 são umas oitenta
+linhas em `packages/avatares/src/assinatura.ts`.
+
+Escrever assinatura à mão só se defende com prova, e a prova **não** é um vetor
+colado num `expect`. Tentei: cheguei a escrever o teste com a assinatura do
+`get-vanilla` e parei antes de rodar, porque o número teria vindo da minha
+memória. A documentação da AWS publica o algoritmo inteiro mas substitui a
+assinatura final por um marcador, e não há botocore nem AWS CLI nesta máquina.
+
+A prova é a **suíte de contrato inteira contra MinIO**, que fala S3. Um vetor
+confere um caso; um servidor confere o protocolo. Está no CI — subido por
+`docker run` e não por `services:`, porque a imagem do MinIO exige o comando
+`server /data` e `services:` não deixa passar comando. E é obrigatória: o passo
+que já cobrava Redis e Postgres agora cobra `packages/avatares` também.
+
+### O contrato pegou um bug meu antes de qualquer produção
+
+O teste de gravações simultâneas do mesmo nome derrubou a primeira versão do
+depósito em disco. O rascunho temporário levava o `pid` — e cinco gravações do
+MESMO processo dividem o pid, então escreviam no mesmo arquivo, uma renomeava e
+as outras estouravam. Duas fotos chegando juntas numa mesa de oito é o caso
+comum, não corrida exótica.
+
+Vale registrar porque é o argumento inteiro a favor da suíte de contrato: ela
+não existe para provar que o R2 funciona. Existe para que a implementação
+**simples** — a que todo mundo assume estar certa — seja cobrada igual.
+
+### Bucket fora do ar não é culpa da foto
+
+Enquanto a gravação vivia dentro do `try` do processamento, um depósito
+inacessível saía como `FALHA_AO_PROCESSAR`: *"não consegui abrir essa imagem,
+ela pode estar corrompida"*. A pessoa procuraria o defeito na própria foto,
+trocaria de imagem, e a segunda falharia igual — mesma família do
+`PROTOCOL_VERSION`, em que a mensagem mandava investigar o lugar errado.
+
+Virou `DEPOSITO_INDISPONIVEL`, com **503 e não 4xx**: 4xx diria que o problema
+está no que a pessoa mandou. Verificado ponta a ponta com o MinIO derrubado no
+meio — o envio dá 503, criar sala e jogar seguem intactos, e o avatar já em
+cache continua sendo servido.
+
+### O que a migração faz de verdade
+
+Copiar bytes seria um laço de três linhas. `server/src/migrar-avatares.ts`
+existe pela **conferência**: o nome de cada objeto é o sha256 do conteúdo, então
+dá para saber, arquivo por arquivo, se o guardado é o que diz ser. É a primeira
+vez que os avatares em produção serão verificados, e é a segunda vez que a
+escolha do hash como nome se paga.
+
+Sem `--aplicar` ele não escreve nada e roda a conferência inteira — a informação
+que interessa aparece antes de qualquer cópia. Corrupção **falha** o script de
+propósito, mesmo com o resto tendo copiado: rodar de novo é inofensivo, porque a
+migração é idempotente (verificado: segunda passada dá "já estavam: 6").
+
+### A ordem do corte, que é fácil de errar
+
+Pôr as variáveis do R2 **antes** de migrar faz o app ler de um bucket vazio, e
+toda foto existente vira 404 até a cópia terminar. Migre primeiro, configure
+depois. Está escrito no `docker-compose.prod.yml`, ao lado das variáveis.
+
+O volume `avatares` **continua montado** depois do corte: é de onde a migração
+lê, e é a rede de segurança até o primeiro backup do bucket ser restaurado para
+valer. Só sai quando RNF-019 fechar.
+
 ## O que fazer a seguir
 
 O [plano 01](docs/plans/01-contas-perfis-e-historico.md) **está entregue** (F1–F5, 26/08/2026).
-Há um plano **aberto**: o [plano 02](docs/plans/02-armazenamento-de-avatares.md), que tira as
-fotos do volume do container e as põe no R2. O gatilho dele é simples e não é arquitetura — **os
-avatares não têm backup nenhum**, enquanto o Postgres tem dump diário e restauração testada.
+O [plano 02](docs/plans/02-armazenamento-de-avatares.md) está **implementado (F1–F4) e não
+implantado**: falta criar o bucket, configurar, migrar e fechar RNF-019. Ver a seção "Plano 02
+implementado" abaixo.
 
 Fora isso, o que sobrou é o **M4 de `12`, que é a definição de "entregue"** — e é onde mora
 quase todo o trabalho restante.

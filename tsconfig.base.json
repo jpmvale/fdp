@@ -44,6 +44,12 @@
       ],
       "@fdp/contas/postgres": [
         "./packages/contas/src/postgres.ts"
+      ],
+      "@fdp/avatares": [
+        "./packages/avatares/src/index.ts"
+      ],
+      "@fdp/avatares/r2": [
+        "./packages/avatares/src/r2.ts"
       ]
     }
   }

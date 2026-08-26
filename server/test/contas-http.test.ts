@@ -21,6 +21,7 @@ import { createHttpApp } from '../src/http.js';
 import { createPersistence } from '../src/persistence.js';
 import { createSigner, type SessionSigner } from '../src/session.js';
 import { COOKIE_SESSAO } from '../src/contas-http.js';
+import { criarDepositoEmDisco } from '@fdp/avatares';
 
 const SEGREDO = 'segredo-de-teste-com-32-caracteres!';
 const CLIENT = fileURLToPath(new URL('../../app/build/', import.meta.url));
@@ -271,7 +272,7 @@ describe('limite de tentativas', () => {
  * operadora dividem o contador, e quem descobria isso era o vizinho que nunca
  * tentou nada.
  */
-describe('CA-390: o avatar não gasta o orçamento do cadastro', () => {
+describe('CA-390 / RNF-017: o avatar não gasta o orçamento do cadastro', () => {
   let dirDeAvatares: string;
 
   const enviarFoto = async (cookie: string, ip = '203.0.113.1'): Promise<Response> =>
@@ -285,7 +286,7 @@ describe('CA-390: o avatar não gasta o orçamento do cadastro', () => {
     dirDeAvatares = await mkdtemp(join(tmpdir(), 'fdp-avatar-lim-'));
     app = createHttpApp({
       hub, signer, clientPath: CLIENT, now: () => agora, dados,
-      cookieSeguro: false, diretorioDeAvatares: dirDeAvatares,
+      cookieSeguro: false, depositoDeAvatares: criarDepositoEmDisco(dirDeAvatares),
     });
   });
 

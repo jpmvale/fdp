@@ -42,6 +42,32 @@ jobs:
 
       - run: npm ci
 
+      # MinIO fala S3, e é contra ele que a assinatura SigV4 escrita à mão em
+      # `packages/avatares/src/assinatura.ts` é provada. Colar um vetor de
+      # referência num `expect` conferiria um caso; um servidor de verdade
+      # confere o protocolo.
+      #
+      # Sobe aqui, e não em `services:`, porque a imagem do MinIO exige o
+      # comando `server /data` e `services:` não deixa passar comando nenhum.
+      - name: MinIO de pé
+        run: |
+          docker run -d --name fdp-minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=fdpteste -e MINIO_ROOT_PASSWORD=fdptestesenha \
+            minio/minio:latest server /data
+
+          # Espera ativa com teto. Sem ela, o primeiro teste corre contra um
+          # servidor que ainda não abriu a porta, e a falha parece da
+          # assinatura — que é o que este serviço existe para provar.
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:9000/minio/health/live >/dev/null; then
+              echo "MinIO pronto em ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::MinIO não subiu em 30s"
+          docker logs fdp-minio
+          exit 1
+
       # Tipagem estrita: sem `any` na fronteira de dados (RNF-103).
       - name: Typecheck
         run: npx tsc -b --pretty
@@ -72,12 +98,16 @@ jobs:
         env:
           REDIS_URL: redis://127.0.0.1:6379
           DATABASE_URL: postgres://postgres:fdp@127.0.0.1:5432/postgres
+          R2_ENDPOINT: http://127.0.0.1:9000
+          R2_BUCKET: avatares
+          R2_ACCESS_KEY_ID: fdpteste
+          R2_SECRET_ACCESS_KEY: fdptestesenha
 
       # As duas suítes se pulam sem a variável; aqui elas são obrigatórias.
       # Pular no CI é o pior resultado possível: verde sem ter testado.
-      - name: Os contratos rodaram contra Redis e Postgres de verdade
+      - name: Os contratos rodaram contra os serviços de verdade
         run: |
-          for pacote in packages/store packages/contas; do
+          for pacote in packages/store packages/contas packages/avatares; do
             if npm test -- "$pacote" 2>&1 | grep -q "skipped"; then
               echo "::error::a suíte de contrato de $pacote foi pulada no CI"
               exit 1
@@ -87,6 +117,10 @@ jobs:
         env:
           REDIS_URL: redis://127.0.0.1:6379
           DATABASE_URL: postgres://postgres:fdp@127.0.0.1:5432/postgres
+          R2_ENDPOINT: http://127.0.0.1:9000
+          R2_BUCKET: avatares
+          R2_ACCESS_KEY_ID: fdpteste
+          R2_SECRET_ACCESS_KEY: fdptestesenha
 
       # Compilado dentro de `src/` faz o Vite resolver o `.js` em vez do `.ts`
       # (os imports são `'./room.js'`, convenção ESM do TypeScript), e a suíte

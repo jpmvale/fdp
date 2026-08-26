@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { arquivoDoCaminho, processarAvatar, TAMANHO_MAX } from '../src/avatar.js';
+import { criarDepositoEmDisco, type DepositoDeAvatares } from '@fdp/avatares';
 
 /**
  * Uma bomba de descompressão em duzentos bytes.
@@ -54,9 +55,14 @@ async function bombaDeCabecalho(largura: number, altura: number): Promise<Buffer
 }
 
 let dir: string;
+let deposito: DepositoDeAvatares;
 
 beforeEach(async () => {
+  // Um diretório por teste, atrás do depósito de verdade. Testar contra a
+  // interface e não contra `fs` é o que faz esta suíte continuar valendo
+  // quando o destino for um bucket (plano 02).
   dir = await mkdtemp(join(tmpdir(), 'fdp-avatar-'));
+  deposito = criarDepositoEmDisco(dir);
 });
 
 const png = (w: number, h: number, cor = '#336699'): Promise<Buffer> =>
@@ -64,7 +70,7 @@ const png = (w: number, h: number, cor = '#336699'): Promise<Buffer> =>
 
 describe('o caminho feliz', () => {
   it('reduz para 256×256 em WebP e devolve o caminho', async () => {
-    const r = await processarAvatar(await png(900, 600), { diretorio: dir });
+    const r = await processarAvatar(await png(900, 600), { deposito });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
 
@@ -77,7 +83,7 @@ describe('o caminho feliz', () => {
   });
 
   it('grava também a versão pequena, para o assento na mesa', async () => {
-    const r = await processarAvatar(await png(500, 500), { diretorio: dir });
+    const r = await processarAvatar(await png(500, 500), { deposito });
     if (!r.ok) throw new Error('falhou');
 
     const meta = await sharp(await readFile(join(dir, `${r.hash}-64.webp`))).metadata();
@@ -85,8 +91,8 @@ describe('o caminho feliz', () => {
   });
 
   it('recorta no centro: retrato e paisagem viram o mesmo quadrado', async () => {
-    const alto = await processarAvatar(await png(200, 800), { diretorio: dir });
-    const largo = await processarAvatar(await png(800, 200), { diretorio: dir });
+    const alto = await processarAvatar(await png(200, 800), { deposito });
+    const largo = await processarAvatar(await png(800, 200), { deposito });
     for (const r of [alto, largo]) {
       expect(r.ok).toBe(true);
       if (!r.ok) continue;
@@ -102,8 +108,8 @@ describe('o caminho feliz', () => {
    */
   it('a mesma imagem duas vezes dá o mesmo nome e um arquivo só', async () => {
     const bytes = await png(400, 400);
-    const a = await processarAvatar(bytes, { diretorio: dir });
-    const b = await processarAvatar(bytes, { diretorio: dir });
+    const a = await processarAvatar(bytes, { deposito });
+    const b = await processarAvatar(bytes, { deposito });
     if (!a.ok || !b.ok) throw new Error('falhou');
 
     expect(a.hash).toBe(b.hash);
@@ -111,8 +117,8 @@ describe('o caminho feliz', () => {
   });
 
   it('imagens diferentes dão nomes diferentes', async () => {
-    const a = await processarAvatar(await png(400, 400, '#ff0000'), { diretorio: dir });
-    const b = await processarAvatar(await png(400, 400, '#00ff00'), { diretorio: dir });
+    const a = await processarAvatar(await png(400, 400, '#ff0000'), { deposito });
+    const b = await processarAvatar(await png(400, 400, '#00ff00'), { deposito });
     if (!a.ok || !b.ok) throw new Error('falhou');
     expect(a.hash).not.toBe(b.hash);
   });
@@ -126,7 +132,7 @@ describe('o caminho feliz', () => {
       await sharp(base).gif().toBuffer(),
     ];
     for (const bytes of formatos) {
-      expect((await processarAvatar(bytes, { diretorio: dir })).ok).toBe(true);
+      expect((await processarAvatar(bytes, { deposito })).ok).toBe(true);
     }
   });
 
@@ -151,7 +157,7 @@ describe('o caminho feliz', () => {
         .jpeg({ quality: 80 })
         .toBuffer();
 
-      const r = await processarAvatar(foto, { diretorio: dir });
+      const r = await processarAvatar(foto, { deposito });
       expect(r.ok, `${nome} (${w}×${h}) devia entrar`).toBe(true);
       if (!r.ok) continue;
       expect((await sharp(join(dir, `${r.hash}.webp`)).metadata()).width).toBe(256);
@@ -164,7 +170,7 @@ describe('o caminho feliz', () => {
       .toBuffer();
     expect(avif.toString('ascii', 4, 12)).toBe('ftypavif');
 
-    const r = await processarAvatar(avif, { diretorio: dir });
+    const r = await processarAvatar(avif, { deposito });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const saida = await sharp(join(dir, `${r.hash}.webp`)).metadata();
@@ -191,7 +197,7 @@ describe('CA-389: HEIC é recusado dizendo o que fazer', () => {
         Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftyp'), Buffer.from(marca, 'ascii'),
         Buffer.alloc(64, 7),
       ]);
-      expect(await processarAvatar(bytes, { diretorio: dir }))
+      expect(await processarAvatar(bytes, { deposito }))
         .toEqual({ ok: false, motivo: 'HEIC_NAO_SUPORTADO' });
     }
   });
@@ -204,26 +210,58 @@ describe('CA-389: HEIC é recusado dizendo o que fazer', () => {
         Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftyp'), Buffer.from(marca, 'ascii'),
         Buffer.alloc(64, 7),
       ]);
-      expect(await processarAvatar(bytes, { diretorio: dir }))
+      expect(await processarAvatar(bytes, { deposito }))
         .toEqual({ ok: false, motivo: 'NAO_E_IMAGEM' });
     }
+  });
+});
+
+/**
+ * CA-393: o depósito fora do ar não é culpa da foto.
+ *
+ * Enquanto a gravação vivia dentro do `try` do processamento, um bucket
+ * inacessível saía como `FALHA_AO_PROCESSAR` — *"não consegui abrir essa
+ * imagem, ela pode estar corrompida"*. A pessoa olharia para a própria foto
+ * procurando um defeito que não existe, trocaria de imagem, e a segunda
+ * falharia igual. É a mesma família de erro do `PROTOCOL_VERSION` que derrubou
+ * o jogo: a mensagem mandava investigar o lugar errado.
+ */
+describe('CA-393: depósito indisponível tem motivo próprio', () => {
+  const quebrado = (): DepositoDeAvatares => ({
+    guardar: () => Promise.reject(new Error('bucket fora do ar')),
+    ler: () => Promise.resolve(undefined),
+    apagar: () => Promise.resolve(),
+  });
+
+  it('a imagem é boa; o motivo é do depósito, não dela', async () => {
+    const r = await processarAvatar(await png(400, 400), { deposito: quebrado() });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toBe('DEPOSITO_INDISPONIVEL');
+  });
+
+  it('a imagem RUIM continua sendo culpa dela, mesmo com o depósito fora', async () => {
+    // A ordem importa: validar antes de gravar significa que quem manda um
+    // PDF continua ouvindo "isso não é uma imagem", e não uma desculpa nossa.
+    const r = await processarAvatar(Buffer.from('nem imagem é'), { deposito: quebrado() });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toBe('NAO_E_IMAGEM');
   });
 });
 
 /** CA-370 — e cada caso é um ataque, não uma categoria. */
 describe('CA-370: o que NÃO entra', () => {
   it('bytes que não são imagem nenhuma', async () => {
-    const r = await processarAvatar(Buffer.from('isto é texto, não uma foto'), { diretorio: dir });
+    const r = await processarAvatar(Buffer.from('isto é texto, não uma foto'), { deposito });
     expect(r).toEqual({ ok: false, motivo: 'NAO_E_IMAGEM' });
   });
 
   it('vazio', async () => {
-    expect(await processarAvatar(Buffer.alloc(0), { diretorio: dir }))
+    expect(await processarAvatar(Buffer.alloc(0), { deposito }))
       .toEqual({ ok: false, motivo: 'GRANDE_DEMAIS' });
   });
 
   it('acima do teto de bytes', async () => {
-    const r = await processarAvatar(Buffer.alloc(TAMANHO_MAX + 1, 0xff), { diretorio: dir });
+    const r = await processarAvatar(Buffer.alloc(TAMANHO_MAX + 1, 0xff), { deposito });
     expect(r).toEqual({ ok: false, motivo: 'GRANDE_DEMAIS' });
   });
 
@@ -236,7 +274,7 @@ describe('CA-370: o que NÃO entra', () => {
     const svg = Buffer.from(
       '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">' +
       '<script>alert(1)</script><rect width="100" height="100"/></svg>');
-    expect(await processarAvatar(svg, { diretorio: dir }))
+    expect(await processarAvatar(svg, { deposito }))
       .toEqual({ ok: false, motivo: 'NAO_E_IMAGEM' });
   });
 
@@ -264,18 +302,18 @@ describe('CA-370: o que NÃO entra', () => {
     expect(bomba.length).toBeLessThan(1_000);
     expect(bomba.length).toBeLessThan(TAMANHO_MAX);
 
-    const r = await processarAvatar(bomba, { diretorio: dir });
+    const r = await processarAvatar(bomba, { deposito });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.motivo).toBe('IMAGEM_ABSURDA');
 
     // E o processo continua vivo o bastante para atender o próximo.
-    expect((await processarAvatar(await png(300, 300), { diretorio: dir })).ok).toBe(true);
+    expect((await processarAvatar(await png(300, 300), { deposito })).ok).toBe(true);
   }, 30_000);
 
   it('logo acima do teto é recusado, e logo abaixo entra', async () => {
     // A fronteira em si: 16 000² é o teto, então 16 001² não passa. Serve para
     // o dia em que alguém mexer no número achando que ninguém está olhando.
-    const acima = await processarAvatar(await bombaDeCabecalho(16_001, 16_001), { diretorio: dir });
+    const acima = await processarAvatar(await bombaDeCabecalho(16_001, 16_001), { deposito });
     expect(acima.ok).toBe(false);
     if (!acima.ok) expect(acima.motivo).toBe('IMAGEM_ABSURDA');
   });
@@ -286,9 +324,9 @@ describe('CA-370: o que NÃO entra', () => {
     }).jpeg().toBuffer();
     const cortado = inteiro.subarray(0, Math.floor(inteiro.length / 3));
 
-    const r = await processarAvatar(cortado, { diretorio: dir });
+    const r = await processarAvatar(cortado, { deposito });
     expect(r.ok).toBe(false);
-    expect((await processarAvatar(await png(300, 300), { diretorio: dir })).ok).toBe(true);
+    expect((await processarAvatar(await png(300, 300), { deposito })).ok).toBe(true);
   });
 
   /** `.png` que na verdade é outra coisa: a extensão é afirmação do cliente. */
@@ -297,7 +335,7 @@ describe('CA-370: o que NÃO entra', () => {
       Buffer.from('GIF89a'),               // começa como GIF…
       Buffer.from('conteúdo que não é imagem nenhuma depois disso'),
     ]);
-    const r = await processarAvatar(mentira, { diretorio: dir });
+    const r = await processarAvatar(mentira, { deposito });
     // Passa pela detecção de bytes (o cabeçalho é de GIF) e morre na
     // decodificação, que é onde a verdade aparece.
     expect(r.ok).toBe(false);
@@ -325,7 +363,7 @@ describe('CA-371: metadados não sobrevivem', () => {
     // passaria mesmo se a montagem estivesse errada.
     expect((await sharp(comExif).metadata()).exif).toBeDefined();
 
-    const r = await processarAvatar(comExif, { diretorio: dir });
+    const r = await processarAvatar(comExif, { deposito });
     if (!r.ok) throw new Error('falhou');
 
     const saida = await readFile(join(dir, `${r.hash}.webp`));
@@ -353,7 +391,7 @@ describe('CA-371: metadados não sobrevivem', () => {
       .jpeg()
       .toBuffer();
 
-    const r = await processarAvatar(deitada, { diretorio: dir });
+    const r = await processarAvatar(deitada, { deposito });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const meta = await sharp(await readFile(join(dir, `${r.hash}.webp`))).metadata();
