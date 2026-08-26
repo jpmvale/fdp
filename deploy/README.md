@@ -128,6 +128,7 @@ enxerga.
 | `vps_fdp_ultima_sonda_segundos` | timestamp da última execução — pega "o cron parou" |
 | `vps_fdp_salas` | salas vivas, de `/api/health` |
 | `vps_fdp_versao{versao}` | versão no ar |
+| `vps_fdp_contas` | 1 se o Postgres de contas está conectado, 0 se a API subiu sem ele |
 
 Numa queda, `vps_fdp_salas` **preserva a última contagem conhecida** em vez de
 publicar 0: zero salas e "não sei" são estados diferentes, e um gráfico que
@@ -156,7 +157,11 @@ armadilha para quem for ajustar um limiar às pressas durante um incidente.
 O token de serviço vive em `~/.config/grafana-api.env` na VPS, com permissão 600
 — o mesmo lugar e o mesmo cuidado das credenciais OTLP.
 
-São duas, e só duas:
+`vps_fdp_contas` é separada de `vps_fdp_disponivel` de propósito: jogar não
+depende de conta (plano 01, I-1), então o banco fora do ar **não** é o site
+caído — é a metade opcional dele indisponível.
+
+São três:
 
 | Regra | Dispara quando | Severidade |
 |---|---|---|

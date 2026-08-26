@@ -75,6 +75,62 @@ groups:
                     params: [1]
 
       # -----------------------------------------------------------------
+      # Contas fora do ar, com o JOGO no ar.
+      #
+      # Severidade `aviso`, e não `critico`, de propósito: jogar não depende de
+      # conta (plano 01, I-1), então isto não é o site caído — é a metade
+      # opcional dele indisponível. Quem chegar pelo link joga normalmente;
+      # quem tentar entrar na conta recebe 503.
+      #
+      # Existe porque, sem ele, o Postgres cair é invisível: a aplicação sobe
+      # sem contas de propósito, e o único sinal seria alguém reclamando de não
+      # conseguir entrar.
+      - uid: fdp-contas-fora
+        title: As contas do FDP estão fora do ar
+        condition: FORA
+        # 10 min: um deploy recria a API e há uma janela em que ela ainda não
+        # conectou. Alertar em 1 min transformaria todo deploy num falso
+        # positivo, e alerta que grita à toa é alerta que se aprende a ignorar.
+        for: 10m
+        noDataState: OK
+        execErrState: Alerting
+        labels:
+          severidade: aviso
+          servico: fdp
+        annotations:
+          summary: 'FDP: o jogo está no ar, mas as contas não'
+          description: >-
+            `vps_fdp_contas` está em 0: a API subiu sem conseguir falar com o
+            Postgres. Jogar por link continua funcionando; cadastro, login,
+            perfil e histórico respondem 503.
+            Comece por `docker ps --filter name=fdp-postgres` e
+            `docker logs fdp-postgres --tail 50`. Se o container estiver de pé,
+            veja `docker logs fdp-api --tail 30` — a mensagem de conexão sai na
+            subida, e a API só tenta conectar UMA vez, ao subir: com o banco de
+            volta, é preciso recriar a API para ela reconectar.
+          runbook_url: https://github.com/jpmvale/fdp/blob/main/deploy/README.md
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: SUBSTITUA_PELO_UID_DO_PROMETHEUS
+            model:
+              refId: A
+              instant: true
+              expr: vps_fdp_contas
+          - refId: FORA
+            datasourceUid: __expr__
+            model:
+              refId: FORA
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+
+      # -----------------------------------------------------------------
       # O alerta que o silêncio não engana.
       #
       # Sem ele, cron desligado, crontab apagado ou máquina fora do ar deixam

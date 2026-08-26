@@ -490,3 +490,42 @@ nunca os vê e passa verde enquanto só a máquina de quem desenvolve quebra. Ag
 ```bash
 find packages/*/src app/src server/src \( -name '*.js' -o -name '*.d.ts' \) -delete
 ```
+
+## Postgres na VPS (26/08/2026)
+
+Está de pé. Serviço no `docker-compose.prod.yml`, só na rede `internal` — nenhuma porta sai da
+máquina —, volume nomeado `postgres-data`, usuário `fdp` (não superusuário), senha em
+`~/apps/fdp/.env` como `FDP_DB_PASSWORD`, permissão 600.
+
+**O `depends_on` é `service_started`, não `service_healthy`.** Com `healthy`, um banco que não
+sobe impediria a API de subir, e o jogo ficaria refém da parte opcional dele. Isso foi
+verificado ao vivo: o compose subiu antes do container do Postgres existir, a API não resolveu o
+host, registrou o erro, **subiu assim mesmo** e recarregou as 2 salas vivas. Contas responderam
+503 e o jogo funcionou.
+
+O Postgres fica **fora de `SERVICOS`** no `deploy.sh`, como o Redis: não sai desta esteira e
+recriá-lo a cada deploy derrubaria conexão à toa. Se um dia o compose mudar o serviço do banco, é
+preciso rodar `docker compose -f docker-compose.prod.yml up -d postgres` à mão.
+
+**A API só tenta conectar UMA vez, na subida.** Com o banco de volta depois de uma queda, é
+preciso recriar a API para ela reconectar:
+
+```bash
+ssh vps 'cd ~/apps/fdp && IMAGE_TAG=$(cat ~/.deploy-state/fdp) docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate api'
+```
+
+**Backup** todo dia às 06:00 UTC, via `com-alerta.sh` como os outros. `backup-postgres.sh` roda
+o `pg_dump` **dentro do container** — a VPS não tem cliente de Postgres no host, e a senha lida
+de `$POSTGRES_PASSWORD` lá dentro nunca passa pela linha de comando, onde apareceria em `ps`. A
+restauração foi exercitada na própria VPS em 26/08/2026: dump, banco vazio, `pg_restore`, seis
+tabelas e o índice funcional de volta.
+
+**Alerta** `fdp-contas-fora` no Grafana, severidade `aviso` (não `crítica`) e `for: 10m` — um
+deploy recria a API e há uma janela antes de ela conectar; alertar em 1 min faria de todo deploy
+um falso positivo.
+
+Para inspecionar o banco (a senha fica dentro do container):
+
+```bash
+ssh vps 'docker exec fdp-postgres sh -c "PGPASSWORD=\$POSTGRES_PASSWORD psql -U fdp -d fdp -c \"SELECT count(*) FROM contas\""'
+```
