@@ -132,6 +132,9 @@ async function main(): Promise<void> {
     version: VERSION,
     dados,
     sso: configuracaoDoAmbiente(process.env),
+    // Sem a variável, o envio de avatar responde 503 e o resto funciona —
+    // mesma lógica das contas e do SSO (I-1).
+    diretorioDeAvatares: process.env['AVATARES_DIR'],
   });
 
   const server = serve({ fetch: app.fetch, port: PORT }, (info) => {

@@ -137,7 +137,13 @@ describe('CA-209: embaralhamento determinístico e uniforme', () => {
     for (const count of buckets) {
       expect(Math.abs(count - expected)).toBeLessThan(expected * 0.2);
     }
-  });
+    // Prazo explícito: são 52 mil embaralhamentos, ~2,3 s numa máquina
+    // ociosa. O teste é DETERMINÍSTICO — as sementes são fixas —, então
+    // falhar aqui só pode ser prazo, e o padrão de 5 s do vitest deixava-o a
+    // um pico de CPU de virar falso vermelho. Aconteceu em 26/08/2026, quando
+    // os testes de avatar entraram e passaram a decodificar imagens grandes
+    // em paralelo.
+  }, 20_000);
 
   it('nextInt não tem viés de módulo em faixas não potência de dois', () => {
     const rng = createRng('bias');

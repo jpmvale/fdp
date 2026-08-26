@@ -166,6 +166,7 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 | RF-061 | Entrar com Google ou GitHub. Só provedor **configurado** vira botão: um botão que devolve 503 é pior que nenhum |
 | RF-062 | SSO com e-mail **verificado pelo provedor** assume a conta de senha, apaga a senha e derruba as sessões |
 | RF-063 | Entrar com senha numa conta assumida por SSO **DEVE** dizer o que houve — *"esta conta agora entra pelo Google"* —, nunca "senha inválida" |
+| RF-070 | Avatar por imagem, só para quem tem conta, reduzido **no servidor** para 256×256 WebP, com EXIF removido. O emoji e a cor **CONTINUAM** por baixo: são o que aparece enquanto a foto carrega e se ela falhar |
 
 Na tela de conta, os botões de SSO vêm **antes** do formulário de senha. Sem recuperação de
 senha (§8 do plano 01), quem entra pelo Google nunca fica sem acesso — e a ordem dos botões é a

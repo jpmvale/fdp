@@ -33,9 +33,22 @@ export const nicknameSchema = z
     message: 'apelido não pode conter caracteres de controle',
   });
 
+/**
+ * Caminho de avatar servido pelo próprio app.
+ *
+ * Fechado num formato só — `/avatares/<64 hex>.webp` — e não "uma URL
+ * qualquer". Aceitar URL livre deixaria alguém apontar o avatar para um
+ * servidor externo, o que vira rastreamento de quem abre a mesa (cada carga
+ * entrega IP e horário a terceiro) e um canal de conteúdo que ninguém
+ * modera. O nome é o sha256 do arquivo: quem inventa um caminho não acerta um
+ * arquivo que exista.
+ */
+export const avatarImagemSchema = z.string().regex(/^\/avatares\/[0-9a-f]{64}\.webp$/);
+
 export const avatarSchema = z.object({
   emoji: z.enum(AVATAR_EMOJIS),
   color: z.enum(AVATAR_COLORS),
+  imagem: avatarImagemSchema.optional(),
 });
 
 /**

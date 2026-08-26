@@ -87,6 +87,9 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      # Avatares enviados (F5). Sem a variável, o envio responde 503 e o resto
+      # funciona — mesma lógica das contas e do SSO.
+      AVATARES_DIR: /var/lib/fdp/avatares
       ALLOWED_ORIGIN: https://fdp.imp-software.cloud
       # Só é seguro PORQUE o Caddy está na frente e sobrescreve
       # X-Forwarded-For. Nenhuma porta deste stack sai da máquina; se um dia
@@ -94,6 +97,11 @@ services:
       TRUST_PROXY: "1"
       PORT: "3000"
       FDP_VERSION: ${IMAGE_TAG:-dev}
+    volumes:
+      # Os avatares precisam sobreviver ao deploy: a cada publicação o
+      # container é RECRIADO, e o que estiver só na camada da imagem some —
+      # todo mundo perderia a foto a cada release.
+      - avatares:/var/lib/fdp/avatares
     networks:
       - internal
       - edge
@@ -128,6 +136,7 @@ services:
         condition: service_started
 
 volumes:
+  avatares:
   # Nomeado, e não bind mount: é o que o `pg_dump` de `deploy/backup-postgres.sh`
   # protege, e o que sobrevive a `docker compose down`.
   postgres-data:

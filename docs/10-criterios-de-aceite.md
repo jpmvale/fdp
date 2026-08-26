@@ -424,9 +424,20 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-367 | I | RF-068 | **Dado** uma partida sem nenhum jogador sentado com conta, **então** nada é gravado — nem com bot carregando conta por engano |
 | CA-368 | I | — | **Dado** uma partida completa, **então** colocação, nota, cheios, erro médio e pior erro do HISTÓRICO são os mesmos da tela de fim, saídos das mesmas funções do motor |
 | CA-369 | I | RF-071 | **Dado** o gancho de histórico estourando, **então** a sala segue viva e a falha vira log; **e** a mesma partida nunca é gravada duas vezes |
+| CA-370 | U | RF-070 | **Dado** um envio que não é imagem, é vazio, passa de 5 MB, é um SVG, é um JPEG truncado, ou é uma **bomba de descompressão**, **então** é recusado com motivo próprio e o processo continua atendendo o próximo |
+| CA-371 | U | RF-070 | **Dado** uma imagem com EXIF — inclusive coordenada de GPS —, **então** o avatar gravado não carrega EXIF, XMP nem os textos; e a **rotação** do EXIF é aplicada antes de o metadado ser descartado |
 
 CA-356 mede o defeito que consertou: a barra normalizava pelo prazo da aposta em todos os
 casos, então a vez de jogar carta nascia em 67% e a de um bot em 2%.
+
+CA-370 lista ataques, e não categorias. A bomba de descompressão é a que mais engana: um PNG
+branco de 8000² cabe em poucos KB — o teto de 5 MB não a pega — e vira 64 milhões de pixels ao
+decodificar, no mesmo processo que está servindo partidas. Só `limitInputPixels` pega. E o SVG
+fica de fora por ser documento **executável**: servido da nossa origem, um `<script>` lá dentro
+roda com a nossa sessão.
+
+CA-371 se importa com o GPS acima de tudo. Foto de rua carrega a coordenada de onde foi tirada,
+e o perfil é público por link (D-4) — entregar isso é entregar onde a pessoa mora.
 
 CA-368 é o teste que carrega a F4. Não pede números "equivalentes": pede **os mesmos**, saídos
 das mesmas funções. É CA-360 de novo — e pior, porque ali a divergência aparecia na tela e sumia,

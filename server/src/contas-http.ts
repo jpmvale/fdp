@@ -18,6 +18,7 @@ import { AVATAR_COLORS, AVATAR_EMOJIS, type Avatar } from '@fdp/protocol';
 import { avatarSchema, nicknameSchema } from '@fdp/protocol/validate';
 import type { Conta, Dados } from '@fdp/contas';
 import { conferirSenha, gastarComoSeFosse, gerarHash, senhaAceitavel } from './senha.js';
+import { processarAvatar, TAMANHO_MAX } from './avatar.js';
 import { createRateLimiter } from './limits.js';
 import { SESSAO_CONTA_MS, type SessionSigner } from './session.js';
 
@@ -30,6 +31,8 @@ export interface ContasHttpOptions {
   clientIp: (c: { env: HttpBindings; req: { header(n: string): string | undefined } }) => string;
   /** Em teste, sem TLS, o cookie não pode exigir `Secure` ou nada funciona. */
   cookieSeguro?: boolean;
+  /** Onde os avatares enviados ficam. Ausente = envio desligado. */
+  diretorioDeAvatares?: string | undefined;
 }
 
 /** O que sai para o cliente. O `id` interno NUNCA vai junto — só o slug. */
@@ -254,6 +257,72 @@ export function montarRotasDeConta(
     });
     if (!atualizada) return c.json({ code: 'SEM_SESSAO' }, 401);
 
+    return c.json({ conta: contaPublica(atualizada) });
+  });
+
+  /**
+   * Envio de avatar (F5). Só para quem tem conta — RF-070.
+   *
+   * Restringir a contas não é privilégio: é o que dá a quem enviou um nome
+   * ligado ao arquivo, e é a única moderação que existe hoje (§10, risco
+   * aceito). Convidado anônimo enviando imagem para uma mesa pública seria
+   * abuso sem rastro.
+   */
+  app.post('/api/eu/avatar', async (c) => {
+    if (!dados) return c.json(semBanco(), 503);
+    if (!opcoes.diretorioDeAvatares) return c.json({ code: 'AVATAR_INDISPONIVEL' }, 503);
+
+    const conta = await contaDoPedido(c.req.header('cookie'));
+    if (!conta) return c.json({ code: 'SEM_SESSAO' }, 401);
+
+    const passe = limiteCadastro.check(opcoes.clientIp(c), agora());
+    if (!passe.allowed) {
+      return c.json({ code: 'RATE_LIMITED' }, 429, {
+        'retry-after': String(Math.ceil(passe.retryAfterMs / 1000)),
+      });
+    }
+
+    // O `Content-Length` é uma AFIRMAÇÃO do cliente; serve para recusar cedo,
+    // e nunca para dispensar a checagem do que de fato chegou.
+    const declarado = Number(c.req.header('content-length') ?? 0);
+    if (declarado > TAMANHO_MAX) return c.json({ code: 'GRANDE_DEMAIS' }, 413);
+
+    let bytes: Buffer;
+    try {
+      bytes = Buffer.from(await c.req.arrayBuffer());
+    } catch {
+      return c.json({ code: 'NAO_E_IMAGEM' }, 400);
+    }
+
+    const r = await processarAvatar(bytes, { diretorio: opcoes.diretorioDeAvatares });
+    if (!r.ok) {
+      return c.json({ code: r.motivo }, r.motivo === 'GRANDE_DEMAIS' ? 413 : 400);
+    }
+
+    // O emoji e a cor CONTINUAM: a imagem é uma camada por cima. É o que a
+    // tela mostra enquanto ela carrega, e é o que preserva a unicidade de
+    // `04` §2 dentro da sala.
+    const atualizada = await dados.contas.atualizarPerfil(conta.id, {
+      apelido: conta.apelido,
+      avatar: { ...conta.avatar, imagem: r.caminho },
+    });
+    if (!atualizada) return c.json({ code: 'SEM_SESSAO' }, 401);
+
+    return c.json({ conta: contaPublica(atualizada) });
+  });
+
+  /** Tirar a imagem e voltar ao emoji. Sem isto, enviar é irreversível. */
+  app.delete('/api/eu/avatar', async (c) => {
+    if (!dados) return c.json(semBanco(), 503);
+    const conta = await contaDoPedido(c.req.header('cookie'));
+    if (!conta) return c.json({ code: 'SEM_SESSAO' }, 401);
+
+    const { imagem, ...semImagem } = conta.avatar;
+    void imagem;
+    const atualizada = await dados.contas.atualizarPerfil(conta.id, {
+      apelido: conta.apelido, avatar: semImagem,
+    });
+    if (!atualizada) return c.json({ code: 'SEM_SESSAO' }, 401);
     return c.json({ conta: contaPublica(atualizada) });
   });
 

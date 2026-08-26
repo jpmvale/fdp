@@ -35,6 +35,7 @@ import type { SessionSigner } from './session.js';
 import type { Dados } from '@fdp/contas';
 import { contaDoCookie, montarRotasDeConta } from './contas-http.js';
 import { montarRotasDeSso } from './sso-http.js';
+import { arquivoDoCaminho } from './avatar.js';
 import type { Buscar, ConfigSso } from './sso.js';
 
 export interface HttpOptions {
@@ -56,6 +57,8 @@ export interface HttpOptions {
   dados?: Dados | null;
   /** Sem TLS em teste, o cookie não pode exigir `Secure`. */
   cookieSeguro?: boolean;
+  /** Onde os avatares enviados ficam. Ausente = envio desligado. */
+  diretorioDeAvatares?: string | undefined;
   /** Provedores de SSO configurados. Vazio = nenhum botão, e nenhuma rota. */
   sso?: ConfigSso;
   /** Injetável para o teste percorrer o fluxo de SSO sem rede. */
@@ -321,6 +324,8 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
     signer,
     now,
     clientIp,
+    ...(options.diretorioDeAvatares === undefined
+      ? {} : { diretorioDeAvatares: options.diretorioDeAvatares }),
     ...(options.cookieSeguro === undefined ? {} : { cookieSeguro: options.cookieSeguro }),
   });
 
@@ -364,6 +369,39 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
     '.ico': 'image/x-icon',
     '.webmanifest': 'application/manifest+json',
   };
+
+  /**
+   * Os avatares enviados.
+   *
+   * Servidos pelo próprio app, e não pelo Caddy, por uma razão só: são um
+   * diretório a mais para configurar na borda, e o app já serve `/assets/`
+   * exatamente assim. Menos uma peça para lembrar quando o domínio mudar.
+   *
+   * O nome é o sha256 do conteúdo, então o cache pode ser IMUTÁVEL sem risco:
+   * conteúdo diferente nunca reusa um nome.
+   */
+  app.get('/avatares/:arquivo', (c) => {
+    if (!options.diretorioDeAvatares) return c.notFound();
+
+    // O nome vem do cliente. Só o formato exato passa — sem isto, `..%2f` e
+    // amigos escolheriam qualquer arquivo da máquina.
+    const arquivo = arquivoDoCaminho(`/avatares/${c.req.param('arquivo')}`);
+    if (!arquivo) return c.notFound();
+
+    try {
+      const bytes = readFileSync(caminhoDe(options.diretorioDeAvatares, arquivo));
+      return c.body(bytes, 200, {
+        'content-type': 'image/webp',
+        'cache-control': 'public, max-age=31536000, immutable',
+        // O arquivo é reescrito por `sharp` a partir dos pixels: não é o
+        // arquivo que a pessoa mandou. Ainda assim, `nosniff` fecha a porta
+        // de o navegador adivinhar outro tipo.
+        'x-content-type-options': 'nosniff',
+      });
+    } catch {
+      return c.notFound();
+    }
+  });
 
   app.get('*', (c) => {
     const caminho = new URL(c.req.url).pathname;

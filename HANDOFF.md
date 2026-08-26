@@ -548,3 +548,40 @@ cookie de `state` com `HttpOnly; SameSite=Lax; Secure; Max-Age=600`. As quatro r
 O `client_id` aparece na URL de redirecionamento e **é público por natureza** — está no
 navegador de todo mundo que clica em "Entrar com Google". O que é segredo é o `client_secret`, e
 ele nunca sai do `.env`.
+
+## Avatar por imagem (26/08/2026) — F5, e o plano 01 fechado
+
+`sharp` entrou como dependência. **É o segundo módulo nativo do projeto** (o primeiro foi o
+`pg`), custa ~27 MB de binários em `node_modules/@img`, e a imagem de produção foi para 382 MB.
+Foi construída e testada no Alpine antes de subir: o `linuxmusl-x64` está no lockfile e carrega.
+
+**A imagem é um campo A MAIS no avatar, não uma união.** O plano 01 §10 desenhou como união e eu
+mudei ao implementar, por três razões: união obrigaria migrar todo avatar já gravado (Postgres,
+Redis das salas vivas, `localStorage`); o emoji vira o fallback enquanto a foto carrega; e ela
+**fecha o buraco de R-6** — com as 8 cores esgotadas é o emoji único que garante o par de `04`
+§2, e um avatar sem emoji perderia esse resgate.
+
+Cada regra do processamento existe por um ataque concreto:
+
+- **Formato pelos BYTES**, nunca pelo `Content-Type` nem pela extensão — os dois são afirmações
+  do cliente.
+- **SVG recusado** mesmo sendo "uma imagem": é documento executável, e servido da nossa origem
+  um `<script>` lá dentro roda com a nossa sessão.
+- **`limitInputPixels`**: um PNG branco de 8000² cabe em poucos KB e vira 64 milhões de pixels
+  ao decodificar. O teto de 5 MB **não** pega isso.
+- **EXIF some, GPS junto.** E o `.rotate()` vem ANTES do descarte: sem ele a foto de retrato do
+  celular sai deitada.
+- O nome do arquivo é o **sha256 do resultado**: reenviar é idempotente e o cache é imutável.
+
+O volume `avatares` no compose não é opcional — sem ele, todo mundo perde a foto a cada deploy,
+porque o container é recriado.
+
+### Um teste derrubou o vizinho
+
+Os testes de avatar decodificam imagens grandes em paralelo e empurraram o **CA-209** (teste
+estatístico de 2,3 s, noutro pacote) para fora do timeout padrão de 5 s do vitest. Ele é
+determinístico — sementes fixas —, então não era intermitente: era prazo.
+
+Corrigido na causa (a bomba de teste foi de 20 000² para 8000², que ainda é 4× o teto) e no
+sintoma (CA-209 ganhou prazo próprio de 20 s). Um teste que derruba o vizinho é pior que teste
+nenhum: ensina a rodar de novo até passar.

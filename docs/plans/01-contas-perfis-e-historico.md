@@ -2,7 +2,7 @@
 
 Status: **EM EXECUÇÃO** · Aberto em 26/08/2026 · P11 emendada em 26/08/2026
 
-Fases: **F1 a F4 concluídas** (26/08/2026) · F5 não começou.
+Fases: **F1 a F5 concluídas** (26/08/2026). O plano está entregue.
 
 Cria contas (SSO e e-mail/senha), perfil público de jogador, histórico persistente de
 partidas e avatar por imagem.
@@ -188,11 +188,14 @@ contas chamadas "João" entram e colidem sem que ninguém tenha escolhido colidi
 | R-6 | Avatar de **imagem nunca é trocado** pela mesa. A cor pode repetir quando as 8 acabarem. | A imagem é canal de identificação mais forte que um emoji: duas fotos diferentes não se confundem a 360 px, mesmo com o mesmo anel. Trocar a foto de alguém para satisfazer uma regra de cor seria trocar o rosto da pessoa. |
 | R-7 | Quem foi desempatado **é avisado** na mesa. | Ver o próprio nome com um sufixo, sem explicação, se parece com defeito. Uma linha basta: *"já havia um João nesta mesa"*. |
 
-R-6 abre um buraco que o desenho atual não tinha e que é preciso assumir de olho aberto: hoje,
-com a cor esgotada, o **emoji único** é o que ainda garante o par de `04` §2. Avatar de imagem
-não tem emoji, então esse resgate deixa de existir. A conta fecha assim mesmo — 8 cores para no
-máximo 12 pessoas, e a partir da nona a foto é o que distingue —, mas quem for mexer em `04` §2
-depois precisa saber que essa é uma **exceção deliberada**, e não um caso esquecido.
+R-6 abriria um buraco: com a cor esgotada, é o **emoji único** que ainda garante o par de
+`04` §2, e um avatar sem emoji perderia esse resgate.
+
+**Resolvido na F5, e o buraco não chegou a existir.** A imagem virou um campo A MAIS no avatar,
+e não uma união que substitui o emoji: quem tem foto continua tendo emoji e cor por baixo — é o
+que a tela mostra enquanto a imagem carrega, e é o que mantém a unicidade de `04` §2 intacta. A
+mesa nunca troca a imagem de ninguém; pode trocar o emoji e a cor por baixo dela, o que é
+invisível e inofensivo.
 
 ---
 
@@ -496,8 +499,32 @@ uma partida de 5 vidas leva minutos, e os roteiros que escrevi para automatizá-
 própria sessão. O gate está fechado por teste determinístico que joga a partida inteira pelo
 motor de verdade e confere os números contra o banco.
 
-**F5 — Avatar por imagem.** Upload, `sharp`, servir por Caddy, e o `Avatar` em união.
+**F5 — Avatar por imagem.** ✅ **Concluída em 26/08/2026.**
 *Gate:* CA-370, CA-371, e o avatar aparece na mesa em 360 px sem quebrar o assento.
+
+*Divergi do desenho de §10 num ponto, e para melhor:* o plano fazia `Avatar` virar uma UNIÃO
+(`{tipo:'emoji'} | {tipo:'imagem'}`). Virou um **campo a mais** (`imagem?: string`) por três
+razões que só apareceram implementando — a união obrigaria migrar todo avatar já gravado (no
+Postgres, no Redis das salas vivas e no `localStorage`); o emoji vira o que a tela mostra
+enquanto a foto carrega e se ela falhar; e, o mais importante, **fecha o buraco que R-6 tinha
+aceitado**. Com as 8 cores esgotadas é o emoji único que ainda garante o par de `04` §2, e um
+avatar sem emoji perdia esse resgate. Com a imagem por cima de um emoji que continua existindo,
+a exceção deliberada de R-6 deixa de ser necessária.
+
+*Servido pelo próprio app*, não pelo Caddy: é um diretório a menos para configurar na borda, e
+o app já serve `/assets/` do mesmo jeito. Endereçado por conteúdo (`sha256`), então o cache é
+imutável sem risco.
+
+*O que o teste de CA-370 cobre são ataques, não categorias:* bomba de descompressão (um PNG
+branco de 8000² cabe em poucos KB e vira 64 milhões de pixels ao decodificar — o teto de 5 MB
+não pega, só `limitInputPixels` pega), SVG com `<script>` (documento executável servido da nossa
+origem seria XSS de primeira parte), JPEG truncado, cabeçalho mentindo sobre o conteúdo, e
+travessia de diretório no caminho público.
+
+*E o EXIF sai, inclusive o GPS* — foto de rua carrega a coordenada de onde foi tirada, e o
+perfil é público por link (D-4). A rotação do EXIF é aplicada ANTES de o metadado ser
+descartado: sem isso a foto de retrato do celular sairia deitada, e a pessoa concluiria que o
+site quebrou a foto dela.
 
 F1 a F3 são sequenciais. F4 depende de F1 e F2. F5 depende de F2 e é independente das demais.
 

@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   AVATAR_COLORS, AVATAR_EMOJIS, NICKNAME_MAX, NICKNAME_MIN,
   type Avatar as AvatarProto,
 } from '@fdp/protocol';
 import { Avatar } from '../components/Avatar';
 import type { PublicPlayer } from '../state/tipos';
+import { enviarAvatar, removerAvatar, ErroApi } from '../net/sessao';
 
 /**
  * Perfil: quem você é na mesa.
@@ -13,7 +14,7 @@ import type { PublicPlayer } from '../state/tipos';
  * chegar) e já dentro da sala (trocando de ideia). A diferença é o botão e o
  * fato de que, dentro da sala, dá para saber quais cores já são de alguém.
  */
-export function Perfil({ inicial, jaNaMesa, eu, aoConfirmar, aoVoltar }: {
+export function Perfil({ inicial, jaNaMesa, eu, aoConfirmar, aoVoltar, comConta }: {
   inicial?: { nickname: string; avatar: AvatarProto } | undefined;
   /** Quem já está na sala, para não escolher a cara de outro. */
   jaNaMesa?: PublicPlayer[] | undefined;
@@ -21,14 +22,17 @@ export function Perfil({ inicial, jaNaMesa, eu, aoConfirmar, aoVoltar }: {
   eu?: string | undefined;
   aoConfirmar: (nickname: string, avatar: AvatarProto) => void;
   aoVoltar: () => void;
+  /** Foto só existe com conta (RF-070). */
+  comConta?: boolean | undefined;
 }) {
   const [apelido, setApelido] = useState(
     inicial?.nickname ?? localStorage.getItem('fdp.apelido') ?? '',
   );
   const [cor, setCor] = useState<string>(inicial?.avatar.color ?? AVATAR_COLORS[0]);
+  const [imagem, setImagem] = useState<string | undefined>(inicial?.avatar.imagem);
   const [emoji, setEmoji] = useState<string>(inicial?.avatar.emoji ?? AVATAR_EMOJIS[0]);
 
-  const avatar = { emoji, color: cor } as AvatarProto;
+  const avatar = { emoji, color: cor, ...(imagem ? { imagem } : {}) } as AvatarProto;
   const limpo = apelido.trim();
   const valido = limpo.length >= NICKNAME_MIN;
 
@@ -134,6 +138,22 @@ export function Perfil({ inicial, jaNaMesa, eu, aoConfirmar, aoVoltar }: {
         )}
       </div>
 
+      {/* Foto só para quem tem conta (RF-070): é o que dá um nome ligado ao
+          arquivo, e é a única moderação que existe hoje. */}
+      {comConta && (
+        <div className="cartao pilha" style={{ gap: 8 }}>
+          <span className="rotulo">foto</span>
+          <p className="fraco" style={{ fontSize: 12 }}>
+            Entra por cima do emoji, e o emoji continua embaixo — é ele que
+            aparece enquanto a foto carrega.
+          </p>
+          <FotoDoAvatar
+            atual={imagem}
+            aoTrocar={(url) => setImagem(url)}
+          />
+        </div>
+      )}
+
       <div className="cartao pilha" style={{ gap: 10 }}>
         <span className="rotulo">emoji</span>
         <div role="radiogroup" aria-label="emoji do avatar" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -176,4 +196,98 @@ export function Perfil({ inicial, jaNaMesa, eu, aoConfirmar, aoVoltar }: {
       </button>
     </div>
   );
+}
+
+
+/**
+ * Escolher, enviar e tirar a foto.
+ *
+ * O envio é imediato — a foto vai para a conta assim que é escolhida, sem
+ * esperar o "salvar" do resto do formulário. É porque o servidor precisa
+ * processá-la para devolver o caminho, e não dá para montar o avatar antes de
+ * saber o endereço final.
+ */
+function FotoDoAvatar({ atual, aoTrocar }: {
+  atual: string | undefined;
+  aoTrocar: (url: string | undefined) => void;
+}) {
+  const campo = useRef<HTMLInputElement>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function escolheu(arquivo: File | undefined): Promise<void> {
+    if (!arquivo) return;
+    setErro(null);
+
+    // Recusa aqui o que o servidor recusaria de qualquer jeito: subir 20 MB
+    // pelo 4G para receber 413 no fim é gastar o dado da pessoa à toa.
+    if (arquivo.size > 5 * 1024 * 1024) {
+      setErro('A imagem passa de 5 MB.');
+      return;
+    }
+
+    setOcupado(true);
+    try {
+      const r = await enviarAvatar(arquivo);
+      aoTrocar(r.conta.avatar.imagem);
+    } catch (e) {
+      setErro(e instanceof ErroApi ? mensagemDaFoto(e.codigo) : 'Não deu para enviar.');
+    } finally {
+      setOcupado(false);
+      if (campo.current) campo.current.value = '';
+    }
+  }
+
+  return (
+    <div className="pilha" style={{ gap: 8 }}>
+      <input
+        ref={campo}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        onChange={(e) => void escolheu(e.target.files?.[0])}
+        style={{ display: 'none' }}
+      />
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          className="fantasma"
+          disabled={ocupado}
+          onClick={() => campo.current?.click()}
+          style={{ flex: 1 }}
+        >
+          {ocupado ? 'Enviando…' : atual ? 'Trocar a foto' : 'Escolher uma foto'}
+        </button>
+
+        {atual && (
+          <button
+            className="fantasma"
+            disabled={ocupado}
+            onClick={() => {
+              void removerAvatar().then(() => aoTrocar(undefined)).catch(() => {
+                setErro('Não deu para tirar a foto.');
+              });
+            }}
+          >
+            Tirar
+          </button>
+        )}
+      </div>
+
+      {erro && <p role="alert" style={{ color: 'var(--vidas)', fontSize: 12 }}>{erro}</p>}
+    </div>
+  );
+}
+
+/** Cada motivo do servidor vira uma frase que diz o que fazer. */
+function mensagemDaFoto(codigo: string): string {
+  switch (codigo) {
+    case 'GRANDE_DEMAIS': return 'A imagem passa de 5 MB.';
+    case 'NAO_E_IMAGEM': return 'Esse arquivo não é uma imagem (JPEG, PNG, WebP ou GIF).';
+    case 'IMAGEM_ABSURDA': return 'Essa imagem tem pixels demais. Reduza antes de enviar.';
+    case 'FALHA_AO_PROCESSAR': return 'Não consegui abrir essa imagem. Ela pode estar corrompida.';
+    case 'AVATAR_INDISPONIVEL': return 'O envio de foto está fora do ar.';
+    case 'SEM_SESSAO': return 'Sua sessão expirou. Entre de novo.';
+    case 'RATE_LIMITED': return 'Muitos envios. Espere um pouco.';
+    default: return 'Não deu para enviar.';
+  }
 }

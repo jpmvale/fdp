@@ -352,6 +352,7 @@ export function App() {
               : souEu}
             jaNaMesa={retrato.players}
             eu={eu}
+            comConta={estado.conta !== null}
             aoVoltar={() => setPerfilAberto(false)}
             aoConfirmar={(nickname, avatar) => {
               // A mesa muda sempre. A CONTA muda só se houver conta — e é ela

@@ -63,7 +63,7 @@ async function api<T>(caminho: string, corpo?: unknown, metodo?: string): Promis
 export interface ContaPublica {
   slug: string;
   apelido: string;
-  avatar: { emoji: string; color: string };
+  avatar: { emoji: string; color: string; imagem?: string };
 }
 
 /**
@@ -120,6 +120,28 @@ export async function provedoresDeSso(): Promise<string[]> {
 export function irParaSso(provedor: string, destino: string): void {
   location.href = `/api/sso/${encodeURIComponent(provedor)}?destino=${encodeURIComponent(destino)}`;
 }
+
+/**
+ * Envia a imagem do avatar. Bytes crus, sem `multipart`.
+ *
+ * `multipart/form-data` existe para mandar VÁRIOS campos; aqui é um arquivo
+ * só, e o formato traria um analisador a mais no servidor — mais código para
+ * receber entrada hostil, que é o oposto do que se quer neste caminho.
+ */
+export async function enviarAvatar(arquivo: File): Promise<{ conta: ContaPublica }> {
+  const r = await fetch('/api/eu/avatar', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'content-type': arquivo.type || 'application/octet-stream' },
+    body: arquivo,
+  });
+  const dados = (await r.json()) as Record<string, string>;
+  if (!r.ok) throw new ErroApi(dados.code ?? 'ERRO', dados.code ?? 'Deu errado.');
+  return dados as unknown as { conta: ContaPublica };
+}
+
+export const removerAvatar = () =>
+  api<{ conta: ContaPublica }>('/api/eu/avatar', undefined, 'DELETE');
 
 export const perfilPublico = (slug: string) =>
   api<{ conta: ContaPublica; resumo: { partidas: number; vitorias: number; notaMedia: number | null } }>(

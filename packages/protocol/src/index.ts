@@ -55,6 +55,25 @@ export type AvatarColor = (typeof AVATAR_COLORS)[number];
 export interface Avatar {
   emoji: AvatarEmoji;
   color: AvatarColor;
+  /**
+   * Imagem enviada pelo dono da conta (P11, F5). Caminho servido pelo próprio
+   * app, endereçado por conteúdo: `/avatares/<sha256>.webp`.
+   *
+   * É um CAMPO A MAIS, e não uma união com o emoji. O plano 01 §10 desenhou
+   * como união (`{tipo:'emoji'} | {tipo:'imagem'}`) e três coisas fizeram
+   * mudar de ideia ao implementar:
+   *
+   * 1. União obrigaria migrar todo avatar já gravado — no Postgres, no Redis
+   *    das salas vivas e no `localStorage` de quem já jogou.
+   * 2. O emoji vira o que a tela mostra **enquanto a imagem carrega** e se ela
+   *    falhar. Numa união, o avatar de imagem não teria fallback nenhum.
+   * 3. **Fecha um buraco que o plano tinha aceitado.** `04` §2 exige emoji e
+   *    cor únicos na sala, e com as 8 cores esgotadas é o emoji único que
+   *    ainda garante o par. Um avatar sem emoji perdia esse resgate — R-6 do
+   *    §5.1 registrava isso como exceção deliberada. Com a imagem por cima de
+   *    um emoji que continua existindo, a exceção deixa de ser necessária.
+   */
+  imagem?: string | undefined;
 }
 
 export type RoomStatus =
