@@ -334,7 +334,23 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
   });
 
   app.get('/api/health', (c) =>
-    c.json({ ok: true, version, protocolVersion: PROTOCOL_VERSION, rooms: hub.roomCount }));
+    c.json({
+      ok: true,
+      version,
+      protocolVersion: PROTOCOL_VERSION,
+      rooms: hub.roomCount,
+      /**
+       * Se as contas estão de pé. **Não** entra no `ok`: o jogo funciona sem
+       * elas (plano 01, I-1), e reprovar a saúde por causa da parte opcional
+       * faria o orquestrador reiniciar um processo saudável — ou pior,
+       * derrubar o jogo porque o banco caiu.
+       *
+       * Está aqui para a sonda poder publicar uma métrica e ALGUÉM ser
+       * avisado: sem este campo, o Postgres cair é invisível até alguém
+       * tentar entrar na conta.
+       */
+      contas: options.dados !== null && options.dados !== undefined,
+    }));
 
   // Cliente: o build do Vite. `clientPath` aponta para o diretório, e o
   // `index.html` dele é o mesmo para toda rota — é uma SPA, o roteamento é do

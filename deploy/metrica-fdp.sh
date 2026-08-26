@@ -39,10 +39,20 @@ if [ "$CODIGO" -eq 0 ]; then
   # campo é um inteiro simples — grep resolve sem dependência nova.
   SALAS=$(echo "$CORPO" | grep -o '"rooms":[0-9]*' | cut -d: -f2)
   VERSAO=$(echo "$CORPO" | grep -o '"version":"[^"]*"' | cut -d'"' -f4)
+  # Contas de pé ou não. É informação SEPARADA de `disponivel` de propósito: o
+  # jogo funciona sem contas (plano 01, I-1), então o banco fora do ar não pode
+  # marcar o serviço como indisponível — mas também não pode passar
+  # despercebido até alguém tentar entrar na conta.
+  case "$CORPO" in
+    *'"contas":true'*)  CONTAS=1 ;;
+    *'"contas":false'*) CONTAS=0 ;;
+    *) CONTAS="" ;;   # versão antiga do app, sem o campo
+  esac
 else
   DISPONIVEL=0
   SALAS=""
   VERSAO=""
+  CONTAS=""
 fi
 
 TMP="${METRICAS}/.${NOME}.tmp"
@@ -68,6 +78,12 @@ TMP="${METRICAS}/.${NOME}.tmp"
     # zero salas e "não sei" são estados diferentes, e um gráfico que despenca
     # a zero durante um incidente conta a história errada depois.
     grep "^vps_fdp_salas" "${METRICAS}/${NOME}.prom" || true
+  fi
+
+  if [ -n "$CONTAS" ]; then
+    echo "# HELP vps_fdp_contas 1 se o Postgres de contas está conectado, 0 se o app subiu sem ele."
+    echo "# TYPE vps_fdp_contas gauge"
+    echo "vps_fdp_contas ${CONTAS}"
   fi
 
   if [ -n "$VERSAO" ]; then
