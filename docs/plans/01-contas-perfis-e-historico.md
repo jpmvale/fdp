@@ -153,20 +153,41 @@ export interface PublicPlayer {
 Consequências que precisam ser cumpridas:
 
 - `PROTOCOL_VERSION` sobe de `1` para `2`. `PublicPlayer` e `Avatar` mudam de forma, e cliente
-  velho com servidor novo tem de recusar limpo.
+  velho com servidor novo tem de recusar limpo — **e esse caminho já existe e funciona**:
+  `validate.ts` devolve o código `PROTOCOL_VERSION` quando o `v` não bate, `ws.ts` o emite, e
+  há teste de integração em `server/test/ws.test.ts`. Subir para `2` já faz o cliente velho
+  receber `ERR-426` e pedir para recarregar; não há nada a construir.
 
-  **Só que esse caminho não existe.** `ERR-426 / PROTOCOL_VERSION` está especificado em `05`
-  §254 e o código está no enum de `protocol`, mas **nada no servidor o emite**: procurei, e o
-  `v` da mensagem não é conferido em lugar nenhum. Subir a versão hoje não faria efeito, e o
-  cliente velho quebraria de um jeito confuso — campo faltando, tela em branco — em vez de
-  pedir para recarregar.
-
-  Então **implementar a checagem de versão é a primeira tarefa da F2**, antes de qualquer
-  mudança de forma no protocolo. É dívida que já estava lá; este plano só é o primeiro a
-  precisar dela.
+  > Correção de 26/08/2026. A primeira versão deste plano afirmava o contrário — que nada no
+  > servidor conferia o `v` — e mandava implementar a checagem como primeira tarefa da F2. Era
+  > engano meu: procurei em `protocol/src/index.ts` e em `server/src/*.ts`, e `validate.ts`
+  > está em `protocol/src/`, exatamente na fresta entre as duas buscas.
 - Quem entra com conta **não escolhe apelido nem avatar na sala**: vêm da conta. Quem entra sem
   conta escolhe como hoje, e nada muda.
 - Espectador com conta também carrega `conta`. Perfil se abre de qualquer assento.
+
+### 5.1 Quando duas contas colidem na mesa
+
+Entrou aqui em 26/08/2026, junto de D-11. A unicidade de apelido, emoji e cor **dentro da
+sala** já é garantida por `packages/room/src/identidade.ts` (`04` §2, CA-374 e CA-375). O que
+muda com contas é que a identidade deixa de ser escolhida na porta e passa a vir pronta — duas
+contas chamadas "João" entram e colidem sem que ninguém tenha escolhido colidir.
+
+| # | Regra | Por quê |
+|---|---|---|
+| R-1 | A entrada **desempata e deixa entrar**. Nunca recusa. | É a mesma razão de CA-006: quem chegou depois não escolheu colidir, e barrar na porta é atrito puro. Com conta é pior ainda — a pessoa não tem como ceder, o apelido é da conta dela. |
+| R-2 | Só a metade que colide é trocada. | Já é a regra da mesa. Perder a cor por causa do emoji apagaria uma escolha que ninguém disputou. |
+| R-3 | **O desempate é da MESA, não da conta.** A conta nunca é reescrita por causa de uma sala. | Sem isto, entrar numa sala onde já existe um "João" renomearia a sua conta para sempre. A sala guarda um apelido de exibição; a conta segue intacta. |
+| R-4 | O editor de perfil no lobby, para quem tem conta, mostra e salva **a identidade da CONTA** — nunca a desempatada. | É a armadilha desta seção. Se a sala te renomeou para "João (2)" e o editor mostrar isso, salvar grava "João (2)" **na sua conta**, e o sufixo vira permanente. O editor tem de ler da conta. |
+| R-5 | Salvar pelo editor continua recusando com motivo (CA-375), e a recusa vale contra a mesa. | A escolha ali é deliberada, e a tela mostra o que está tomado. Desempatar em silêncio trocaria a escolha de alguém. |
+| R-6 | Avatar de **imagem nunca é trocado** pela mesa. A cor pode repetir quando as 8 acabarem. | A imagem é canal de identificação mais forte que um emoji: duas fotos diferentes não se confundem a 360 px, mesmo com o mesmo anel. Trocar a foto de alguém para satisfazer uma regra de cor seria trocar o rosto da pessoa. |
+| R-7 | Quem foi desempatado **é avisado** na mesa. | Ver o próprio nome com um sufixo, sem explicação, se parece com defeito. Uma linha basta: *"já havia um João nesta mesa"*. |
+
+R-6 abre um buraco que o desenho atual não tinha e que é preciso assumir de olho aberto: hoje,
+com a cor esgotada, o **emoji único** é o que ainda garante o par de `04` §2. Avatar de imagem
+não tem emoji, então esse resgate deixa de existir. A conta fecha assim mesmo — 8 cores para no
+máximo 12 pessoas, e a partir da nona a foto é o que distingue —, mas quem for mexer em `04` §2
+depois precisa saber que essa é uma **exceção deliberada**, e não um caso esquecido.
 
 ---
 
@@ -318,7 +339,9 @@ deixar de ser um grupo de amigos, isso vira urgente.
 
 ## 11. Requisitos e critérios
 
-IDs livres hoje: **RF-060+**, **CA-363+**, **RNF-105+**. Nenhum `RJ-###` novo — I-2.
+IDs livres hoje: **RF-060+**, **RNF-105+**. Em `CA-###`, o bloco **363 a 373** continua
+reservado a este plano, e **376+** para o que vier depois — 374 e 375 foram tomados pela
+unicidade de identidade na mesa (26/08/2026), que passou na frente. Nenhum `RJ-###` novo — I-2.
 
 | ID | Requisito (rascunho) |
 |---|---|
@@ -334,6 +357,8 @@ IDs livres hoje: **RF-060+**, **CA-363+**, **RNF-105+**. Nenhum `RJ-###` novo �
 | RF-069 | Apelido e avatar são gravados como snapshot |
 | RF-070 | Avatar por imagem, reduzido no servidor, com EXIF removido |
 | RF-071 | Falha ao gravar histórico não afeta a partida |
+| RF-072 | Colisão de identidade entre contas desempata na entrada e avisa quem foi desempatado (§5.1) |
+| RF-073 | O editor de perfil de quem tem conta edita a conta, não o apelido desempatado da mesa |
 
 | ID | Critério (rascunho) |
 |---|---|
@@ -347,7 +372,11 @@ IDs livres hoje: **RF-060+**, **CA-363+**, **RNF-105+**. Nenhum `RJ-###` novo �
 | CA-370 | Upload que não é imagem, ou que estoura o teto de pixels, é recusado sem derrubar o processo |
 | CA-371 | Avatar processado não carrega EXIF nem GPS |
 | CA-372 | Sala com jogador sem conta continua funcionando de ponta a ponta |
-| CA-373 | Cliente em `PROTOCOL_VERSION` 1 contra servidor 2 recusa limpo com `ERR-426`, e não com tela quebrada |
+| CA-373 | Cliente em `PROTOCOL_VERSION` 1 contra servidor 2 recusa limpo com `ERR-426`, e não com tela quebrada — o teste já existe em `server/test/ws.test.ts`; a F2 só precisa mantê-lo verde depois da subida para `2` |
+| CA-376 | Duas **contas** com o mesmo apelido na mesma sala: a segunda entra desempatada, e nenhuma é barrada na porta (R-1) |
+| CA-377 | O desempate da mesa **não** altera o apelido da conta: sair e entrar noutra sala vazia devolve o nome original (R-3) |
+| CA-378 | O editor de perfil de quem tem conta mostra o apelido da CONTA, não o desempatado — salvar não grava o sufixo (R-4) |
+| CA-379 | Avatar de imagem não é trocado pela mesa, mesmo com as 8 cores esgotadas (R-6) |
 
 O contrato de repositório segue o precedente do `RoomStore`: **uma suíte só, que a implementação
 em memória e a de Postgres passam igual** (`11` §4). Sem isso não há teste de conta que rode
@@ -364,9 +393,9 @@ a suíte de contrato dupla. Backup do volume e alerta no Grafana junto dos que j
 *Gate:* a suíte de contrato passa nas duas implementações; o backup é restaurado uma vez, para
 valer, num banco vazio.
 
-**F2 — Contas por e-mail e senha.** Primeiro a checagem de `PROTOCOL_VERSION`, que está
-especificada e não implementada (§5). Depois cadastro, login, sessão em cookie, token de sala
-derivado, limites de tentativa, `PROTOCOL_VERSION` 2 e `PublicPlayer.conta`.
+**F2 — Contas por e-mail e senha.** Cadastro, login, sessão em cookie, token de sala derivado,
+limites de tentativa, `PROTOCOL_VERSION` 2 e `PublicPlayer.conta` — mais o desempate de apelido
+entre contas na entrada (§5.1).
 *Gate:* CA-363, CA-372 e CA-373. Uma pessoa com conta e uma sem jogam a mesma partida inteira.
 
 **F3 — SSO.** Google e GitHub, PKCE, `state`, e a regra de tomada de conta com a tela de RF-063.
@@ -401,5 +430,9 @@ F1 a F3 são sequenciais. F4 depende de F1 e F2. F5 depende de F2 e é independe
    a **mesa** ter dois "João", e é lá que a regra vale. A consequência para este plano: quem
    entra com conta traz apelido e avatar da conta (§5), então **a colisão passa a ser possível
    entre duas contas na mesma sala**, e o caminho de entrada tem de desempatar como já faz com
-   convidado — sufixando na entrada, nunca recusando na porta. Isso ainda não está escrito em
-   nenhuma fase; entra na F2, junto de `PublicPlayer.conta`.
+   convidado — sufixando na entrada, nunca recusando na porta.
+
+   **Escrito em 26/08/2026: virou §5.1**, com sete regras, RF-072/RF-073 e CA-376 a CA-379, e
+   está na F2. Duas coisas que só apareceram ao escrever: o editor de perfil precisa ler da
+   conta, senão o sufixo da mesa vira permanente ao salvar (R-4); e avatar de imagem não tem
+   emoji, então some o resgate que hoje garante o par de `04` §2 quando as cores acabam (R-6).

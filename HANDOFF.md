@@ -368,12 +368,18 @@ printf "\n%s\n" "$(cat chave.pub)" >> ~/.ssh/authorized_keys
 `PROPOSTO`. Cinco fases com gate de saída; F1→F3 sequenciais, F4 depende de F1+F2, F5 depende
 de F2. A primeira coisa é a emenda **P11** em `00` §5 — nada do plano vale antes dela.
 
-Duas correções ao plano, encontradas conferindo o código:
+As duas correções que estavam anotadas aqui **já foram aplicadas ao plano** (26/08/2026):
 
-- **§5 diz que a checagem de `PROTOCOL_VERSION` não existe e é a primeira tarefa da F2.**
-  Existe: `validate.ts` recusa `v` diferente e devolve `PROTOCOL_VERSION`, o `ws.ts` emite, e há
-  teste de integração. Subir para a versão 2 já faz o cliente velho pedir recarregar.
-- **A pendência 4 (apelido duplicado) foi resolvida** e a mesa já garante — ver D-11.
+- A checagem de `PROTOCOL_VERSION` **existe** — `validate.ts` recusa `v` diferente, `ws.ts`
+  emite, e há teste de integração em `server/test/ws.test.ts`. O plano afirmava o contrário e
+  mandava implementá-la como primeira tarefa da F2; §5 agora traz a correção e diz de onde veio
+  o engano (a busca original passou ao lado de `protocol/src/validate.ts`). Subir para a versão
+  2 já faz o cliente velho pedir recarregar, e CA-373 é um teste que só precisa seguir verde.
+- A pendência de apelido duplicado virou **§5.1 do plano**, com sete regras, RF-072/RF-073 e
+  CA-376 a CA-379, dentro da F2.
+
+Reserva de IDs, para não colidir de novo: `CA-363` a `CA-373` e `CA-376+` são do plano; 374 e
+375 foram para a unicidade de identidade na mesa. `RF-060+` e `RNF-105+` estão livres.
 
 O resto continua sendo escolha, não dívida:
 
