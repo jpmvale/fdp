@@ -160,6 +160,10 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 | RF-058 | O áudio **DEVE** ser armado no **primeiro gesto** do jogador (toque ou tecla) e **DEVE** ter interruptor visível no menu ☰, cujo rótulo diz o estado atual. A escolha sobrevive a recarregar a página. |
 | RF-059 | Na vez do jogador, o **feltro inteiro** **DEVE** acender com borda vermelha pulsante **e** exibir sobre a mesa o aviso escrito **"É A SUA VEZ!"**. Só na própria vez, e nunca com a mesa pausada. |
 | RF-060 | Criar conta com e-mail e senha, sem confirmação de e-mail. A senha exige **comprimento** (10), nunca composição |
+| RF-074 | **Entrar e criar conta são telas separadas.** Entrar é a porta; cadastrar é um link abaixo do botão, nunca uma aba de igual peso — são dois momentos diferentes, e a aba fazia o aviso de RF-076 disputar espaço com o caminho de quem só quer voltar |
+| RF-075 | O cadastro **DEVE** ter confirmação de senha, e todo campo de senha **DEVE** ter alternador de mostrar/esconder, com o estado no rótulo acessível. Sem recuperação de senha (D-10), conferir o que se digitou é a única defesa contra um erro de digitação que custa a conta |
+| RF-076 | Concluído o cadastro, a sessão criada com ele **DEVE** ser encerrada e o jogador vai para **Entrar**, com o e-mail preenchido. Entrar uma vez prova que a senha funciona enquanto ela ainda está fresca — noutro produto seria atrito, aqui é a última hora barata de achar o erro |
+| RF-077 | Os botões de SSO **DEVEM** trazer a marca do provedor, desenhada em SVG local — a CSP não admite origem externa, e a marca é o que faz o botão ser reconhecido antes de ser lido |
 | RF-064 | Jogar sem conta **DEVE** continuar completo: entrar por link, jogar e ver o fim de partida sem cadastro, mesmo com o banco fora do ar |
 | RF-072 | Duas contas de mesmo apelido na mesma sala desempatam na **entrada**, nunca são recusadas na porta |
 | RF-073 | O editor de perfil de quem tem conta edita **a conta**, e parte do apelido dela — nunca do desempatado pela mesa |

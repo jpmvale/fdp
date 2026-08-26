@@ -413,8 +413,8 @@ dispatch.
 ### Reserva de IDs
 
 Para não colidir: `CA-363` a `CA-373` e `CA-376` a `CA-379` são do plano 01; `CA-374` e
-`CA-375` são da unicidade de identidade na mesa. Livres a partir de `CA-380`, `RF-074` e
-`RNF-106`.
+`CA-375` são da unicidade de identidade na mesa, e `CA-380` a `CA-383` das telas de conta.
+Livres a partir de `CA-384`, `RF-078` e `RNF-106`.
 
 ## Postgres e o pacote `@fdp/contas` (26/08/2026)
 

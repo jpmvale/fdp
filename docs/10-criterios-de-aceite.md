@@ -419,6 +419,10 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-376 | I | RF-072 | **Dado** duas contas de mesmo apelido, **quando** entram na mesma sala, **então** as duas entram, a segunda desempatada, e cada uma segue apontando para a própria conta |
 | CA-377 | I | RF-072 | **Dado** o desempate da mesa, **então** o apelido da CONTA não muda: noutra sala vazia a pessoa volta a entrar com o nome original |
 | CA-378 | I | RF-073 | **Dado** quem tem conta editando o perfil, **então** grava na conta e o slug não acompanha o apelido |
+| CA-380 | E | RF-074 | **Dado** a tela de conta, **então** ela abre em **Entrar**, sem aba de cadastro; cadastrar é um link abaixo do botão, e a tela de cadastro tem link de volta |
+| CA-381 | E | RF-075 | **Dado** o cadastro, **quando** as duas senhas divergem, **então** o botão fica bloqueado e a divergência é dita; **e** o alternador de cada campo troca o `type` e o rótulo acessível junto |
+| CA-382 | E | RF-076 | **Dado** um cadastro concluído, **então** `GET /api/eu` devolve `conta: null`, a tela de Entrar aparece com o e-mail preenchido e o recado, e entrar com a senha recém-criada funciona |
+| CA-383 | E | RF-077 | **Dado** provedores configurados, **então** cada botão de SSO traz a marca do provedor, servida da própria origem |
 | CA-364 | I | RF-061 | **Dado** a volta do provedor, **então** ela é recusada sem `state` na URL, sem o cookie, com os dois diferentes, com `state` de outro provedor, na segunda vez com o mesmo `state`, e depois de dez minutos |
 | CA-365 | I | RF-062 | **Dado** SSO cujo e-mail **não** é verificado pelo provedor, **então** a conta de senha existente NÃO é assumida e nasce conta separada; **dado** e-mail verificado, a conta é assumida e a senha some. No GitHub, só o e-mail `primary` **e** `verified` autoriza |
 | CA-367 | I | RF-068 | **Dado** uma partida sem nenhum jogador sentado com conta, **então** nada é gravado — nem com bot carregando conta por engano |

@@ -1,29 +1,32 @@
 import { useEffect, useState } from 'react';
-import {
-  criarConta, entrarComSenha, ErroApi, irParaSso, provedoresDeSso,
-  type ContaPublica,
-} from '../net/sessao';
+import { entrarComSenha, ErroApi, irParaSso, provedoresDeSso, type ContaPublica } from '../net/sessao';
+import { mensagemDeConta, SENHA_MINIMA } from '../net/erroDeConta';
 import { Folha } from '../components/Folha';
+import { CampoSenha } from '../components/CampoSenha';
+import { MARCA } from '../components/IconesSso';
 
 /**
- * Criar conta ou entrar.
+ * Entrar.
  *
  * **Conta é acréscimo, nunca pedágio** (plano 01, I-1). Esta tela só existe
  * porque alguém a abriu de propósito — nada no caminho de jogar passa por
  * aqui, e a Home continua com "Criar sala" como ação principal.
  *
- * A frase sobre não haver recuperação de senha não é rodapé jurídico: sem
- * confirmação de e-mail (D-5) não existe "esqueci minha senha", e quem
- * descobrir isso depois perde a conta e o histórico junto. Dizer na hora custa
- * uma linha e é a diferença entre uma escolha informada e uma armadilha.
+ * Entrar e cadastrar eram abas na mesma tela. Viraram duas telas porque são
+ * dois momentos diferentes: quem volta quer o caminho mais curto para dentro, e
+ * quem nunca entrou precisa ler o que está aceitando. A aba fazia as duas
+ * coisas competirem pelo mesmo espaço e empurrava o aviso sobre recuperação de
+ * senha para o rodapé de uma tela que ninguém estava lendo.
  */
-export function Conta({ aoFechar, aoEntrar }: {
+export function Conta({ emailInicial, recado, aoFechar, aoCriarConta, aoEntrar }: {
+  /** Vem do cadastro recém-concluído, para não redigitar. */
+  emailInicial?: string | undefined;
+  recado?: string | undefined;
   aoFechar: () => void;
+  aoCriarConta: () => void;
   aoEntrar: (conta: ContaPublica) => void;
 }) {
-  const [modo, setModo] = useState<'entrar' | 'criar'>('entrar');
-  const [apelido, setApelido] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(emailInicial ?? '');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -33,33 +36,32 @@ export function Conta({ aoFechar, aoEntrar }: {
   // que devolve 503 é pior que não oferecer nada.
   useEffect(() => { void provedoresDeSso().then(setProvedores); }, []);
 
-  const criando = modo === 'criar';
-  const podeEnviar =
-    email.trim().length > 3 && senha.length >= 10 && (!criando || apelido.trim().length >= 2);
+  const podeEnviar = email.trim().length > 3 && senha.length > 0;
 
   async function enviar(): Promise<void> {
+    if (!podeEnviar || ocupado) return;
     setErro(null);
     setOcupado(true);
     try {
-      const r = criando
-        ? await criarConta({ apelido: apelido.trim(), email: email.trim(), senha })
-        : await entrarComSenha(email.trim(), senha);
+      const r = await entrarComSenha(email.trim(), senha);
       aoEntrar(r.conta);
     } catch (e) {
-      setErro(e instanceof ErroApi
-        ? mensagem(e.codigo, e.params)
-        : 'Não deu para conectar.');
+      setErro(e instanceof ErroApi ? mensagemDeConta(e.codigo, e.params) : 'Não deu para conectar.');
     } finally {
       setOcupado(false);
     }
   }
 
   return (
-    <Folha rotulo={criando ? 'Criar conta' : 'Entrar'} aoFechar={aoFechar}>
-      <div role="tablist" aria-label="Conta" style={{ display: 'flex', gap: 6 }}>
-        <Aba atual={modo} valor="entrar" aoEscolher={setModo}>Entrar</Aba>
-        <Aba atual={modo} valor="criar" aoEscolher={setModo}>Criar conta</Aba>
-      </div>
+    <Folha rotulo="Entrar" aoFechar={aoFechar} cabecalho={<b style={{ fontSize: 15 }}>Entrar</b>}>
+      {recado && (
+        <p role="status" style={{
+          fontSize: 13, padding: '10px 12px', borderRadius: 'var(--r-md)',
+          background: 'rgba(63,185,138,0.14)', boxShadow: 'inset 0 0 0 1px rgba(63,185,138,0.5)',
+        }}>
+          {recado}
+        </p>
+      )}
 
       <p className="fraco" style={{ fontSize: 13 }}>
         Conta guarda seu apelido, seu avatar e o histórico das suas partidas.
@@ -70,20 +72,25 @@ export function Conta({ aoFechar, aoEntrar }: {
 
           Sem confirmação de e-mail não existe recuperação de senha (§8 do
           plano 01): quem entra pelo Google nunca fica sem acesso, e quem
-          escolhe senha assume um risco que a tela avisa logo abaixo. Pôr o
-          caminho seguro na frente é a única recomendação que a ordem dos
-          botões consegue fazer. */}
+          escolhe senha assume um risco que o cadastro avisa. Pôr o caminho
+          seguro na frente é a única recomendação que a ordem dos botões
+          consegue fazer. */}
       {provedores.length > 0 && (
         <div className="pilha" style={{ gap: 8 }}>
-          {provedores.map((p) => (
-            <button
-              key={p}
-              className="fantasma"
-              onClick={() => irParaSso(p, location.pathname + location.search)}
-            >
-              Entrar com {p === 'google' ? 'Google' : 'GitHub'}
-            </button>
-          ))}
+          {provedores.map((p) => {
+            const marca = MARCA[p];
+            return (
+              <button
+                key={p}
+                className="fantasma"
+                onClick={() => irParaSso(p, location.pathname + location.search)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}
+              >
+                {marca ? <marca.Icone /> : null}
+                Entrar com {marca?.nome ?? p}
+              </button>
+            );
+          })}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ flex: 1, height: 1, background: 'var(--linha)' }} />
             <span className="fraco">ou com e-mail</span>
@@ -93,105 +100,53 @@ export function Conta({ aoFechar, aoEntrar }: {
       )}
 
       <div className="pilha" style={{ gap: 10 }}>
-        {criando && (
-          <label className="pilha" style={{ gap: 4 }}>
-            <span className="rotulo">apelido</span>
-            <input
-              value={apelido}
-              onChange={(e) => setApelido(e.target.value)}
-              maxLength={16}
-              autoComplete="nickname"
-            />
-          </label>
-        )}
-
         <label className="pilha" style={{ gap: 4 }}>
           <span className="rotulo">e-mail</span>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void enviar(); }}
             autoComplete="email"
             inputMode="email"
           />
         </label>
 
-        <label className="pilha" style={{ gap: 4 }}>
-          <span className="rotulo">senha</span>
-          <input
-            type="password"
-            value={senha}
-            onChange={(e) => setSenha(e.target.value)}
-            autoComplete={criando ? 'new-password' : 'current-password'}
-          />
-          {/* Comprimento, e só. Exigir maiúscula e símbolo produz senha pior —
-              leva a `Senha@123` — e é o que o NIST desaconselha desde 2017. */}
-          <span className="fraco" style={{ fontSize: 11 }}>
-            {senha.length < 10
-              ? `pelo menos 10 caracteres — faltam ${10 - senha.length}`
-              : 'boa'}
-          </span>
-        </label>
+        <CampoSenha
+          rotulo="senha"
+          valor={senha}
+          aoMudar={setSenha}
+          autoComplete="current-password"
+          aoEnter={() => void enviar()}
+        />
       </div>
 
-      {erro && (
-        <p role="alert" style={{ color: 'var(--vidas)', fontSize: 13 }}>{erro}</p>
-      )}
+      {erro && <p role="alert" style={{ color: 'var(--vidas)', fontSize: 13 }}>{erro}</p>}
 
       <button disabled={!podeEnviar || ocupado} onClick={() => void enviar()}>
-        {ocupado ? 'Um instante…' : criando ? 'Criar conta' : 'Entrar'}
+        {ocupado ? 'Um instante…' : 'Entrar'}
       </button>
 
-      {criando && (
-        <p className="fraco" style={{ fontSize: 12, textAlign: 'center' }}>
-          Ainda não dá para recuperar a senha por e-mail. Se esquecer, a conta
-          se perde — guarde num gerenciador de senhas.
-        </p>
-      )}
+      {/* Link, e não terceiro botão: cadastrar é a ação de quem NÃO é o público
+          desta tela, e competir em peso com "Entrar" atrapalharia os dois. */}
+      <p style={{ textAlign: 'center', fontSize: 13 }}>
+        <span className="fraco">Não tem conta? </span>
+        <button
+          className="fantasma"
+          onClick={aoCriarConta}
+          style={{
+            background: 'transparent', boxShadow: 'none', padding: '0 4px',
+            minHeight: 'var(--toque)', color: 'var(--acento-claro)',
+            textDecoration: 'underline', width: 'auto', display: 'inline',
+          }}
+        >
+          Criar conta
+        </button>
+      </p>
+
+      <p className="fraco" style={{ fontSize: 11, textAlign: 'center' }}>
+        A senha precisa de pelo menos {SENHA_MINIMA} caracteres.
+      </p>
     </Folha>
-  );
-}
-
-/**
- * Mensagens em português, a partir do código do servidor.
- *
- * `CREDENCIAL_INVALIDA` é de propósito a MESMA frase para senha errada e para
- * e-mail que não existe: dizer "não encontramos esse e-mail" entrega quem tem
- * conta aqui, e o perfil é público por link (D-4).
- */
-function mensagem(codigo: string, params?: Record<string, unknown>): string {
-  switch (codigo) {
-    case 'CREDENCIAL_INVALIDA': return 'E-mail ou senha não conferem.';
-    // RF-063. Dizer "senha inválida" aqui é o comportamento fácil, e o que faz
-    // a pessoa tentar cinco vezes e ir embora achando que é bug.
-    case 'CONTA_MIGRADA_PARA_SSO': {
-      const lista = Array.isArray(params?.['provedores']) ? params['provedores'] as string[] : [];
-      const nome = lista.includes('google') ? 'Google' : lista.includes('github') ? 'GitHub' : 'outro serviço';
-      return `Esta conta agora entra pelo ${nome}. Use o botão acima.`;
-    }
-    case 'EMAIL_EM_USO': return 'Já existe uma conta com esse e-mail.';
-    case 'EMAIL_INVALIDO': return 'Esse e-mail não parece um e-mail.';
-    case 'SENHA_FRACA': return 'A senha precisa de pelo menos 10 caracteres.';
-    case 'APELIDO_INVALIDO': return 'Apelido entre 2 e 16 caracteres.';
-    case 'RATE_LIMITED': return 'Muitas tentativas. Espere um pouco.';
-    case 'CONTAS_INDISPONIVEIS': return 'As contas estão fora do ar. O jogo funciona normalmente.';
-    default: return 'Deu errado. Tente de novo.';
-  }
-}
-
-function Aba<T extends string>({ atual, valor, aoEscolher, children }: {
-  atual: T; valor: T; aoEscolher: (v: T) => void; children: React.ReactNode;
-}) {
-  const ativa = atual === valor;
-  return (
-    <button
-      role="tab"
-      aria-selected={ativa}
-      className={ativa ? undefined : 'fantasma'}
-      onClick={() => aoEscolher(valor)}
-      style={{ flex: 1, minHeight: 40 }}
-    >
-      {children}
-    </button>
   );
 }

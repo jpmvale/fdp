@@ -15,6 +15,7 @@ import { BloqueioConexao, FaixaConexao, bloqueia } from './components/Conexao';
 import { Home } from './screens/Home';
 import { Perfil } from './screens/Perfil';
 import { Conta } from './screens/Conta';
+import { CriarConta } from './screens/CriarConta';
 import { PerfilPublico } from './screens/PerfilPublico';
 import { Folha } from './components/Folha';
 import { Menu } from './screens/Menu';
@@ -43,7 +44,11 @@ export function App() {
    */
   const reconciliador = useRef(createReconciler());
   const [regrasAbertas, setRegrasAbertas] = useState(false);
-  const [contaAberta, setContaAberta] = useState(false);
+  // Três estados e não um booleano: entrar e cadastrar são telas irmãs, e o
+  // recado do cadastro recém-feito precisa atravessar a troca.
+  const [conta, setConta] = useState<
+    { tela: 'entrar'; email?: string; recado?: string } | { tela: 'criar' } | null
+  >(null);
   const [perfilPublico, setPerfilPublico] = useState<string | null>(null);
   // O que o Perfil vai fazer ao confirmar: criar sala, entrar numa, ou só
   // salvar (quando já se está na mesa).
@@ -242,7 +247,7 @@ export function App() {
             codigoInicial={new URLSearchParams(location.search).get('sala') ?? ''}
             aoAbrirRegras={() => setRegrasAbertas(true)}
             conta={estado.conta}
-            aoAbrirConta={() => setContaAberta(true)}
+            aoAbrirConta={() => setConta({ tela: 'entrar' })}
             aoSairDaConta={() => {
               void sairDaConta().catch(() => {});
               definir({ conta: null });
@@ -262,10 +267,29 @@ export function App() {
           />
         )}
 
-        {contaAberta && (
+        {conta?.tela === 'entrar' && (
           <Conta
-            aoFechar={() => setContaAberta(false)}
-            aoEntrar={(conta) => { definir({ conta }); setContaAberta(false); avisar(`Olá, ${conta.apelido}`); }}
+            emailInicial={conta.email}
+            recado={conta.recado}
+            aoFechar={() => setConta(null)}
+            aoCriarConta={() => setConta({ tela: 'criar' })}
+            aoEntrar={(entrou) => {
+              definir({ conta: entrou });
+              setConta(null);
+              avisar(`Olá, ${entrou.apelido}`);
+            }}
+          />
+        )}
+
+        {conta?.tela === 'criar' && (
+          <CriarConta
+            aoFechar={() => setConta(null)}
+            aoVoltarParaEntrar={() => setConta({ tela: 'entrar' })}
+            aoCriada={(email) => setConta({
+              tela: 'entrar',
+              email,
+              recado: 'Conta criada. Entre com ela agora para confirmar que a senha está certa.',
+            })}
           />
         )}
 
