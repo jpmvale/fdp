@@ -159,6 +159,18 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 | RF-057 | O tempo acabando **DEVE** ter aviso próprio no último quarto do prazo, com frequência crescente — som **e** pulso visual na barra, nunca só um dos dois (RNF-031). Só para quem está na vez: os outros veriam pressão que não é deles. |
 | RF-058 | O áudio **DEVE** ser armado no **primeiro gesto** do jogador (toque ou tecla) e **DEVE** ter interruptor visível no menu ☰, cujo rótulo diz o estado atual. A escolha sobrevive a recarregar a página. |
 | RF-059 | Na vez do jogador, o **feltro inteiro** **DEVE** acender com borda vermelha pulsante **e** exibir sobre a mesa o aviso escrito **"É A SUA VEZ!"**. Só na própria vez, e nunca com a mesa pausada. |
+| RF-060 | Criar conta com e-mail e senha, sem confirmação de e-mail. A senha exige **comprimento** (10), nunca composição |
+| RF-064 | Jogar sem conta **DEVE** continuar completo: entrar por link, jogar e ver o fim de partida sem cadastro, mesmo com o banco fora do ar |
+| RF-072 | Duas contas de mesmo apelido na mesma sala desempatam na **entrada**, nunca são recusadas na porta |
+| RF-073 | O editor de perfil de quem tem conta edita **a conta**, e parte do apelido dela — nunca do desempatado pela mesa |
+
+A tela de cadastro **DEVE** dizer, no ato, que ainda não há recuperação de senha (§8 do plano
+01). Não é rodapé jurídico: sem confirmação de e-mail não existe "esqueci minha senha", e quem
+descobrir isso depois perde a conta e o histórico junto. Custa uma linha, e é a diferença entre
+uma escolha informada e uma armadilha.
+
+A porta da conta na Home fica **abaixo** das duas ações de jogar. Pôr "Entrar" acima de "Criar
+sala" faria o jogo parecer que pede cadastro, e ele não pede.
 
 RF-055 corrige um erro que passava por decoração: a barra normalizava sempre pelo prazo da
 aposta (45 s), então a vez de jogar carta (30 s) nascia em 67% e a vez de um bot (900 ms)

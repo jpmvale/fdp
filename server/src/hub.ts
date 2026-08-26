@@ -9,7 +9,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
-import { CLOSE_CODES, type ErrorPayload, type ServerEvent } from '@fdp/protocol';
+import { PROTOCOL_VERSION, CLOSE_CODES, type ErrorPayload, type ServerEvent } from '@fdp/protocol';
 import {
   nextDeadline,
   tick,
@@ -58,7 +58,7 @@ export function createHub({
 
   const send: Hub['send'] = (socket, event, stateVersion) => {
     if (!socket || socket.readyState !== socket.OPEN) return;
-    socket.send(JSON.stringify({ v: 1, id: newId(), ts: now(), stateVersion, ...event }));
+    socket.send(JSON.stringify({ v: PROTOCOL_VERSION, id: newId(), ts: now(), stateVersion, ...event }));
   };
 
   const deliver = (room: Room, emissions: Emission[]): void => {

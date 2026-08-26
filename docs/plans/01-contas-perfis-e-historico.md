@@ -2,7 +2,7 @@
 
 Status: **EM EXECUÇÃO** · Aberto em 26/08/2026 · P11 emendada em 26/08/2026
 
-Fases: **F1 concluída** (26/08/2026) · F2 a F5 não começaram.
+Fases: **F1 e F2 concluídas** (26/08/2026) · F3 a F5 não começaram.
 
 Cria contas (SSO e e-mail/senha), perfil público de jogador, histórico persistente de
 partidas e avatar por imagem.
@@ -413,10 +413,31 @@ gerenciados). Era exatamente o tipo de defeito que só apareceria em produção.
 *Fica para quando o Postgres subir na VPS:* alerta no Grafana junto dos que já existem, e o
 backup no cron.
 
-**F2 — Contas por e-mail e senha.** Cadastro, login, sessão em cookie, token de sala derivado,
-limites de tentativa, `PROTOCOL_VERSION` 2 e `PublicPlayer.conta` — mais o desempate de apelido
-entre contas na entrada (§5.1).
+**F2 — Contas por e-mail e senha.** ✅ **Concluída em 26/08/2026.** Cadastro, login, sessão em
+cookie, limites de tentativa, `PROTOCOL_VERSION` 2, `PublicPlayer.conta` e o desempate de §5.1.
 *Gate:* CA-363, CA-372 e CA-373. Uma pessoa com conta e uma sem jogam a mesma partida inteira.
+
+*Cumprido:* 28 testes de rota e 13 do núcleo de autenticação. Senha com `scrypt` do
+`node:crypto` (D-6), sessão em cookie `HttpOnly` (D-7), revogação por época (D-8), perfil
+público por slug (D-4) e `PATCH /api/eu` para R-4.
+
+*Três coisas que só apareceram implementando:*
+
+1. **Confusão de tipo entre os dois tokens.** O de sala e o de conta são HS256 com o MESMO
+   segredo, então a assinatura de um confere no outro — e o de sala viaja na query string do
+   WebSocket, onde proxy registra. Sem separação, um token de log viraria sessão permanente.
+   Resolvido com a claim `tipo`, que é obrigatória no token de conta e opcional no de sala
+   (ausente = emitido antes, e continua valendo: deploy não expulsa ninguém do meio da
+   partida).
+2. **O servidor emitia `v: 1` fixo** em `hub.ts`, enquanto validava a entrada contra a
+   constante. Subir para 2 teria deixado servidor e cliente falando versões diferentes em
+   direções opostas. Agora segue a constante.
+3. **As rotas novas violavam RNF-001**, devolvendo `{ error: { code } }` em vez de
+   `{ code, params? }`. O cliente lê `code` do topo, então metade das mensagens de erro
+   chegaria vazia na tela. Corrigido, com teste que compara os dois formatos.
+
+*Deliberadamente adiado:* CA-379 (avatar de imagem não trocado pela mesa) depende da união de
+`Avatar`, que é da F5.
 
 **F3 — SSO.** Google e GitHub, PKCE, `state`, e a regra de tomada de conta com a tela de RF-063.
 *Gate:* CA-364, CA-365, CA-366.

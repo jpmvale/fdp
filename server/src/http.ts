@@ -32,6 +32,8 @@ import {
 import type { Hub } from './hub.js';
 import { createRateLimiter } from './limits.js';
 import type { SessionSigner } from './session.js';
+import type { Dados } from '@fdp/contas';
+import { contaDoCookie, montarRotasDeConta } from './contas-http.js';
 
 export interface HttpOptions {
   hub: Hub;
@@ -44,6 +46,14 @@ export interface HttpOptions {
   /** Atrás do Caddy o IP verdadeiro vem em `X-Forwarded-For`. */
   trustProxy?: boolean;
   version?: string;
+  /**
+   * Persistência de contas. **Opcional de propósito** (plano 01, I-1): sem ela
+   * as rotas de conta respondem 503 e o jogo continua inteiro. Banco fora do ar
+   * não pode tirar o jogo do ar.
+   */
+  dados?: Dados | null;
+  /** Sem TLS em teste, o cookie não pode exigir `Secure`. */
+  cookieSeguro?: boolean;
 }
 
 /** Avatar de quem não escolheu. A sala troca se já estiver tomado. */
@@ -142,8 +152,21 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
     const rate = createLimit.check(clientIp(c), now());
     if (!rate.allowed) return c.json(limited(rate.retryAfterMs), 429);
 
-    const identity = parseIdentity(await c.req.json().catch(() => ({})));
-    if (!identity.ok) return c.json(fail('VALIDATION_FAILED'), 422);
+    // Mesma regra da entrada: logado, a identidade vem da conta (§5).
+    const conta = await contaDoCookie(
+      options.dados ?? null, signer, c.req.header('cookie'), now());
+
+    let nickname: string;
+    let avatar: Avatar;
+    if (conta) {
+      nickname = conta.apelido;
+      avatar = conta.avatar;
+    } else {
+      const identity = parseIdentity(await c.req.json().catch(() => ({})));
+      if (!identity.ok) return c.json(fail('VALIDATION_FAILED'), 422);
+      nickname = identity.value.nickname;
+      avatar = identity.value.avatar ?? PADRAO;
+    }
 
     const code = generateFreeCode(
       (n) => randomBytes(n),
@@ -156,7 +179,7 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
       createRoom(
         code,
         // Sala nova: não há com quem colidir, então o host leva o que pediu.
-        { playerId, nickname: identity.value.nickname, avatar: identity.value.avatar ?? PADRAO },
+        { playerId, nickname, avatar, conta: conta?.slug ?? null },
         ctx,
       ),
     );
@@ -203,8 +226,30 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
     const room = hub.get(parsed.data);
     if (!room || room.status === 'ENCERRADA') return c.json(fail('ROOM_NOT_FOUND'), 404);
 
-    const identity = parseIdentity(await c.req.json().catch(() => ({})));
-    if (!identity.ok) return c.json(fail('VALIDATION_FAILED'), 422);
+    /**
+     * Quem entra logado **não escolhe** apelido nem avatar aqui: vêm da conta
+     * (plano 01 §5). Aceitar o que o corpo mandou deixaria a identidade da
+     * mesa divergir da do perfil que o assento aponta — e o link do perfil
+     * levaria a outra pessoa.
+     *
+     * O que a sala ainda pode mudar é o desempate: se já houver um "João" na
+     * mesa, `join` sufixa (R-1, R-2). Isso vale para a MESA e não volta para a
+     * conta (R-3).
+     */
+    const conta = await contaDoCookie(
+      options.dados ?? null, signer, c.req.header('cookie'), now());
+
+    let nickname: string;
+    let avatar: Avatar;
+    if (conta) {
+      nickname = conta.apelido;
+      avatar = conta.avatar;
+    } else {
+      const identity = parseIdentity(await c.req.json().catch(() => ({})));
+      if (!identity.ok) return c.json(fail('VALIDATION_FAILED'), 422);
+      nickname = identity.value.nickname;
+      avatar = identity.value.avatar ?? PADRAO;
+    }
 
     const playerId = randomUUID();
     const ctx = hub.ctx();
@@ -212,7 +257,7 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
       room,
       // Sem pré-deduplicar: `join` é quem garante a identidade única agora.
       // Duas checagens do mesmo com regras próprias foi o que criou o buraco.
-      { playerId, nickname: identity.value.nickname, avatar: identity.value.avatar ?? PADRAO },
+      { playerId, nickname, avatar, conta: conta?.slug ?? null },
       ctx,
     );
     if (!result.ok) {
@@ -265,6 +310,14 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
   // nova" e "o seu cliente não fala mais a mesma língua". Só a segunda obriga
   // o jogador a recarregar — um deploy comum atravessa a partida sem que
   // ninguém precise fazer nada (CA-046).
+  montarRotasDeConta(app, {
+    dados: options.dados ?? null,
+    signer,
+    now,
+    clientIp,
+    ...(options.cookieSeguro === undefined ? {} : { cookieSeguro: options.cookieSeguro }),
+  });
+
   app.get('/api/health', (c) =>
     c.json({ ok: true, version, protocolVersion: PROTOCOL_VERSION, rooms: hub.roomCount }));
 

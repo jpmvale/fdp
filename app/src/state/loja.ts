@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import type { Retrato } from './tipos';
 import type { EstadoConexao } from '../net/socket';
 import type { PreJogada } from '../jogada';
+import type { ContaPublica } from '../net/sessao';
 
 /**
  * Estado local do cliente. **Só reflete o retrato do servidor** (`11` §6): não
@@ -40,6 +41,14 @@ export interface Estado {
    * só — o baralho é redistribuído e o mesmo id volta a existir noutra.
    */
   cartaPreJogada: PreJogada | null;
+  /**
+   * A conta de quem está logado, ou `null` para visitante.
+   *
+   * `null` é o estado NORMAL, e não erro: jogar sem conta continua sendo o
+   * caminho principal (plano 01, I-1). Serve para a tela saber o que mostrar,
+   * e nunca para liberar ou barrar alguma coisa.
+   */
+  conta: ContaPublica | null;
 }
 
 const inicial: Estado = {
@@ -52,6 +61,7 @@ const inicial: Estado = {
   avisos: [],
   cartaSelecionada: null,
   cartaPreJogada: null,
+  conta: null,
 };
 
 let estado = inicial;

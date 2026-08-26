@@ -413,9 +413,26 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-374 | U | `04` §2 | **Dado** oito pessoas pedindo o mesmo apelido, emoji e cor, **quando** entram, **então** todas entram e as três coisas ficam distintas; quem chegou primeiro fica com o que pediu, e só a metade que colide é trocada |
 | CA-375 | U | `04` §2 | **Dado** um jogador editando o perfil no lobby, **quando** pede apelido, emoji ou cor de outra pessoa presente, **então** o comando é recusado com `APELIDO_TOMADO`, `EMOJI_TOMADO` ou `COR_TOMADA`; manter a própria identidade não é conflito, e quem saiu da sala não segura mais nada |
 | CA-362 | U | RF-059 | **Dado** o aviso "É A SUA VEZ!" no feltro, **então** ele não cruza as cartas jogadas (com a mesa cheia), nem os assentos de cima, nem o contador do centro, nem o meu assento — com 2 a 8 jogadores —, e fica dentro do pano |
+| CA-363 | U | RF-060 | **Dado** login com e-mail que não existe e login com senha errada, **então** os dois custam a mesma ordem de grandeza de tempo e devolvem a mesma resposta — não dá para descobrir quem tem conta |
+| CA-372 | I | RF-064 | **Dado** o servidor **sem banco**, **então** criar sala, entrar e retomar sessão funcionam; **e** com banco, uma pessoa com conta e uma sem começam a mesma partida, com a conta atravessando o início e o motor sem saber o que é conta |
+| CA-373 | I | — | **Dado** cliente em `PROTOCOL_VERSION` 1 contra servidor 2, **então** recusa com `ERR-426` e pede recarregar |
+| CA-376 | I | RF-072 | **Dado** duas contas de mesmo apelido, **quando** entram na mesma sala, **então** as duas entram, a segunda desempatada, e cada uma segue apontando para a própria conta |
+| CA-377 | I | RF-072 | **Dado** o desempate da mesa, **então** o apelido da CONTA não muda: noutra sala vazia a pessoa volta a entrar com o nome original |
+| CA-378 | I | RF-073 | **Dado** quem tem conta editando o perfil, **então** grava na conta e o slug não acompanha o apelido |
 
 CA-356 mede o defeito que consertou: a barra normalizava pelo prazo da aposta em todos os
 casos, então a vez de jogar carta nascia em 67% e a de um bot em 2%.
+
+CA-363 mede o que não dá erro: sem o hash de mentira, e-mail inexistente responde na hora — não
+há hash a calcular — e o tempo de resposta vira uma consulta de "esta pessoa tem conta aqui?".
+Com perfil público por link (D-4), é exatamente o que não pode vazar. A margem do teste é
+folgada de propósito: o que se prova é a mesma ORDEM de grandeza, não igualdade ao milissegundo.
+
+CA-372 é o teste que protege a promessa central do produto. Metade dele roda com o servidor
+**sem banco nenhum**, porque a maneira de quebrar a invariante I-1 é silenciosa: basta alguém
+pôr uma checagem de conta no caminho do `join` algum dia. A outra metade prova que `conta` não
+vaza para `MatchState` — se vazar, o teste cai, e é o que se quer: seria o começo de a regra de
+jogo depender de quem tem cadastro.
 
 CA-362 existe porque a faixa é apertada por um motivo que não some: quando a vez é minha e eu
 jogo por último, há exatamente 7 cartas na mesa — o momento em que o aviso aparece é o mesmo em

@@ -8,7 +8,14 @@
 
 import type { Card, CardId, MatchOptions, PlayerId, PublicTrick, RoundPhase } from '@fdp/rules';
 
-export const PROTOCOL_VERSION = 1;
+/**
+ * 2 desde 26/08/2026: `PublicPlayer` ganhou `conta` (plano 01, F2).
+ *
+ * Subir a versão faz o cliente velho receber `ERR-426` e pedir recarregar, em
+ * vez de desenhar uma mesa com campo faltando. `validate.ts` confere e
+ * `ws.ts` emite — o caminho já existia e tem teste de integração.
+ */
+export const PROTOCOL_VERSION = 2;
 
 // ---------------------------------------------------------------------------
 // Envelope (`05` §1)
@@ -75,6 +82,14 @@ export interface PublicPlayer {
   connection: ConnectionStatus;
   isSpectator: boolean;
   joinedAt: number;
+  /**
+   * Slug PÚBLICO da conta, quando há conta (plano 01 §5). `null` em convidado
+   * e em bot.
+   *
+   * É o slug e não o id interno de propósito: o id nunca sai do servidor. É
+   * por este campo que a mesa abre o perfil de quem está sentado.
+   */
+  conta: string | null;
   /**
    * Presente só em bot. É informação PÚBLICA de propósito: uma mesa que não
    * sabe quem é bot não sabe o que está jogando, e esconder isso seria a

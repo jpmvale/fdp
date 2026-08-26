@@ -46,6 +46,15 @@ export interface RoomPlayer {
    * muda é quem decide — e que ele nunca cai, então nunca pausa a mesa.
    */
   bot: { difficulty: BotDifficulty } | null;
+  /**
+   * Slug da conta de quem entrou logado (plano 01 §5). `null` em convidado e
+   * em bot.
+   *
+   * A conta NÃO substitui o `playerId`: o motor continua trabalhando com um
+   * identificador opaco por sala, e nada em `@fdp/rules` sabe o que é conta
+   * (I-2). Ela é um campo a mais no jogador da SALA, e só.
+   */
+  conta: string | null;
 }
 
 export interface PauseState {
@@ -99,6 +108,8 @@ export interface JoinParams {
   playerId: PlayerId;
   nickname: string;
   avatar: Avatar;
+  /** Slug da conta, quando quem entra está logado. */
+  conta?: string | null;
 }
 
 export function toPublicPlayer(player: RoomPlayer): PublicPlayer {
@@ -111,6 +122,7 @@ export function toPublicPlayer(player: RoomPlayer): PublicPlayer {
     connection: player.connection === 'RECONECTANDO' ? 'CONECTADO' : player.connection,
     isSpectator: player.isSpectator,
     joinedAt: player.joinedAt,
+    conta: player.conta,
     // Só aparece quando É bot: um campo `bot: null` em todo jogador humano
     // seria ruído em cada quadro, e o cliente já lê a ausência como "humano".
     ...(player.bot ? { bot: { difficulty: player.bot.difficulty } } : {}),

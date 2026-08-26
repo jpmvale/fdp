@@ -31,7 +31,11 @@ describe('sessão: assinatura', () => {
     const token = signer.sign('jogador-1', 'K7QMP', T0);
     const claims = JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString('utf8'));
 
-    expect(Object.keys(claims).sort()).toEqual(['exp', 'iat', 'playerId', 'roomCode']);
+    // `tipo` entrou em 26/08/2026 e não é enfeite: é o que impede um token de
+    // sala de ser apresentado como token de CONTA, já que os dois são HS256
+    // com o mesmo segredo e a assinatura de um confere no outro.
+    expect(Object.keys(claims).sort()).toEqual(['exp', 'iat', 'playerId', 'roomCode', 'tipo']);
+    expect(claims.tipo).toBe('sala');
   });
 
   it('expira junto com a sala (ROOM_MAX_LIFE)', () => {

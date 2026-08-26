@@ -25,6 +25,9 @@
     },
     {
       "path": "../packages/room"
+    },
+    {
+      "path": "../packages/contas"
     }
   ]
 }

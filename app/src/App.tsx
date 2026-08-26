@@ -5,6 +5,7 @@ import { createReconciler } from './net/reconcile';
 import { reduzir } from './state/redutores';
 import * as sessao from './net/sessao';
 import { frase } from './net/mensagens';
+import { quemSouEu, sairDaConta, salvarPerfilDaConta } from './net/sessao';
 import { jogadaAutomatica } from './jogada';
 import { carregarPreferenciaDeSom, despertarSomNoPrimeiroGesto } from './som';
 import { useEstado, definir, ler, avisar, errar } from './state/loja';
@@ -13,6 +14,7 @@ import type { Reconciler } from './net/reconcile';
 import { BloqueioConexao, FaixaConexao, bloqueia } from './components/Conexao';
 import { Home } from './screens/Home';
 import { Perfil } from './screens/Perfil';
+import { Conta } from './screens/Conta';
 import { Folha } from './components/Folha';
 import { Menu } from './screens/Menu';
 import { Regras } from './screens/Regras';
@@ -40,6 +42,7 @@ export function App() {
    */
   const reconciliador = useRef(createReconciler());
   const [regrasAbertas, setRegrasAbertas] = useState(false);
+  const [contaAberta, setContaAberta] = useState(false);
   // O que o Perfil vai fazer ao confirmar: criar sala, entrar numa, ou só
   // salvar (quando já se está na mesa).
   const [intencao, setIntencao] = useState<{ tipo: 'CRIAR' } | { tipo: 'ENTRAR'; codigo: string } | null>(null);
@@ -114,6 +117,17 @@ export function App() {
   useEffect(() => {
     carregarPreferenciaDeSom();
     return despertarSomNoPrimeiroGesto();
+  }, []);
+
+  /**
+   * Quem está logado, uma vez por carregamento.
+   *
+   * Não bloqueia nada: enquanto a resposta não chega, a tela é a de visitante,
+   * que é o estado normal. Servidor sem banco cai aqui como visitante também —
+   * conta é acréscimo, nunca pedágio (I-1).
+   */
+  useEffect(() => {
+    void quemSouEu().then((conta) => { if (conta) definir({ conta }); });
   }, []);
 
   useEffect(() => {
@@ -201,8 +215,31 @@ export function App() {
           <Home
             codigoInicial={new URLSearchParams(location.search).get('sala') ?? ''}
             aoAbrirRegras={() => setRegrasAbertas(true)}
-            aoCriar={() => { setIntencao({ tipo: 'CRIAR' }); definir({ tela: 'perfil' }); }}
-            aoEntrar={(codigo) => { setIntencao({ tipo: 'ENTRAR', codigo }); definir({ tela: 'perfil' }); }}
+            conta={estado.conta}
+            aoAbrirConta={() => setContaAberta(true)}
+            aoSairDaConta={() => {
+              void sairDaConta().catch(() => {});
+              definir({ conta: null });
+              avisar('Você saiu da conta');
+            }}
+            /* Logado, o servidor tira a identidade da conta e a tela do Perfil
+               deixa de fazer sentido no caminho — ela pergunta quem você é, e
+               isso já está respondido. */
+            aoCriar={() => {
+              if (estado.conta) { criar(estado.conta.apelido, estado.conta.avatar as AvatarProto, entrar); return; }
+              setIntencao({ tipo: 'CRIAR' }); definir({ tela: 'perfil' });
+            }}
+            aoEntrar={(codigo) => {
+              if (estado.conta) { juntar(codigo, estado.conta.apelido, estado.conta.avatar as AvatarProto, entrar); return; }
+              setIntencao({ tipo: 'ENTRAR', codigo }); definir({ tela: 'perfil' });
+            }}
+          />
+        )}
+
+        {contaAberta && (
+          <Conta
+            aoFechar={() => setContaAberta(false)}
+            aoEntrar={(conta) => { definir({ conta }); setContaAberta(false); avisar(`Olá, ${conta.apelido}`); }}
           />
         )}
 
@@ -269,12 +306,30 @@ export function App() {
       {perfilAberto && (
         <Sobreposicao>
           <Perfil
-            inicial={souEu}
+            /**
+             * R-4 do plano 01 §5.1, e a armadilha desta fase.
+             *
+             * Logado, o editor parte da identidade da CONTA — nunca da que a
+             * mesa mostra. Se a sala desempatou para "João (2)" porque já
+             * havia um João, e este campo viesse do assento, salvar gravaria o
+             * sufixo NA CONTA: a pessoa passaria a se chamar "João (2)" em
+             * todas as salas, para sempre, por causa de uma mesa de uma noite.
+             */
+            inicial={estado.conta
+              ? { nickname: estado.conta.apelido, avatar: estado.conta.avatar as AvatarProto }
+              : souEu}
             jaNaMesa={retrato.players}
             eu={eu}
             aoVoltar={() => setPerfilAberto(false)}
             aoConfirmar={(nickname, avatar) => {
+              // A mesa muda sempre. A CONTA muda só se houver conta — e é ela
+              // que sobrevive à sala.
               enviar('player:setProfile', { nickname, avatar });
+              if (estado.conta) {
+                void salvarPerfilDaConta(nickname, avatar)
+                  .then((r) => definir({ conta: r.conta }))
+                  .catch(() => errar('Não deu para salvar no seu perfil.'));
+              }
               setPerfilAberto(false);
             }}
           />

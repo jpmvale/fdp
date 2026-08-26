@@ -111,6 +111,29 @@ alternativa, não como caminho principal (métrica de tempo-até-jogar em `00` �
 | ID | Requisito |
 |---|---|
 | RNF-001 | Toda resposta de erro segue `{ "code": "...", "params": {...} }` |
+
+## 6. Contas (P11, plano 01 F2)
+
+**Tudo aqui é opcional.** Sem `DATABASE_URL` estas rotas respondem `503 CONTAS_INDISPONIVEIS` e
+o jogo funciona inteiro — conta é acréscimo, nunca pedágio.
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `POST` | `/api/contas` | Cadastro com e-mail e senha. Devolve a conta e já põe o cookie |
+| `POST` | `/api/sessao` | Login. Senha errada e e-mail inexistente dão a MESMA resposta (CA-363) |
+| `DELETE` | `/api/sessao` | Sai neste aparelho. **Não** derruba os outros |
+| `GET` | `/api/eu` | A conta do cookie, ou `null`. Visitante é estado normal, não erro |
+| `PATCH` | `/api/eu` | Edita apelido e avatar **da conta** (R-4). O slug não muda |
+| `GET` | `/api/perfis/{slug}` | Perfil público (D-4). Sem listagem e sem busca |
+
+A sessão é um cookie `HttpOnly; Secure; SameSite=Lax`, com JWT de claim `tipo: 'conta'`. O
+token de SALA continua na query string do WebSocket porque expira com a sala e só serve para
+ela; sessão de conta é identidade permanente e não pode viajar assim. **Os dois nunca se
+confundem**: a claim `tipo` é conferida nos dois sentidos.
+
+`POST /api/rooms` e `POST /api/rooms/{code}/join` passam a ler o cookie: quem está logado tem
+apelido e avatar tirados da CONTA, e o corpo do pedido é ignorado. Quem não está segue
+escolhendo como sempre.
 | RNF-002 | CORS restrito à origem da aplicação |
 | RNF-003 | Rate limit por IP: 10 criações de sala por hora, 60 joins por hora |
 | RNF-004 | Nenhum endpoint HTTP expõe estado de partida — nem placar, nem cartas |

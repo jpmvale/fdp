@@ -9,11 +9,17 @@ import { ROOM_CODE_LENGTH } from '@fdp/protocol';
  * razão melhor: entrar por link não é a mesma coisa que criar sala, e a Home
  * enxuta deixa as duas portas do mesmo tamanho.
  */
-export function Home({ aoCriar, aoEntrar, aoAbrirRegras, codigoInicial }: {
+export function Home({
+  aoCriar, aoEntrar, aoAbrirRegras, codigoInicial, conta, aoAbrirConta, aoSairDaConta,
+}: {
   aoCriar: () => void;
   aoEntrar: (codigo: string) => void;
   aoAbrirRegras: () => void;
   codigoInicial: string;
+  /** `null` é visitante, e é o estado normal (plano 01, I-1). */
+  conta: { slug: string; apelido: string } | null;
+  aoAbrirConta: () => void;
+  aoSairDaConta: () => void;
 }) {
   const [codigo, setCodigo] = useState(codigoInicial.toUpperCase());
   const completo = codigo.length === ROOM_CODE_LENGTH;
@@ -56,6 +62,30 @@ export function Home({ aoCriar, aoEntrar, aoAbrirRegras, codigoInicial }: {
           Entrar na sala
         </button>
       </div>
+
+      {/* A conta fica ABAIXO das duas portas, e de propósito.
+
+          Ela não é caminho para jogar: quem chega por link não passa por aqui,
+          e pôr "Entrar na conta" acima de "Criar sala" faria o jogo parecer
+          que pede cadastro (plano 01, I-1). É oferta, não portão. */}
+      {conta ? (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+          <span className="fraco" style={{ fontSize: 13 }}>
+            entrando como <b style={{ color: 'var(--texto)' }}>{conta.apelido}</b>
+          </span>
+          <button className="fantasma" onClick={aoSairDaConta} style={{ minHeight: 36, padding: '0 12px' }}>
+            sair
+          </button>
+        </div>
+      ) : (
+        <button
+          className="fantasma"
+          onClick={aoAbrirConta}
+          style={{ alignSelf: 'center', minHeight: 40, padding: '0 18px' }}
+        >
+          Entrar ou criar conta
+        </button>
+      )}
 
       {/* `07` §2.1. Faltava aqui, que é o único lugar onde alguém chega sem
           nunca ter visto o jogo: no lobby e na mesa as regras já estavam no ☰,

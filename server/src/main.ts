@@ -12,12 +12,14 @@ import { serve } from '@hono/node-server';
 import { createMemoryStore, type RoomStore } from '@fdp/store';
 import { createHub, CLOSE_CODES } from './hub.js';
 import { createHttpApp } from './http.js';
+import type { Dados } from '@fdp/contas';
 import { createPersistence } from './persistence.js';
 import { createSigner } from './session.js';
 import { attachWebSocket } from './ws.js';
 
 const PORT = Number(process.env.PORT ?? 3000);
 const REDIS_URL = process.env.REDIS_URL;
+const DATABASE_URL = process.env.DATABASE_URL;
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN;
 const TRUST_PROXY = process.env.TRUST_PROXY === '1';
 const VERSION = process.env.FDP_VERSION ?? 'dev';
@@ -53,6 +55,31 @@ async function main(): Promise<void> {
     console.warn('REDIS_URL ausente: store em memória. As salas morrem com o processo.');
   }
 
+  /**
+   * Contas são OPCIONAIS (plano 01, I-1).
+   *
+   * Sem `DATABASE_URL` o jogo sobe inteiro e as rotas de conta respondem 503.
+   * Não é degradação tolerada a contragosto: é o desenho. Conta é acréscimo,
+   * nunca pedágio, e um banco fora do ar não pode tirar do ar um jogo que
+   * funciona por link e sem cadastro.
+   *
+   * E se o banco estiver configurado mas não responder na subida, o servidor
+   * sobe assim mesmo, sem contas — derrubar o jogo inteiro por causa da parte
+   * opcional seria trocar uma falha pequena por uma grande.
+   */
+  let dados: Dados | null = null;
+  if (DATABASE_URL) {
+    try {
+      dados = await (await import('@fdp/contas/postgres'))
+        .criarDadosEmPostgres({ url: DATABASE_URL });
+      console.log('contas: Postgres conectado');
+    } catch (erro) {
+      console.error('contas: Postgres INDISPONÍVEL, subindo sem contas:', erro);
+    }
+  } else {
+    console.warn('DATABASE_URL ausente: sem contas. O jogo funciona normalmente.');
+  }
+
   const persistence = createPersistence({
     store,
     // Falha de gravação não derruba partida: o estado vivo está na memória e a
@@ -83,6 +110,7 @@ async function main(): Promise<void> {
     allowedOrigin: ALLOWED_ORIGIN,
     trustProxy: TRUST_PROXY,
     version: VERSION,
+    dados,
   });
 
   const server = serve({ fetch: app.fetch, port: PORT }, (info) => {
