@@ -529,3 +529,22 @@ Para inspecionar o banco (a senha fica dentro do container):
 ```bash
 ssh vps 'docker exec fdp-postgres sh -c "PGPASSWORD=\$POSTGRES_PASSWORD psql -U fdp -d fdp -c \"SELECT count(*) FROM contas\""'
 ```
+
+## SSO ligado em produção (26/08/2026)
+
+`/api/sso` devolve `["google","github"]`. As quatro variáveis vivem no `.env` da VPS, e são
+**opcionais** no compose (sem `:?`): faltando, o app sobe e a tela simplesmente não desenha
+botão. Exigi-las faria o jogo depender de dois terceiros para subir.
+
+`redirect_uri` cadastrados nos provedores:
+`https://fdp.imp-software.cloud/api/sso/{google|github}/retorno`. **Se o domínio mudar, os dois
+cadastros precisam ser atualizados** — o provedor recusa qualquer URI que não bata exatamente.
+
+Conferido contra a produção: PKCE presente no Google e ausente no GitHub (que não o implementa),
+escopo `user:email` no GitHub — sem ele a tomada de conta de D-3 não teria como decidir —, e o
+cookie de `state` com `HttpOnly; SameSite=Lax; Secure; Max-Age=600`. As quatro recusas testadas:
+`state` ausente, `state` sem cookie, `state` cruzado entre provedores, provedor inexistente.
+
+O `client_id` aparece na URL de redirecionamento e **é público por natureza** — está no
+navegador de todo mundo que clica em "Entrar com Google". O que é segredo é o `client_secret`, e
+ele nunca sai do `.env`.

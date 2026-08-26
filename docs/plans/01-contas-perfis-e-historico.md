@@ -464,9 +464,10 @@ confirmação de e-mail (§8, adiada por D-10) — quando entrar, os dois caminh
 entra pelo Google nunca fica sem acesso, e a ordem dos botões é a única recomendação que a
 interface consegue fazer.
 
-*Falta para valer em produção:* criar os apps no Google e no GitHub e pôr `GOOGLE_CLIENT_ID`,
-`GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID` e `GITHUB_CLIENT_SECRET` no ambiente da VPS. Sem
-eles, `/api/sso` devolve lista vazia e a tela não desenha botão nenhum.
+*No ar desde 26/08/2026.* Os apps foram criados no Google e no GitHub e as quatro variáveis
+estão no `.env` da VPS. `/api/sso` devolve `["google","github"]` e a tela desenha os dois botões.
+As defesas foram conferidas contra a produção: `state` ausente, `state` sem o cookie, `state` de
+um provedor usado no retorno do outro e provedor inventado — os quatro recusados.
 
 **F4 — Histórico e perfil público.** ✅ **Concluída em 26/08/2026.**
 *Gate:* CA-367, CA-368, CA-369. Uma partida real aparece no perfil com os mesmos números da tela
