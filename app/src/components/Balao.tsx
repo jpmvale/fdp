@@ -19,9 +19,21 @@ export interface BalaoNaMesa {
   playerId: string;
   texto: string;
   tipo: 'chat' | 'vida';
-  /** Quem falou estava assistindo. Só faz sentido em `chat`. */
-  assiste?: boolean;
 }
+
+/**
+ * Quem assiste **não** ganha balão no feltro.
+ *
+ * O balão sai de um ASSENTO, e quem assiste não tem assento. Sem lugar de onde
+ * sair, ele ia parar no meio da mesa, por cima das cartas — que é exatamente o
+ * espaço que `07` §2.4 protege, e no pior momento: quem assiste fala mais
+ * justamente enquanto a mão está sendo disputada.
+ *
+ * A mensagem não se perde: ela aparece no painel do chat, com a marca `assiste`
+ * (RF-084), que é onde ela sempre pôde ser lida com calma. O que se perde é a
+ * sobreposição.
+ */
+export const semBalao = (m: ChatMessage): boolean => !m.spectator;
 
 /** Quanto tempo cada tipo fica na tela. */
 const DURACAO = { chat: 5_000, vida: 1_600 } as const;
@@ -163,20 +175,6 @@ export function Balao({ balao, x, y, empilhado, aoSumir }: {
         fontWeight: vida ? 600 : 400,
       }}
     >
-      {/* O balão de quem assiste sai do assento como qualquer outro, mas com
-          a marca junto: ele vê as cartas da mesa inteira (RJ-159), e sem isto
-          o conselho dele pareceria o de um jogador comum. */}
-      {balao.assiste === true && (
-        <span
-          style={{
-            display: 'block', fontSize: 8, letterSpacing: 0.4,
-            color: 'var(--texto-apagado)', textTransform: 'uppercase',
-            marginBottom: 1,
-          }}
-        >
-          assiste
-        </span>
-      )}
       {balao.texto}
       {/* O bico: é ele que faz o balão SAIR de alguém em vez de flutuar perto. */}
       <span
@@ -222,14 +220,13 @@ export function useBaloes(chat: ChatMessage[], partida: PlayerView | null): {
     chatVisto.current = chat.length;
     setBaloes((atuais) => comTeto([
       ...atuais,
-      ...novas.map((m) => ({
+      ...novas.filter(semBalao).map((m) => ({
         id: `chat-${m.id}`,
         playerId: m.playerId,
         // Compactado AQUI, e não na hora de desenhar: o balão carrega o que
         // vai mostrar, e o teste consegue perguntar isso sem montar a tela.
         texto: resumoDoBalao(m.text),
         tipo: 'chat' as const,
-        assiste: m.spectator,
       })),
     ]));
   }, [chat]);

@@ -27,7 +27,7 @@ npm run build:client   # OBRIGATÓRIO antes do primeiro `npm start`
 npm run redis          # opcional, noutro terminal
 npm run minio          # opcional: o outro lado do depósito de avatares (R2)
 npm start              # http://localhost:3000
-npm test               # 560 testes (3 pulados: Redis, Postgres e R2 — só rodam com as env deles)
+npm test               # 567 testes (3 pulados: Redis, Postgres e R2 — só rodam com as env deles)
 npm run auditoria      # o que `docs/` promete e nenhum teste cobre
 npm run typecheck
 ```
@@ -785,6 +785,51 @@ O script **não** falha o build. A dívida é grande demais para virar portão d
 noite para o dia, e um portão que dói demais é um portão que alguém desliga. Ele
 serve para o número ser lido, não lembrado.
 
+## O espectador que reiniciava a partida (27/08/2026)
+
+**Um espectador saindo da sala abortava a rodada em curso e mandava todo mundo
+de volta para `DISTRIBUICAO`.** Relatado como "a partida volta pro início", e
+era exatamente isso.
+
+A causa estava em `isActive` (`@fdp/rules`), que perguntava duas coisas:
+
+```ts
+!eliminated.includes(id) && !withdrawn.includes(id)
+```
+
+Quem **nunca esteve** na partida não está em nenhuma das duas listas, então
+passava nas duas e voltava `true`. `leave()` pergunta exatamente isso para
+aplicar a retirada de RJ-154 — a resposta vinha "sim, estava jogando" para
+alguém que só assistia, e a rodada era abortada.
+
+> `activePlayers` nunca sofreu, porque filtra `playerOrder` **antes** de
+> perguntar. É o que escondeu o defeito por tanto tempo: por dentro a função
+> parecia certa, e cada chamador que não filtrava antes carregava o buraco
+> sozinho. O conserto foi acrescentar a membresia à própria `isActive` — o que o
+> nome sempre prometeu — em vez de remendar `leave()`.
+
+Dois outros chamadores melhoraram junto, e nenhum dos dois tinha sintoma
+conhecido: `applyMove` passa a recusar a jogada de quem não está na partida
+(`JOGADOR_INATIVO`) em vez de deixá-la seguir para as checagens de fase, e
+`withdrawPlayers` deixa de gravar uma retirada com `livesAtWithdrawal:
+undefined` para um id que não tem vidas.
+
+O teste vive nos **dois** níveis: CA-406 na raiz, e CA-407 no sintoma — porque
+foi pelo sintoma que ele apareceu, e é pelo sintoma que alguém vai reconhecê-lo
+se voltar.
+
+### Junto, duas do espectador na tela
+
+**RF-087 — a mensagem de quem assiste não vira balão.** Não é moderação, é
+geometria: o balão sai de um assento, e quem assiste não tem assento. O dele ia
+parar no meio do feltro, por cima das cartas, e no momento em que quem assiste
+mais fala. A mensagem continua no chat, com a marca de RF-084.
+
+**RF-088 — contador de plateia no cabeçalho**, com os nomes ao passar o mouse ou
+tocar. É a outra metade de RJ-159: quem joga precisa saber que há gente vendo
+todas as cartas sem ter de abrir o chat e reparar numa etiqueta. Fecha ao tocar
+fora e no Esc, porque no celular não existe tirar o mouse de cima.
+
 ## O que fazer a seguir
 
 O [plano 01](docs/plans/01-contas-perfis-e-historico.md) **está entregue** (F1–F5, 26/08/2026).
@@ -799,7 +844,7 @@ quase todo o trabalho restante.
 
 | O quê | Onde | Por que importa |
 |---|---|---|
-| **Nenhuma suíte E2E existe** | `11` §8 previa Playwright; não há `test/e2e/` nem a dependência | 19 critérios de nível `E` não são executados por ninguém, e o gate do M4 exige 100% dos `CA` de v1 passando. **É a dívida mais cara do projeto**: quatro bugs graves foram achados jogando ou por relato, nenhum por teste — INV-05 (sala travada), a pausa de fim de vaza, o `v: 1` que derrubou o jogo inteiro, e o volume `root` que impediu todo envio de avatar desde sempre |
+| **Nenhuma suíte E2E existe** | `11` §8 previa Playwright; não há `test/e2e/` nem a dependência | 20 critérios de nível `E` não são executados por ninguém, e o gate do M4 exige 100% dos `CA` de v1 passando. **É a dívida mais cara do projeto**: cinco bugs graves foram achados jogando ou por relato, nenhum por teste — INV-05 (sala travada), a pausa de fim de vaza, o `v: 1` que derrubou o jogo inteiro, o volume `root` que impediu todo envio de avatar desde sempre, e o espectador que reiniciava a rodada ao sair |
 | **32 critérios sem teste, e nenhum deles é E2E** | `npm run auditoria` | RNF-102 diz que requisito sem teste que cite seu ID é requisito **não entregue**. São 24 `U`, 7 `I` e 1 `CI` — coisas que dava para testar e não se testou. Muitos são de desempenho (CA-160 a CA-164, que dependem do teste de carga) e de a11y manual, mas não todos |
 | **Nenhum teste de carga** | RNF-060: 500 salas, 2.000 sockets | Junto vão CA-160 a CA-164 (desempenho). Nada disso foi medido contra a VPS |
 | **Auditoria de segurança** | `09` §3.1 | A tabela de ameaças nunca foi percorrida em bloco |

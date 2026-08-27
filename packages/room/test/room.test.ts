@@ -818,6 +818,49 @@ describe('CA-397 / RF-083: entrar e sair da mesa no lobby', () => {
     expect(humano(room), 'depois de alguém novo chegar').toBe(true);
   });
 
+  it('CA-407: espectador saindo NÃO mexe na partida em curso', () => {
+    /*
+     * O defeito mais grave desta leva, e o mais fácil de não acreditar: alguém
+     * que só estava ASSISTINDO fechava a aba e a rodada em curso era abortada,
+     * voltando todo mundo para `DISTRIBUICAO`.
+     *
+     * A causa estava em `isActive` (`@fdp/rules`), que respondia "sim, está
+     * ativo" para um id que nunca esteve na partida — ele não está em
+     * `eliminated` nem em `withdrawn`, e ninguém checava `playerOrder`. O
+     * `leave()` daqui pergunta exatamente isso para aplicar RJ-154.
+     *
+     * O teste vive nos dois níveis: a raiz está coberta em `engine.test.ts`
+     * (CA-406), e aqui fica o sintoma — porque foi pelo sintoma que ele
+     * apareceu, e é pelo sintoma que alguém vai reconhecê-lo se voltar.
+     */
+    let room = roomWith(3);
+    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(10))).room;
+
+    room = ok(join(room, { playerId: 's1', nickname: 'Plateia', avatar: { emoji: '🦉', color: 'sky' } }, ctxAt(20))).room;
+    room = ok(reconnect(room, 's1', ctxAt(21))).room;
+    expect(spectators(room).map((p) => p.id)).toEqual(['s1']);
+
+    const antes = room.match!;
+    const r = ok(leave(room, 's1', ctxAt(30)));
+
+    // Nenhuma rodada abortada, e nada da partida se moveu.
+    expect(r.emissions.map((e) => e.event.type)).not.toContain('round:aborted');
+    expect(r.room.match!.round.phase).toBe(antes.round.phase);
+    expect(r.room.match!.roundNumber).toBe(antes.roundNumber);
+    expect(r.room.match!.withdrawn).toEqual(antes.withdrawn);
+    expect(r.room.match!.playerOrder).toEqual(antes.playerOrder);
+  });
+
+  it('CA-407: quem ESTAVA jogando e sai continua abortando a rodada (RJ-154)', () => {
+    // A outra metade: o conserto não pode ter desligado a retirada de verdade.
+    let room = roomWith(3);
+    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(10))).room;
+
+    const r = ok(leave(room, 'p2', ctxAt(20)));
+    expect(r.emissions.map((e) => e.event.type)).toContain('round:aborted');
+    expect(r.room.match!.withdrawn.map((w) => w.playerId)).toEqual(['p2']);
+  });
+
   it('CA-400: mesa só de bots não começa partida', () => {
     let room = roomWith(1);
     room = ok(applyCommand(room, 'p1', { type: 'host:addBot', payload: { difficulty: 'MEDIO' } }, ctxAt(10))).room;

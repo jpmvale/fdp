@@ -333,6 +333,17 @@ era o **único da mesa que nunca via a própria carta** — todos os outros a vi
 inteira, e ele passava direto para o acerto de contas sem saber o que tinha tirado. É o que
 CA-347 cobra, e `07` RF-035 já dizia ao marcar a fronteira em EV-023 e não na rodada.
 
+> **`isActive` pergunta três coisas, e a primeira é a membresia.**
+>
+> Ela só perguntava "não foi eliminado?" e "não se retirou?" — e quem **nunca
+> esteve** na partida passava nas duas, porque não está em nenhuma das listas.
+> Um id qualquer devolvia `true`.
+>
+> Um **espectador** saindo da sala fazia a rodada em curso ser abortada e
+> recomeçar (RJ-154 aplicada a quem não jogava). `activePlayers` nunca sofreu
+> porque filtra `playerOrder` antes de perguntar — o que escondeu o defeito e
+> deixou a função parecer certa por dentro. Corrigido em 27/08/2026, CA-406.
+
 RJ-159 é uma exceção deliberada a RJ-102, aberta em 26/08/2026, e o recorte é "quem joga".
 
 O segredo da mão existe para proteger **decisão**: apostar e escolher carta sabendo o que o

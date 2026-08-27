@@ -7,7 +7,8 @@
  * quem fala demais ocupa o mesmo espaço de quem fala pouco.
  */
 import { describe, expect, it } from 'vitest';
-import { BALAO_TEXTO_MAX, comTeto, resumoDoBalao, type BalaoNaMesa } from '../src/components/Balao';
+import { BALAO_TEXTO_MAX, comTeto, resumoDoBalao, semBalao, type BalaoNaMesa } from '../src/components/Balao';
+import type { ChatMessage } from '../src/state/tipos';
 
 const balao = (playerId: string, n: number, tipo: 'chat' | 'vida' = 'chat'): BalaoNaMesa =>
   ({ id: `${playerId}-${n}`, playerId, texto: `${n}`, tipo });
@@ -94,5 +95,34 @@ describe('CA-385: mensagem grande é compactada no balão', () => {
 
     expect(cortada).toHaveLength(BALAO_TEXTO_MAX + 1);
     expect(cortada.startsWith('https://exemplo.com/')).toBe(true);
+  });
+});
+
+
+/**
+ * CA-408: quem assiste não ganha balão no feltro.
+ *
+ * O balão sai de um ASSENTO, e quem assiste não tem assento — o dele ia parar
+ * no meio da mesa, por cima das cartas. E no pior momento possível: quem
+ * assiste fala mais justamente enquanto a mão está sendo disputada.
+ */
+describe('CA-408: a mensagem de quem assiste fica só no chat', () => {
+  const msg = (over: Partial<ChatMessage> = {}): ChatMessage => ({
+    id: 'm1', playerId: 'ana', nickname: 'Ana', text: 'oi', at: 0, spectator: false, ...over,
+  });
+
+  it('mensagem de jogador vira balão', () => {
+    expect(semBalao(msg())).toBe(true);
+  });
+
+  it('mensagem de quem assiste NÃO vira balão', () => {
+    expect(semBalao(msg({ spectator: true }))).toBe(false);
+  });
+
+  it('o filtro é por quem falou, não pelo conteúdo', () => {
+    // Um espectador dizendo qualquer coisa continua fora do feltro; a régua é
+    // de onde a mensagem sairia, e não do que ela diz.
+    expect(semBalao(msg({ spectator: true, text: 'a'.repeat(200) }))).toBe(false);
+    expect(semBalao(msg({ spectator: false, text: 'a'.repeat(200) }))).toBe(true);
   });
 });

@@ -35,8 +35,34 @@ const fail = (
 ): MoveFailure => ({ ok: false, code, motivo });
 
 /** Jogador ainda na partida: nem eliminado, nem retirado. */
+/**
+ * Este jogador está na partida e ainda em pé?
+ *
+ * **As três condições, e a primeira é a que faltava.** Por muito tempo esta
+ * função só perguntava "não foi eliminado?" e "não se retirou?" — e quem
+ * NUNCA ESTEVE na partida passava nas duas, porque não está em nenhuma das
+ * listas. Um id qualquer devolvia `true`.
+ *
+ * Isso derrubou a mesa de um jeito difícil de acreditar: um **espectador**
+ * saindo da sala fazia a rodada em curso ser abortada e recomeçar. `leave()`
+ * pergunta "quem saiu estava jogando?" para aplicar a retirada de RJ-154, a
+ * resposta vinha `true` para alguém que só estava assistindo, e a partida
+ * voltava para `DISTRIBUICAO` na cara de todo mundo.
+ *
+ * `activePlayers` nunca sofreu porque filtra `playerOrder` antes de perguntar —
+ * o que escondeu o defeito e deixou a função parecer certa por dentro. Todo
+ * chamador que NÃO filtrava antes carregava o buraco, e cada um teria de
+ * lembrar de conferir pertencimento por conta própria. Conferir aqui conserta
+ * todos de uma vez, e é o que o nome sempre prometeu.
+ *
+ * Dois outros chamadores melhoram junto: `applyMove` passa a recusar a jogada
+ * de quem não está na partida com `JOGADOR_INATIVO`, e `withdrawPlayers` deixa
+ * de gravar uma retirada com `livesAtWithdrawal: undefined` para um id que não
+ * tem vidas.
+ */
 export function isActive(state: MatchState, playerId: PlayerId): boolean {
   return (
+    state.playerOrder.includes(playerId) &&
     !state.eliminated.some((e) => e.playerId === playerId) &&
     !state.withdrawn.some((w) => w.playerId === playerId)
   );

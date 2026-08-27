@@ -6,6 +6,7 @@ import { tocarSuaVez, tocarTique } from '../som';
 import { Carta } from '../components/Carta';
 import { Chat } from '../components/Chat';
 import { Historico } from '../components/Historico';
+import { Assistindo } from '../components/Assistindo';
 import { Plateia } from '../components/Plateia';
 import { useTelaLarga } from '../telaLarga';
 import { Feltro } from '../components/Feltro';
@@ -134,6 +135,11 @@ function Cabecalho({ partida, retrato, aoAbrirRegras }: {
           }} />
           {estavel ? 'estável' : 'pausada'}
         </span>
+
+        {/* Quem joga precisa saber que há plateia sem abrir o chat: quem
+            assiste vê a mão de todo mundo (RJ-159), e isso muda o peso de um
+            palpite vindo de fora. */}
+        <Assistindo plateia={retrato.players.filter((p) => p.isSpectator)} />
 
         <button
           className="fantasma"

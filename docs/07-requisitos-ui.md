@@ -176,6 +176,8 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 | RF-084 | Quem assiste **DEVE** ser identificado no chat e no balão. Ele vê a mão de todos (RJ-159), e conselho de quem vê tudo não é o mesmo que palpite de quem joga |
 | RF-085 | O assento **DEVE** mostrar quantas cartas a pessoa tem na mão, em **cartas viradas** do tamanho do coração. Acima de cinco vira número, como as vidas |
 | RF-086 | Em tela **larga** (≥ 900 px) o chat e o log vão para uma **lateral direita** grudada no topo; abaixo disso continuam empilhados no fim, como no celular |
+| RF-087 | A mensagem de quem assiste **NÃO DEVE** virar balão no feltro. Ela aparece só no chat, com a marca de RF-084 |
+| RF-088 | Com partida em curso, o cabeçalho **DEVE** mostrar quantos assistem, e revelar os nomes ao passar o mouse ou tocar |
 | RF-061 | Entrar com Google ou GitHub. Só provedor **configurado** vira botão: um botão que devolve 503 é pior que nenhum |
 | RF-062 | SSO com e-mail **verificado pelo provedor** assume a conta de senha, apaga a senha e derruba as sessões |
 | RF-063 | Entrar com senha numa conta assumida por SSO **DEVE** dizer o que houve — *"esta conta agora entra pelo Google"* —, nunca "senha inválida" |
@@ -192,6 +194,19 @@ componentes serve os dois casos, nada é montado duas vezes, e girar o aparelho 
 perde estado nenhum. O único uso de `matchMedia` é decidir se o painel de chat
 começa aberto — na lateral, fechado seria uma coluna vazia; no celular, aberto
 empurraria a mão de cartas para fora da tela.
+
+RF-087 existe por geometria, não por moderação. O balão sai de um **assento**, e
+quem assiste não tem assento — o dele ia parar no meio da mesa, por cima das
+cartas, e justamente no momento em que a mão está sendo disputada, que é quando
+quem assiste mais fala. A mensagem não se perde: ela vive no painel do chat, que
+é onde se lê com calma.
+
+RF-088 é a outra metade de RJ-159. Quem joga precisa **saber que há plateia** sem
+abrir o chat e reparar numa etiqueta: um palpite vindo de quem vê todas as
+cartas vale outra coisa. O número fica sempre visível porque é barato; os nomes
+ficam sob demanda porque uma lista aberta o tempo todo rouba espaço de algo que
+quase nunca muda. Zero pessoas não vira "0 assistindo" — contador zerado
+permanente é ruído, e a ausência de plateia é o caso comum.
 
 RF-085 mostra informação que **já era pública** (`handCounts`, RJ-102) e não estava
 em lugar nenhum: quem quisesse saber quantas cartas restavam ao adversário tinha de

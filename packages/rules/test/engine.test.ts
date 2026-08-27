@@ -315,6 +315,32 @@ describe('CA-281 a CA-286: projeção e vazamento', () => {
     }
   });
 
+  it('CA-406: `isActive` é falso para quem NUNCA esteve na partida', () => {
+    const state = settle(createMatch({ matchId: 'm', seed: 'membro', playerIds: players(3) })).state;
+
+    for (const id of state.playerOrder) expect(isActive(state, id)).toBe(true);
+
+    /*
+     * A condição que faltava, e que custou caro: quem não está em `playerOrder`
+     * não está em `eliminated` nem em `withdrawn`, então passava nas duas
+     * perguntas antigas e voltava `true`. Um espectador saindo da sala fazia a
+     * rodada em curso ser abortada e recomeçar.
+     */
+    expect(isActive(state, 'quem-assiste')).toBe(false);
+    expect(isActive(state, '')).toBe(false);
+  });
+
+  it('CA-406: a jogada de quem não está na partida é recusada', () => {
+    let state = settle({ ...createMatch({ matchId: 'm', seed: 'intruso', playerIds: players(3) }), cardsThisRound: 3 }).state;
+    state = { ...state, round: { ...state.round, phase: 'APOSTAS' } };
+
+    // Antes, um id estranho passava por `isActive` e seguia para as checagens
+    // de fase. A membresia é a primeira porta, e é onde ele para.
+    const r = applyMove(state, { type: 'bet', playerId: 'estranho', roundNumber: state.roundNumber, trickNumber: 0, bet: 0 }, ctx);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toBe('JOGADOR_INATIVO');
+  });
+
   it('CA-396 / RJ-159: quem assiste vê a mão de todo mundo', () => {
     let state = createMatch({ matchId: 'm', seed: 'plateia', playerIds: players(4) });
     state = settle({ ...state, cardsThisRound: 4 }).state;

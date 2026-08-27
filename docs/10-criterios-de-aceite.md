@@ -447,6 +447,10 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-400 | U | RF-018 | **Dado** só bots sentados, **então** começar a partida é recusado com `SO_BOTS_NA_MESA`, e o botão já vem desligado com a explicação |
 | CA-401 | E | RF-085 | **Dado** um jogador com N cartas, **então** o assento mostra N cartas viradas até 5, e `verso ×N` acima disso |
 | CA-402 | E | RF-086 | **Dado** uma janela de 900 px ou mais na mesa, **então** o chat e o log ficam à direita, grudados no topo; abaixo de 900, empilhados no fim |
+| CA-406 | U | RJ-154 | **Dado** um id que **não está em `playerOrder`**, **então** `isActive` é falso; a jogada dele é recusada com `JOGADOR_INATIVO` e a retirada não o alcança |
+| CA-407 | U | RJ-154 | **Dado** uma partida em curso, **quando** um **espectador** sai da sala, **então** nada da partida se move e `round:aborted` **não** é emitido; quem estava JOGANDO e sai continua abortando a rodada |
+| CA-408 | U | RF-087 | **Dado** uma mensagem de quem assiste, **então** ela não vira balão no feltro — a régua é quem falou, nunca o conteúdo |
+| CA-409 | E | RF-088 | **Dado** plateia numa partida em curso, **então** o cabeçalho mostra a contagem, e passar o mouse ou tocar revela os nomes; com plateia vazia o indicador não aparece |
 | CA-404 | U | RF-081 | **Dado** um avatar gravado, **então** o caminho devolvido é da **nossa** origem (`/avatares/<hash>.webp`) — nunca URL do fornecedor, nem assinada, nem com host externo |
 | CA-405 | U | RNF-018 | **Dado** dois pedidos do mesmo avatar, **então** o segundo não toca o depósito; o cache tem teto em **bytes** e despeja o mais antigo; ausência **não** é cacheada |
 | CA-403 | U | RNF-020 | **Dado** a subida, **então** a sonda grava, lê, confere e apaga um objeto; sem permissão de escrita ela acusa a etapa `guardar` com o erro do sistema, e o servidor **continua atendendo** |
