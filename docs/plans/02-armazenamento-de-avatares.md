@@ -1,11 +1,14 @@
 # Plano 02 — Armazenamento de avatares
 
-Status: **NO AR** desde 27/08/2026 · F1 a F4 implantadas · falta só o gate de RNF-019 · Aberto em 26/08/2026
+Status: **ENTREGUE** · F1 a F4 no ar em 27/08/2026 · RNF-019 exercitado no mesmo dia · Aberto em 26/08/2026
 
 Os 32 avatares foram conferidos contra o próprio hash (**nenhum corrompido**),
-copiados para `fdp-avatares`, e a aplicação lê de lá desde 27/08/2026. Falta o
-gate de **RNF-019**: restaurar o backup do bucket uma vez, para valer. Até isso
-acontecer, o volume `fdp_avatares` continua montado como rede de segurança.
+copiados para `fdp-avatares`, e a aplicação lê de lá desde 27/08/2026. **RNF-019
+foi exercitado**: o dump do Postgres foi buscado do bucket e restaurado num banco
+descartável, com as contagens conferidas contra produção.
+
+O volume `fdp_avatares` continua montado. Ele deixou de ser obrigatório, mas
+tirá-lo é uma mudança à parte — e não custa nada mantê-lo.
 
 Tira as fotos de avatar do disco do container e as põe num bucket R2, com backup
 e com o pipeline calibrado por medição em vez de suposição.

@@ -992,6 +992,58 @@ igual). Mexer no arquivo aqui **não** muda o que o cron roda; é preciso copiar
 scp deploy/backup-postgres.sh vps:~/bin/backup-postgres.sh
 ```
 
+## RNF-019 fechado: o backup volta (27/08/2026)
+
+Restaurar **do bucket**, e não da cópia local — é o ponto inteiro. Um dump que
+só foi lido de onde foi escrito não prova que a cópia remota serve.
+
+| Etapa | Resultado |
+|---|---|
+| Buscar do R2 | 17 571 bytes, o objeto `fdp/fdp-20260827T181615Z.dump` |
+| Destino | Postgres **descartável**, em container próprio, sem porta no host |
+| Guarda do script | recusaria se o destino tivesse a tabela `contas`; tinha 0 |
+| `pg_restore --exit-on-error` | seis tabelas de volta |
+
+Conferência contra produção, tabela por tabela:
+
+| Tabela | Restaurado | Produção | |
+|---|---|---|---|
+| `contas` | 10 | 10 | igual |
+| `credenciais_senha` | 0 | 0 | igual |
+| `identidades_sso` | 10 | 10 | igual |
+| `migracoes` | 1 | 1 | igual |
+| `partidas` | 30 | 31 | difere |
+| `partida_jogadores` | 194 | 202 | difere |
+
+A diferença **não é perda**: o backup saiu 18:16:15, a partida mais recente
+dentro dele terminou 18:13:48, e a mais recente em produção terminou 18:20:09.
+Uma partida de 8 pessoas acabou depois do dump — 1 partida e 8 jogadores,
+exatamente o delta. É o sistema tendo continuado a funcionar.
+
+> Comparar contagem com produção é o que separa "o `pg_restore` não deu erro"
+> de "o backup tem os dados". Um dump vazio restaura sem erro nenhum.
+
+Tudo descartado no fim: container, arquivos temporários, diretório. Produção
+não foi tocada em momento nenhum.
+
+### A VPS não sabia BAIXAR do R2
+
+`~/bin/enviar-r2.sh` envia, lista e apaga. Não busca — o `enviar-r2.mjs` por
+trás dele importa `PutObject`, `HeadObject`, `ListObjectsV2` e `DeleteObjects`,
+e nenhum `GetObject`.
+
+Isso vale para **todos os serviços da máquina**, não só o FDP: há backups indo
+para o R2 há tempo e nenhum caminho testado para trazê-los de volta. Para este
+exercício usei o nosso próprio assinador num script de uso único, sem tocar na
+infra compartilhada — mas a lacuna continua lá, e é a mesma classe de problema
+que RNF-019 existe para não deixar passar.
+
+**Duas armadilhas de quem for repetir isto.** Um `.ts` fora de um pacote com
+`"type": "module"` é tratado como CJS pelo `tsx` e recusa `await` no topo: use
+`.mts`. E `docker --env-file` **não tira as aspas** dos valores, diferente do
+`source` do shell — o `backup-r2.env` guarda entre aspas, e sem tratar isso o
+host vira `"conta".r2.cloudflarestorage.com` e o DNS não resolve.
+
 ## O que fazer a seguir
 
 O [plano 01](docs/plans/01-contas-perfis-e-historico.md) **está entregue** (F1–F5, 26/08/2026).

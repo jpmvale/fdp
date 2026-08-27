@@ -38,7 +38,7 @@ nada.
 | Plano | O que propõe | Status |
 |---|---|---|
 | [plans/01-contas-perfis-e-historico.md](./plans/01-contas-perfis-e-historico.md) | Contas (SSO e e-mail/senha), perfil público, histórico persistente e avatar por imagem. Reverteu `00` §4.2 pela decisão P11 | ENTREGUE (F1–F5 ✅, 26/08/2026) |
-| [plans/02-armazenamento-de-avatares.md](./plans/02-armazenamento-de-avatares.md) | Tira as fotos do volume do container e as põe num bucket R2, com backup. Gatilho: os avatares não têm backup nenhum | **NO AR** (27/08/2026); falta o gate de RNF-019 |
+| [plans/02-armazenamento-de-avatares.md](./plans/02-armazenamento-de-avatares.md) | Tira as fotos do volume do container e as põe num bucket R2, com backup. Gatilho: os avatares não têm backup nenhum | ENTREGUE (F1–F4 ✅ + RNF-019, 27/08/2026) |
 
 ## Por onde começar
 
