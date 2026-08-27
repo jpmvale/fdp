@@ -52,14 +52,21 @@ echo "ok $arquivo ($(du -h "$arquivo" | cut -f1))"
 # Opcional de propósito, como o SSO e o R2 dos avatares: sem as variáveis, o
 # backup local continua funcionando igual e o script não falha. Quem roda numa
 # máquina de teste não precisa de bucket.
-if [ -n "${R2_BUCKET:-}" ]; then
-  echo "enviando para o R2…"
+#
+# **Bucket PRÓPRIO, e não o `R2_BUCKET` do `.env`.** Aquele é o dos avatares, e
+# o `.env` da aplicação o define — se este script lesse a mesma variável, o dump
+# do banco iria parar no bucket das fotos. Dois usos diferentes do mesmo R2
+# precisam de nomes diferentes, e o erro seria silencioso: subiria, daria "ok",
+# e ninguém olharia até o dia da restauração.
+if [ -n "${R2_BUCKET_BACKUPS:-}" ]; then
+  echo "enviando para o R2 (bucket $R2_BUCKET_BACKUPS)…"
   # Dentro do container da API: ele tem node e o nosso código, e a VPS não
   # precisa ganhar nada novo no host. `--network host` não é preciso — o
   # container fala com a internet pela rede padrão dele.
   if docker run --rm \
       -v "$DESTINO":/backups:ro \
-      -e R2_ENDPOINT -e R2_BUCKET -e R2_ACCESS_KEY_ID -e R2_SECRET_ACCESS_KEY -e R2_REGIAO \
+      -e R2_ENDPOINT -e R2_ACCESS_KEY_ID -e R2_SECRET_ACCESS_KEY -e R2_REGIAO \
+      -e "R2_BUCKET=$R2_BUCKET_BACKUPS" \
       "${IMAGEM_FDP:-ghcr.io/jpmvale/fdp:latest}" \
       npx tsx server/src/enviar-para-r2.ts "/backups/$(basename "$arquivo")" \
         "postgres/$(basename "$arquivo")"; then

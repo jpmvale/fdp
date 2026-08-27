@@ -933,12 +933,48 @@ Ele também recusa arquivo vazio (um `pg_dump` que falhou em silêncio) e arquiv
 acima de 4 GB (não faz multipart — mandar assim produziria um objeto truncado, e
 backup truncado é pior que backup nenhum porque parece que existe).
 
+## O R2 no ar (27/08/2026)
+
+Os avatares saíram do volume. A ordem seguida foi a da §6 do plano 02, e ela
+importa: **migrar antes de configurar**. Com as variáveis ativas antes da cópia,
+a aplicação leria de um bucket vazio e toda foto viraria 404 até a migração
+terminar.
+
+| Passo | Resultado |
+|---|---|
+| Ensaio (`migrar-avatares.ts`, sem `--aplicar`) | 32 avatares, **0 corrompidos**, 0 nomes inválidos |
+| `--aplicar` | 32 copiados |
+| `--aplicar` de novo | 0 copiados, **32 já estavam** — e a migração compara CONTEÚDO antes de dizer isso |
+| `docker compose up -d` | `recarregadas 1 sala(s)`, `avatares: R2`, `o depósito aceita gravar` |
+
+A partida em curso atravessou o reinício. A sonda de RNF-020 gravou, leu,
+conferiu e apagou um objeto no bucket — não é suposição de que funciona.
+
+**O ensaio respondeu uma pergunta que nunca tinha sido feita:** nenhum dos 32
+arquivos estava corrompido. O hash no nome tornou isso trivial de verificar, e é
+a segunda vez que essa escolha do plano 01 se paga.
+
+O volume `fdp_avatares` **continua montado**, de propósito: é a rede de
+segurança até RNF-019 fechar. Só sai depois de uma restauração de verdade.
+
+### O bucket do backup precisou de variável própria
+
+Ao ligar o envio do dump, quase cometi um erro silencioso: `enviar-para-r2.ts`
+lê `R2_BUCKET`, e o `.env` da aplicação agora define `R2_BUCKET=fdp-avatares`. O
+dump do Postgres teria ido parar no bucket das fotos — subiria, diria "ok", e
+ninguém olharia até o dia da restauração.
+
+`backup-postgres.sh` usa `R2_BUCKET_BACKUPS`, e passa esse valor como
+`R2_BUCKET` para dentro do container do envio. Dois usos do mesmo R2 precisam de
+nomes diferentes.
+
 ## O que fazer a seguir
 
 O [plano 01](docs/plans/01-contas-perfis-e-historico.md) **está entregue** (F1–F5, 26/08/2026).
-O [plano 02](docs/plans/02-armazenamento-de-avatares.md) está **implementado (F1–F4) e não
-implantado**: falta criar o bucket, configurar, migrar e fechar RNF-019. Ver a seção "Plano 02
-implementado" abaixo.
+O [plano 02](docs/plans/02-armazenamento-de-avatares.md) está **no ar desde 27/08/2026**: os 32
+avatares foram conferidos contra o próprio hash (nenhum corrompido), copiados para o bucket
+`fdp-avatares`, e a aplicação lê de lá. Falta só o gate de **RNF-019** — restaurar o backup do
+bucket uma vez, para valer.
 
 Fora isso, o que sobrou é o **M4 de `12`, que é a definição de "entregue"** — e é onde mora
 quase todo o trabalho restante.

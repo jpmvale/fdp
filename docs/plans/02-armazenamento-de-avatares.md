@@ -1,11 +1,11 @@
 # Plano 02 — Armazenamento de avatares
 
-Status: **F1 a F4 IMPLEMENTADAS** (26/08/2026), **não implantadas** · Aberto em 26/08/2026
+Status: **NO AR** desde 27/08/2026 · F1 a F4 implantadas · falta só o gate de RNF-019 · Aberto em 26/08/2026
 
-O código está pronto e testado localmente contra um MinIO em container. O que
-falta é operacional e só o dono das credenciais pode fazer: criar o bucket no
-R2, pôr as quatro variáveis no compose, rodar `migrar-avatares` em ensaio, depois
-com `--aplicar`, e então fechar o gate de RNF-019 restaurando o backup uma vez.
+Os 32 avatares foram conferidos contra o próprio hash (**nenhum corrompido**),
+copiados para `fdp-avatares`, e a aplicação lê de lá desde 27/08/2026. Falta o
+gate de **RNF-019**: restaurar o backup do bucket uma vez, para valer. Até isso
+acontecer, o volume `fdp_avatares` continua montado como rede de segurança.
 
 Tira as fotos de avatar do disco do container e as põe num bucket R2, com backup
 e com o pipeline calibrado por medição em vez de suposição.
@@ -194,7 +194,7 @@ suposto.
 **F3 — R2.** ✅ **Implementada.** A segunda implementação, e a escrita dupla da §6.
 *Gate:* CA-392 verde no CI, com a suíte do R2 comprovadamente executada.
 
-**F4 — Migração e corte.** ⚠️ **Escrita e ensaiada; o corte em produção é operacional.** Os passos 2 a 4 da §6.
+**F4 — Migração e corte.** ✅ **Feita em 27/08/2026** (o gate de RNF-019 continua aberto). Os passos 2 a 4 da §6.
 *Gate:* RNF-019 — o backup restaurado uma vez, num bucket vazio, com os hashes
 conferidos. Sem isso, F4 não fecha: era exatamente essa a lacuna que abriu este
 plano.
