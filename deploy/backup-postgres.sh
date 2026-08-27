@@ -63,11 +63,21 @@ if [ -n "${R2_BUCKET_BACKUPS:-}" ]; then
   # Dentro do container da API: ele tem node e o nosso código, e a VPS não
   # precisa ganhar nada novo no host. `--network host` não é preciso — o
   # container fala com a internet pela rede padrão dele.
-  if docker run --rm \
+  # A imagem é a do container QUE ESTÁ NO AR, e nunca `:latest`.
+  #
+  # `latest` na VPS é o que sobrou de um `docker compose up` sem `IMAGE_TAG` —
+  # uma construção local, de commit indeterminado. O CI publica só a tag do sha,
+  # e é essa que o `deploy.sh` sobe. Perguntar ao container em execução dá
+  # sempre o artefato que de fato está servindo o jogo.
+  IMAGEM="${IMAGEM_FDP:-$(docker inspect fdp-api --format '{{.Config.Image}}' 2>/dev/null)}"
+  if [ -z "$IMAGEM" ]; then
+    echo "::erro:: não achei a imagem do fdp-api; defina IMAGEM_FDP" >&2
+    FALHOU_ENVIO=1
+  elif docker run --rm \
       -v "$DESTINO":/backups:ro \
       -e R2_ENDPOINT -e R2_ACCESS_KEY_ID -e R2_SECRET_ACCESS_KEY -e R2_REGIAO \
       -e "R2_BUCKET=$R2_BUCKET_BACKUPS" \
-      "${IMAGEM_FDP:-ghcr.io/jpmvale/fdp:latest}" \
+      "$IMAGEM" \
       npx tsx server/src/enviar-para-r2.ts "/backups/$(basename "$arquivo")" \
         "postgres/$(basename "$arquivo")"; then
     echo "cópia fora da máquina ok"
