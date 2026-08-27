@@ -27,7 +27,7 @@ npm run build:client   # OBRIGATÓRIO antes do primeiro `npm start`
 npm run redis          # opcional, noutro terminal
 npm run minio          # opcional: o outro lado do depósito de avatares
 npm start              # http://localhost:3000
-npm test               # 555 testes (2 pulados: Redis e Postgres, que só rodam com as env deles)
+npm test               # 559 testes (2 pulados: Redis e Postgres, que só rodam com as env deles)
 npm run typecheck
 ```
 
@@ -677,6 +677,97 @@ E junto veio **CA-400**: `maxBots = maxPlayers − 1` existia para uma mesa nunc
 ser só de bots, e essa aritmética parou de bastar quando o humano pôde sair da
 mesa sem sair da sala. Dois bots sentados e a única pessoa assistindo passavam
 nas duas contagens, e a partida começaria sem ninguém para jogá-la.
+
+## Avatares: por que nunca funcionaram em produção (26/08/2026)
+
+**O volume era montado como `root` e o processo roda como `node`.** Toda
+gravação de foto morria com `EACCES`, desde sempre.
+
+O `Dockerfile` tem `USER node`, e o `docker-compose.prod.yml` monta um volume
+nomeado em `/var/lib/fdp/avatares` — um caminho que **não existia na imagem**.
+Quando o caminho não existe, o Docker o cria como `root:root 0755`, e o usuário
+`node` não escreve nele. Reproduzido em três linhas:
+
+```
+docker run --rm -v v:/var/lib/fdp/avatares node:24-alpine \
+  sh -c 'ls -ld /var/lib/fdp/avatares; su node -s /bin/sh -c "touch /var/lib/fdp/avatares/x"'
+# drwxr-xr-x root root
+# touch: Permission denied
+```
+
+### O que fez isso durar semanas
+
+A gravação vivia **dentro do `try` do processamento de imagem**, e o `catch`
+traduzia tudo para `FALHA_AO_PROCESSAR` — cuja frase é *"não consegui abrir
+essa imagem, ela pode estar corrompida"*.
+
+Quem enviava lia isso, olhava para a própria foto, trocava de imagem, e a
+segunda falhava igual. Eu passei a sessão inteira investigando o lado errado:
+achei e consertei o orçamento de cadastro sendo gasto pelo avatar, achei e
+consertei o teto de pixels que recusava toda câmera moderna — os dois eram
+defeitos reais, e nenhum dos dois era ESTE.
+
+> A mensagem de erro decidiu onde três pessoas procuraram, e ela apontava para o
+> lugar errado. Separar "não consegui ler o que você mandou" de "não consegui
+> guardar o que produzi" não é organização de código: é a diferença entre o
+> usuário investigar o arquivo dele e nós investigarmos a nossa infraestrutura.
+
+Foi só depois de `DEPOSITO_INDISPONIVEL` existir (plano 02) que a frase certa
+apareceu na tela e o problema ficou localizável em minutos.
+
+### Os dois consertos
+
+**No `Dockerfile`**, antes de `USER node`:
+
+```
+RUN mkdir -p /var/lib/fdp/avatares && chown -R node:node /var/lib/fdp
+```
+
+O Docker semeia a dona do diretório da imagem num volume **vazio** — então isto
+conserta o volume que já está na VPS, justamente porque ele está vazio (nenhuma
+gravação jamais deu certo). Medido nos três casos:
+
+| Volume | Depois do conserto |
+|---|---|
+| Novo | `node:node`, grava |
+| Já existe, **vazio** | `node:node`, grava |
+| Já existe, **com conteúdo** | continua `root`, **não** grava |
+
+Se um dia houver conteúdo lá dentro, o conserto da imagem não alcança e é
+preciso, na VPS:
+
+```
+docker compose -f docker-compose.prod.yml down
+docker run --rm -v fdp_avatares:/v alpine chown -R 1000:1000 /v
+docker compose -f docker-compose.prod.yml up -d
+```
+
+**RNF-020 — a sonda de escrita.** Na subida, o servidor grava, lê, confere e
+apaga um objeto de teste, e diz no log o que aconteceu. Não é fatal: jogar não
+depende de foto (I-1), e derrubar o processo por um diretório tiraria do ar um
+jogo que funciona.
+
+```
+avatares: o depósito aceita gravar
+```
+ou
+```
+avatares: O DEPÓSITO NÃO ACEITA GUARDAR — o envio de foto vai falhar.
+  Error: EACCES: permission denied, open '/var/lib/fdp/avatares/....tmp'
+  Em produção isto costuma ser o volume montado como root com o processo
+  rodando como `node`.
+```
+
+O defeito esteve **a um `touch` de distância de ser descoberto** por semanas. O
+que faltava era alguém dar o `touch` — e ninguém dá, se ninguém escreveu que
+alguém deveria. Agora o processo dá, toda vez que sobe.
+
+### Verificado na imagem de produção, não por dedução
+
+Construí a imagem, montei um volume `root` vazio igual ao da VPS, subi o
+container e enviei a foto de 48 MP: gravou como `node:node`, serviu de volta, e
+o hash saiu **idêntico** ao produzido no macOS — o `sharp` do Alpine/musl dá o
+mesmo byte, que era a única incerteza que restava sobre o teto de pixels.
 
 ## O que fazer a seguir
 

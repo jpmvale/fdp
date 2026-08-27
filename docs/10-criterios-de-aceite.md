@@ -447,6 +447,7 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-400 | U | RF-018 | **Dado** só bots sentados, **então** começar a partida é recusado com `SO_BOTS_NA_MESA`, e o botão já vem desligado com a explicação |
 | CA-401 | E | RF-085 | **Dado** um jogador com N cartas, **então** o assento mostra N cartas viradas até 5, e `verso ×N` acima disso |
 | CA-402 | E | RF-086 | **Dado** uma janela de 900 px ou mais na mesa, **então** o chat e o log ficam à direita, grudados no topo; abaixo de 900, empilhados no fim |
+| CA-403 | U | RNF-020 | **Dado** a subida, **então** a sonda grava, lê, confere e apaga um objeto; sem permissão de escrita ela acusa a etapa `guardar` com o erro do sistema, e o servidor **continua atendendo** |
 | CA-392 | U/I | RF-080 | **Dado** a suíte de contrato do depósito, **então** ela passa idêntica em disco, disco+cache e R2; o CI recusa o build se a do R2 tiver sido pulada |
 | CA-393 | U/I | RF-082 | **Dado** o depósito fora do ar, **então** o envio responde 503 `DEPOSITO_INDISPONIVEL`, a imagem RUIM continua sendo recusada pelo motivo dela, e criar sala e jogar seguem intactos |
 | CA-394 | U | RF-080 | **Dado** a migração, **quando** o conteúdo de um objeto não bate com o hash do próprio nome, **então** ele é **denunciado e não copiado**; a variante `-64` é isenta da conferência, porque carrega o hash da grande |

@@ -43,6 +43,24 @@ COPY . .
 # sintoma sendo um 500 na raiz sem causa aparente.
 COPY --from=cliente /app/app/build ./app/build
 
+# O diretório dos avatares, criado AQUI e com dono certo.
+#
+# Sem esta linha, o volume nomeado do compose é montado sobre um caminho que
+# não existe na imagem — e o Docker o cria como **root**. O processo roda como
+# `node` (a linha abaixo), então toda gravação de foto morria com `EACCES`.
+#
+# O envio de avatar NUNCA funcionou em produção por causa disto, e ninguém
+# soube: o código antigo devolvia `FALHA_AO_PROCESSAR`, cuja frase é "não
+# consegui abrir essa imagem, ela pode estar corrompida". Quem enviava ia
+# procurar defeito na própria foto, trocava de imagem, e a segunda falhava
+# igual.
+#
+# O Docker semeia a dona do diretório da imagem num volume **vazio**, então
+# isto conserta o volume que já existe lá — desde que ele esteja vazio, que é o
+# caso justamente porque nenhuma gravação jamais deu certo. Com conteúdo
+# dentro, a dona fica como está e é preciso um `chown` na mão (ver HANDOFF).
+RUN mkdir -p /var/lib/fdp/avatares && chown -R node:node /var/lib/fdp
+
 # Roda dos fontes TypeScript sob `tsx`: os pacotes do workspace exportam `.ts` e
 # os imports usam `.js` — convenção ESM do TypeScript que o resolvedor do Node
 # não mapeia de volta, então `node` puro não sobe o processo.

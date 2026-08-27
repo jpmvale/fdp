@@ -18,7 +18,7 @@ import { registroDaPartida } from './historico.js';
 import { createPersistence } from './persistence.js';
 import { createSigner } from './session.js';
 import { attachWebSocket } from './ws.js';
-import { comCache, criarDepositoEmDisco, type DepositoDeAvatares } from '@fdp/avatares';
+import { comCache, criarDepositoEmDisco, sondarDeposito, type DepositoDeAvatares } from '@fdp/avatares';
 import { configDoAmbiente as configDeR2, criarDepositoEmR2 } from '@fdp/avatares/r2';
 
 /**
@@ -157,6 +157,29 @@ async function main(): Promise<void> {
   const signer = createSigner(sessionSecret());
 
   const deposito = escolherDeposito();
+
+  /**
+   * A sonda de escrita, na subida (RNF-020).
+   *
+   * Não bloqueia: o servidor sobe e atende enquanto ela roda, porque jogar não
+   * depende de foto (I-1). O que ela produz é uma LINHA NO LOG — e essa linha
+   * é a diferença entre descobrir um volume sem permissão agora ou daqui a
+   * semanas, pelo relato de alguém que achou que o problema era a foto dele.
+   */
+  if (deposito) {
+    void sondarDeposito(deposito).then((r) => {
+      if (r.ok) {
+        console.log('avatares: o depósito aceita gravar');
+        return;
+      }
+      console.error(
+        `avatares: O DEPÓSITO NÃO ACEITA ${r.etapa.toUpperCase()} — o envio de foto vai falhar.\n` +
+        `  ${r.erro}\n` +
+        '  Em produção isto costuma ser o volume montado como root com o processo\n' +
+        '  rodando como `node`. Ver "Avatares" no HANDOFF.',
+      );
+    });
+  }
 
   const app = createHttpApp({
     hub,
