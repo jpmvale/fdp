@@ -25,6 +25,7 @@ import {
   type Emission,
   type Room,
   type RoomCtx,
+  absentMatchPlayers,
 } from '@fdp/room';
 import { ROOM_CODE_ALPHABET } from '@fdp/protocol';
 
@@ -1153,5 +1154,146 @@ describe('CA-346: o servidor segura a mesa no fim da vaza', () => {
 
     expect(room.match!.round.activePlayerId).toBeNull();
     expect(checkRoomInvariants(room)).toEqual([]);
+  });
+});
+
+/**
+ * RJ-117b — trocar de aplicativo não é sumir.
+ *
+ * O defeito que estes testes existem para prender é de CELULAR, e passava
+ * despercebido no computador: ao abrir o WhatsApp, o sistema congela a aba e
+ * fecha o WebSocket. O servidor vê o mesmo `close` de uma queda de internet,
+ * espera 10 s de `TRANSPORT_GRACE` e **pausa a mesa de todo mundo** — porque
+ * alguém olhou uma mensagem.
+ *
+ * Pior: a aba congelada não consegue reconectar, então os 10 s são
+ * inalcançáveis por construção. Qualquer troca de aplicativo mais longa que
+ * isso pausava a partida.
+ */
+describe('CA-414: segundo plano não é ausência', () => {
+  const emSegundoPlano = (room: Room, id: string, valor: boolean, now: number) =>
+    ok(send(room, id, { type: 'player:background', payload: { emSegundoPlano: valor } }, now)).room;
+
+  it('quem avisou que saiu da tela NÃO pausa a partida quando o socket cai', () => {
+    let room = started(roomWith(3));
+    const [, p2] = room.players;
+
+    room = emSegundoPlano(room, p2!.id, true, 200);
+    room = ok(disconnect(room, p2!.id, ctxAt(300))).room;
+
+    // Passa muito além da carência de transporte.
+    const depois = tick(room, ctxAt(300 + LIMITS.transportGraceMs + 5_000));
+    expect(depois.room.status).toBe('EM_PARTIDA');
+    expect(absentMatchPlayers(depois.room)).toEqual([]);
+  });
+
+  /**
+   * O contraste que dá sentido ao teste acima: SEM o aviso, o comportamento
+   * antigo continua valendo. Queda de internet de verdade ainda pausa.
+   */
+  it('sem o aviso, a queda continua pausando — a mesa não ficou desprotegida', () => {
+    let room = started(roomWith(3));
+    const [, p2] = room.players;
+
+    room = ok(disconnect(room, p2!.id, ctxAt(300))).room;
+
+    const depois = tick(room, ctxAt(300 + LIMITS.transportGraceMs + 5_000));
+    expect(depois.room.status).toBe('PAUSADA');
+    expect(absentMatchPlayers(depois.room)).toEqual([p2!.id]);
+  });
+
+  /**
+   * O ponto inteiro do conserto: com a mesa rodando, o prazo do turno corre e
+   * o auto-play cobre a vez de quem está no WhatsApp. Era isso que a pausa
+   * impedia — `phaseDeadline` vira `null` em `PAUSADA`, e sem prazo não há
+   * auto-play.
+   */
+  it('o prazo do turno CONTINUA correndo para quem está em segundo plano', () => {
+    let room = started(roomWith(3));
+    const [, p2] = room.players;
+
+    room = emSegundoPlano(room, p2!.id, true, 200);
+    room = ok(disconnect(room, p2!.id, ctxAt(300))).room;
+    const depois = tick(room, ctxAt(300 + LIMITS.transportGraceMs + 1_000)).room;
+
+    expect(depois.status).toBe('EM_PARTIDA');
+    expect(depois.phaseDeadline).not.toBeNull();
+  });
+
+  it('voltar à tela desfaz a marca, e a queda seguinte volta a pausar', () => {
+    let room = started(roomWith(3));
+    const [, p2] = room.players;
+
+    room = emSegundoPlano(room, p2!.id, true, 200);
+    room = emSegundoPlano(room, p2!.id, false, 400);
+    room = ok(disconnect(room, p2!.id, ctxAt(500))).room;
+
+    // A marca não pode virar um passe vitalício: quem voltou e depois perdeu a
+    // internet de verdade merece a pausa como qualquer um.
+    const depois = tick(room, ctxAt(500 + LIMITS.transportGraceMs + 1_000));
+    expect(depois.room.status).toBe('PAUSADA');
+  });
+
+  it('reconectar limpa a marca mesmo sem aviso de volta', () => {
+    let room = started(roomWith(3));
+    const [, p2] = room.players;
+
+    room = emSegundoPlano(room, p2!.id, true, 200);
+    room = ok(disconnect(room, p2!.id, ctxAt(300))).room;
+    room = ok(reconnect(room, p2!.id, ctxAt(400))).room;
+
+    expect(room.players.find((p) => p.id === p2!.id)!.emSegundoPlano).toBe(false);
+  });
+
+  /**
+   * O caminho do Android, onde o socket costuma SOBREVIVER ao segundo plano.
+   *
+   * Aqui não há `close`: a aba congela, os pongs param, e 45 s depois o
+   * servidor derruba o socket por batimento morto. Sem a marca, isso vira
+   * pausa igual. Com ela, a mesa segue e o auto-play cobre.
+   *
+   * Note que NÃO existe o caminho "avisar que voltou com o socket morto":
+   * mandar um comando exige socket aberto, e ter socket aberto significa que a
+   * reconexão já aconteceu — e é ela que limpa a marca (teste acima).
+   */
+  it('socket derrubado por batimento morto também não pausa quem avisou', () => {
+    let room = started(roomWith(3));
+    const [, p2] = room.players;
+
+    room = emSegundoPlano(room, p2!.id, true, 200);
+    // O que o servidor faz quando o batimento não volta: derruba o socket.
+    room = ok(disconnect(room, p2!.id, ctxAt(45_000))).room;
+
+    const depois = tick(room, ctxAt(45_000 + LIMITS.transportGraceMs + 1_000));
+    expect(depois.room.status).toBe('EM_PARTIDA');
+    expect(depois.room.phaseDeadline).not.toBeNull();
+  });
+
+  it('repetir o mesmo aviso não gera versão nova da sala', () => {
+    let room = started(roomWith(3));
+    const [, p2] = room.players;
+
+    const primeira = ok(send(room, p2!.id,
+      { type: 'player:background', payload: { emSegundoPlano: true } }, 200));
+    room = primeira.room;
+    const segunda = ok(send(room, p2!.id,
+      { type: 'player:background', payload: { emSegundoPlano: true } }, 250));
+
+    // O celular dispara `visibilitychange` mais de uma vez em alguns fluxos.
+    expect(segunda.emissions).toEqual([]);
+  });
+
+  it('espectador em segundo plano não muda nada — ele já não pausava', () => {
+    let room = started(roomWith(3));
+    const espectador = ok(join(room, {
+      playerId: 'e1', nickname: 'Zé', avatar: AVATAR,
+    }, ctxAt(150)));
+    room = espectador.room;
+
+    room = emSegundoPlano(room, 'e1', true, 200);
+    room = ok(disconnect(room, 'e1', ctxAt(300))).room;
+
+    expect(tick(room, ctxAt(300 + LIMITS.transportGraceMs + 1_000)).room.status)
+      .toBe('EM_PARTIDA');
   });
 });

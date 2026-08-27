@@ -1319,3 +1319,35 @@ determinístico — sementes fixas —, então não era intermitente: era prazo.
 Corrigido na causa (a bomba de teste foi de 20 000² para 8000², que ainda é 4× o teto) e no
 sintoma (CA-209 ganhou prazo próprio de 20 s). Um teste que derruba o vizinho é pior que teste
 nenhum: ensina a rodar de novo até passar.
+
+## A pausa que o WhatsApp causava (27/08/2026)
+
+**O defeito.** No celular, trocar de aplicativo pausava a partida de todo mundo. Só no celular —
+no computador nunca aconteceu, e é por isso que sobreviveu tanto tempo.
+
+**A cadeia.** O sistema congela a aba ao ir para segundo plano e fecha o WebSocket. O servidor
+recebe o mesmo `close` de uma queda de internet, marca `RECONECTANDO`, e 10 s depois
+(`TRANSPORT_GRACE`) promove a `DESCONECTADO` — que pausa. E o pior: **a aba congelada não
+consegue reconectar**, porque o `setTimeout` do backoff congelou junto. Os 10 s eram
+inalcançáveis por construção.
+
+**Por que só o cliente pode resolver.** Olhando o transporte, os dois casos são idênticos. A
+diferença só existe dentro do navegador, e é ele que a conta: `player:background`, mandado
+ANTES de sumir, enquanto o socket ainda existe (RJ-117b). É melhor-esforço — sem o aviso, a mesa
+pausa como antes, e errar para o lado de pausar é o lado seguro.
+
+**O que destravou o conserto** foi descobrir que o auto-play NÃO é bloqueado por conexão: ele
+dispara sempre que `phaseDeadline` vence. Quem cai não é auto-jogado apenas porque a sala vira
+`PAUSADA` e o `phaseDeadline` some. Ou seja, bastou não pausar — a cobertura já existia.
+
+**Consequência deliberada:** quem fica no WhatsApp perde a vez por auto-play, como perderia se
+tivesse largado o telefone na mesa. É o que se quer; o contrário é a partida dos outros parar
+porque alguém foi olhar uma mensagem.
+
+Junto foi um segundo defeito: **ao voltar, o cliente esperava o backoff** (até 4 s) antes de
+reconectar, sobre um servidor que nunca esteve fora do ar — quem estava indisponível era a aba.
+Agora `visibilitychange → visible` reconecta na hora e zera a tentativa.
+
+**Sem cap de tempo, por ora.** Quem fica em segundo plano indefinidamente segue sendo
+auto-jogado até a partida acabar, e nunca pausa. Se um dia isso incomodar, o lugar de mexer é
+`isAbsent`.

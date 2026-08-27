@@ -86,6 +86,10 @@ export const commandSchema = z.discriminatedUnion('type', [
     type: z.literal('player:setProfile'),
     payload: z.object({ nickname: nicknameSchema, avatar: avatarSchema }).strict(),
   }),
+  z.object({
+    type: z.literal('player:background'),
+    payload: z.object({ emSegundoPlano: z.boolean() }).strict(),
+  }),
   z.object({ type: z.literal('player:leave'), payload: empty }),
   z.object({
     type: z.literal('player:setSpectator'),

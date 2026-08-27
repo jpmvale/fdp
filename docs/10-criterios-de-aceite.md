@@ -456,6 +456,7 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-408 | U | RF-087 | **Dado** uma mensagem de quem assiste, **então** ela não vira balão no feltro — a régua é quem falou, nunca o conteúdo |
 | CA-409 | E | RF-088 | **Dado** plateia numa partida em curso, **então** o cabeçalho mostra a contagem, e passar o mouse ou tocar revela os nomes; com plateia vazia o indicador não aparece |
 | CA-404 | U | RF-081 | **Dado** um avatar gravado, **então** o caminho devolvido é da **nossa** origem (`/avatares/<hash>.webp`) — nunca URL do fornecedor, nem assinada, nem com host externo |
+| CA-414 | I | RJ-117b | **Dado** um jogador que avisou estar em segundo plano, **quando** o socket dele cai e a carência de transporte vence, **então** a partida **NÃO** pausa e o prazo do turno continua correndo; **e** sem o aviso, a queda continua pausando |
 | CA-405 | U | RNF-018 | **Dado** dois pedidos do mesmo avatar, **então** o segundo não toca o depósito; o cache tem teto em **bytes** e despeja o mais antigo; ausência **não** é cacheada |
 | CA-403 | U | RNF-020 | **Dado** a subida, **então** a sonda grava, lê, confere e apaga um objeto; sem permissão de escrita ela acusa a etapa `guardar` com o erro do sistema, e o servidor **continua atendendo** |
 | CA-392 | U/I | RF-080 | **Dado** a suíte de contrato do depósito, **então** ela passa idêntica em disco, disco+cache e R2; o CI recusa o build se a do R2 tiver sido pulada |
@@ -478,6 +479,15 @@ propósito, gente com exatamente as mesmas vidas.
 
 CA-356 mede o defeito que consertou: a barra normalizava pelo prazo da aposta em todos os
 casos, então a vez de jogar carta nascia em 67% e a de um bot em 2%.
+
+CA-414 prende um defeito que só existia no CELULAR e passava despercebido no computador: ao
+abrir o WhatsApp, o sistema congela a aba e fecha o WebSocket, o servidor vê o mesmo `close` de
+uma queda de internet, e **a mesa de todo mundo pausava porque alguém olhou uma mensagem**. Pior,
+a aba congelada não consegue reconectar — os 10 s de carência eram inalcançáveis por construção.
+
+O teste tem duas metades e a segunda é a que importa tanto quanto a primeira: **sem** o aviso, a
+queda continua pausando. Consertar o caso do celular não podia desproteger quem perde a internet
+de verdade.
 
 CA-370 lista ataques, e não categorias. A bomba de descompressão é a que mais engana: um PNG
 branco de 8000² cabe em poucos KB — o teto de 5 MB não a pega — e vira 64 milhões de pixels ao

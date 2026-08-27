@@ -389,11 +389,26 @@ por ser a aposta mais conservadora.
 |---|---|
 | RJ-117 | Um jogador só entra em `DESCONECTADO` depois de ficar **sem socket por `TRANSPORT_GRACE`** (10 s). Aí sim a partida entra em `PAUSADA`, em qualquer fase. |
 | RJ-117a | Queda de socket seguida de reconexão dentro de `TRANSPORT_GRACE` **NÃO** é ausência: não pausa, não notifica, não conta para `RECONNECT_GRACE`. |
+| RJ-117b | Jogador que avisou estar em **segundo plano** (trocou de aplicativo, bloqueou o celular) **NÃO** é ausente, mesmo com o socket caído: o prazo do turno continua correndo e o auto-play cobre a vez dele. Reconectar ou avisar que voltou desfaz a marca. |
 | RJ-118 | Em `PAUSADA`, nenhum comando de jogada é aceito e **nenhum timer de turno corre**. |
 | RJ-119 | Quando **todos** os ausentes reconectam, a partida retoma automaticamente do ponto exato em que parou, e os timers de turno reiniciam do zero. |
 
 RJ-118 e RJ-119 juntos garantem que ninguém volta de uma queda de conexão já com o prazo
 estourado.
+
+**Por que RJ-117b existe, e por que só o cliente pode responder.** No celular, trocar para o
+WhatsApp faz o sistema congelar a aba e fechar o WebSocket. O servidor recebe **o mesmo `close`**
+de uma queda de internet — não há como distinguir olhando o transporte. E a aba congelada não
+consegue reconectar, então os 10 s de `TRANSPORT_GRACE` são inalcançáveis por construção:
+qualquer troca de aplicativo mais longa que isso pausava a mesa de todo mundo.
+
+Só o cliente sabe a diferença, e é ele que avisa — `player:background`, mandado ANTES de sumir,
+enquanto o socket ainda existe. É **melhor-esforço** de propósito: se o aviso não sair a tempo,
+a mesa pausa como antes. Errar para o lado de pausar é o lado seguro.
+
+A consequência é deliberada: quem está no WhatsApp perde a vez por auto-play, como perderia se
+tivesse largado o telefone na mesa. Isso é o que se quer — o contrário é a partida dos outros
+parar porque alguém foi olhar uma mensagem.
 
 **Por que RJ-117a existe.** Socket que cai não é jogador que sumiu. 4G instável, túnel,
 elevador, troca de Wi-Fi para dados móveis: o celular perde a conexão por dois ou três segundos

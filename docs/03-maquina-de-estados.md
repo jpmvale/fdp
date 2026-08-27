@@ -96,11 +96,11 @@ todos os eliminados (RJ-129).
 
 | Timer | Valor | Escopo | Efeito ao expirar |
 |---|---|---|---|
-| `TRANSPORT_GRACE` | 10 s | Socket ausente | `CONECTADO → DESCONECTADO`; só aqui a partida pausa (RJ-117) |
+| `TRANSPORT_GRACE` | 10 s | Socket ausente | `CONECTADO → DESCONECTADO`; só aqui a partida pausa (RJ-117) — **exceto** para quem avisou estar em segundo plano (RJ-117b) |
 | `RECONNECT_GRACE` | 60 s | Pausa contínua | Host passa a poder decidir (RJ-150) |
 | `PAUSE_MAX` | 10 min | Pausa contínua | Partida encerra sozinha (RJ-157) |
-| `BET_TIMEOUT` | 45 s | Jogador **conectado** da vez | Auto-play: 0, ou 1 se proibido (RJ-114) |
-| `PLAY_TIMEOUT` | 30 s | Jogador **conectado** da vez | Auto-play: menor carta da mão (RJ-115) |
+| `BET_TIMEOUT` | 45 s | Jogador da vez que não seja ausente — inclui quem está em segundo plano (RJ-117b) | Auto-play: 0, ou 1 se proibido (RJ-114) |
+| `PLAY_TIMEOUT` | 30 s | Jogador da vez que não seja ausente — inclui quem está em segundo plano (RJ-117b) | Auto-play: menor carta da mão (RJ-115) |
 | `LOBBY_IDLE` | 15 min | Sala sem ninguém conectado | Sala → `ENCERRADA` |
 | `ROOM_MAX_LIFE` | 4 h | Desde a criação | Sala → `ENCERRADA` |
 

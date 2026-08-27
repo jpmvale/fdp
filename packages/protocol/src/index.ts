@@ -165,6 +165,19 @@ export interface MoveBase {
 export type Command =
   | { type: 'room:resync'; payload: Record<string, never> }
   | { type: 'player:setProfile'; payload: { nickname: string; avatar: Avatar } }
+  /**
+   * "Estou saindo da tela" / "voltei" — o celular trocando de aplicativo.
+   *
+   * Existe porque o servidor NÃO consegue distinguir, sozinho, um socket que
+   * morreu porque a internet caiu de um que morreu porque o sistema congelou a
+   * aba. Os dois chegam como o mesmo `close`. Só o cliente sabe a diferença, e
+   * é ele que avisa — antes de sumir, enquanto ainda tem socket.
+   *
+   * É melhor-esforço por natureza: se o aviso não sair a tempo, a mesa
+   * degrada para o comportamento antigo e pausa. Errar para o lado de pausar é
+   * o lado seguro.
+   */
+  | { type: 'player:background'; payload: { emSegundoPlano: boolean } }
   | { type: 'player:leave'; payload: Record<string, never> }
   /** Sentar-se à mesa ou sair dela para assistir. Só no lobby (RF-083). */
   | { type: 'player:setSpectator'; payload: { spectator: boolean } }

@@ -32,6 +32,7 @@ export function conectar(wsUrl: string, token: string, ouvintes: Ouvintes): Cone
   let ws: WebSocket | null = null;
   let vivo = true;
   let tentativa = 0;
+  let agendada: ReturnType<typeof setTimeout> | null = null;
 
   const abrir = () => {
     if (!vivo) return;
@@ -69,33 +70,99 @@ export function conectar(wsUrl: string, token: string, ouvintes: Ouvintes): Cone
       const espera = Math.min(400 * 2 ** tentativa, 4000);
       tentativa += 1;
       ouvintes.aoMudarEstado('RECONECTANDO');
-      setTimeout(abrir, espera);
+      agendada = setTimeout(abrir, espera);
     };
+  };
+
+  /**
+   * Voltar à tela reconecta AGORA, sem esperar o backoff.
+   *
+   * O celular congela a aba ao trocar de aplicativo, e congela o `setTimeout`
+   * junto. Ao voltar, o relógio destrava e o cliente ficava esperando até 4 s
+   * de um backoff que já não fazia sentido — 4 s a mais de mesa parada, depois
+   * de o próprio tempo de fora já ter custado a pausa.
+   *
+   * `tentativa = 0` porque a espera acumulada era sobre um servidor que talvez
+   * nunca tenha estado fora do ar: quem estava indisponível era esta aba.
+   */
+  const aoVoltarParaTela = () => {
+    if (!vivo || typeof document === 'undefined' || document.visibilityState !== 'visible') return;
+    // Avisa que voltou. Se o socket sobreviveu (Android costuma manter), este
+    // é o único aviso que o servidor recebe — e é o que tira a mesa da pausa.
+    if (ws?.readyState === WebSocket.OPEN) {
+      enviar('player:background', { emSegundoPlano: false });
+      return;
+    }
+    if (agendada !== null) { clearTimeout(agendada); agendada = null; }
+    tentativa = 0;
+    abrir();
+  };
+
+  /**
+   * Avisa ANTES de sumir, enquanto o socket ainda existe (RJ-117b).
+   *
+   * É a única chance: depois que o sistema congela a aba, não há mais como
+   * mandar nada. Por isso vai em `visibilitychange` e não em `pagehide` — o
+   * primeiro dispara ao trocar de aplicativo, que é o caso comum; o segundo,
+   * só ao fechar de verdade.
+   *
+   * É melhor-esforço, e o desenho conta com isso: se o aviso não sair a tempo,
+   * a mesa pausa como antes. Errar para o lado de pausar é o lado seguro.
+   */
+  const aoSairDaTela = () => {
+    if (!vivo || typeof document === 'undefined' || document.visibilityState !== 'hidden') return;
+    if (ws?.readyState === WebSocket.OPEN) {
+      enviar('player:background', { emSegundoPlano: true });
+    }
+  };
+
+  const aoMudarVisibilidade = () => {
+    if (document.visibilityState === 'visible') aoVoltarParaTela();
+    else aoSairDaTela();
+  };
+
+  /**
+   * Sem DOM, não há visibilidade a observar — e o módulo continua servindo.
+   *
+   * O teste roda em Node, onde `document` não existe; sem esta guarda, exigir
+   * DOM aqui derrubava a suíte do socket inteira. Um cliente de rede não tem
+   * por que depender de haver uma tela.
+   */
+  const temDom = typeof document !== 'undefined';
+  if (temDom) document.addEventListener('visibilitychange', aoMudarVisibilidade);
+
+  const enviar = (tipo: string, payload: unknown = {}): void => {
+    if (ws?.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({
+      v: PROTOCOL_VERSION, id: crypto.randomUUID(), type: tipo, ts: Date.now(), payload,
+    }));
   };
 
   abrir();
 
   return {
+    /**
+     * `PROTOCOL_VERSION`, e NUNCA um número escrito à mão.
+     *
+     * Aqui estava `v: 1`, desde o dia em que o cliente nasceu. Quando o
+     * protocolo virou 2, o servidor passou a recusar TODO comando deste
+     * cliente com `PROTOCOL_VERSION` — sentar bot, começar partida, apostar,
+     * jogar carta, falar no chat. A tela continuava carregando, a sala
+     * continuava sendo criada por HTTP, e o único sinal era um "Não deu
+     * certo. Tente de novo." vermelho, porque `PROTOCOL_VERSION` nem estava
+     * traduzido. O jogo ficou inteiro fora do ar parecendo um erro qualquer.
+     *
+     * A constante é a mesma que o servidor valida, do mesmo módulo. As duas
+     * pontas não têm mais como discordar. O envio em si mora em `enviar`, que
+     * o aviso de segundo plano também usa — uma implementação, não duas.
+     */
     enviar(tipo, payload = {}) {
-      if (ws?.readyState !== WebSocket.OPEN) return;
-      // `PROTOCOL_VERSION`, e NUNCA um número escrito à mão.
-      //
-      // Aqui estava `v: 1`, desde o dia em que o cliente nasceu. Quando o
-      // protocolo virou 2, o servidor passou a recusar TODO comando deste
-      // cliente com `PROTOCOL_VERSION` — sentar bot, começar partida, apostar,
-      // jogar carta, falar no chat. A tela continuava carregando, a sala
-      // continuava sendo criada por HTTP, e o único sinal era um "Não deu
-      // certo. Tente de novo." vermelho, porque `PROTOCOL_VERSION` nem estava
-      // traduzido. O jogo ficou inteiro fora do ar parecendo um erro qualquer.
-      //
-      // A constante é a mesma que o servidor valida, do mesmo módulo. As duas
-      // pontas não têm mais como discordar.
-      ws.send(JSON.stringify({
-        v: PROTOCOL_VERSION, id: crypto.randomUUID(), type: tipo, ts: Date.now(), payload,
-      }));
+      enviar(tipo, payload);
     },
     fechar() {
       vivo = false;
+      if (temDom) document.removeEventListener('visibilitychange', aoMudarVisibilidade);
+      if (agendada !== null) { clearTimeout(agendada); agendada = null; }
       ws?.close();
     },
   };

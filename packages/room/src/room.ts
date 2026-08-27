@@ -117,6 +117,7 @@ function newPlayer(params: JoinParams, now: number, isSpectator: boolean): RoomP
     joinedAt: now,
     lastSeenAt: now,
     socketLostAt: null,
+    emSegundoPlano: false,
     lastChatAt: null,
     bot: null,
     conta: params.conta ?? null,
@@ -165,6 +166,8 @@ function newBot(
     // Bot não fala (CA-336), então este campo nunca sai de `null` nele. Está
     // aqui porque o tipo é um só: um jogador da sala é um jogador da sala.
     lastChatAt: null,
+    // Bot nunca sai da tela: não tem tela.
+    emSegundoPlano: false,
     bot: { difficulty },
     // Bot nunca tem conta. Não é descuido: é o que impede uma mesa só de bots
     // de fazer uma partida entrar no histórico de alguém (RF-068).
@@ -240,6 +243,11 @@ export function reconnect(room: Room, playerId: PlayerId, ctx: RoomCtx): RoomRes
     connection: 'CONECTADO',
     socketLostAt: null,
     lastSeenAt: ctx.now,
+    // Reconectou: está de volta à tela, aconteça o que tiver acontecido antes.
+    // Sem isto, quem avisou que ia para segundo plano e voltou continuaria
+    // marcado como tal para sempre — e uma queda de internet REAL depois disso
+    // não pausaria mais a mesa, que é exatamente o que a marca não pode custar.
+    emSegundoPlano: false,
   });
 
   const emissions: Emission[] = [];
@@ -432,6 +440,42 @@ export function applyCommand(
 
     case 'player:leave':
       return leave(room, playerId, ctx);
+
+    /**
+     * RJ-117b. Trocar de aplicativo não é sumir.
+     *
+     * O celular congela a aba e fecha o WebSocket ao ir para segundo plano, e
+     * o servidor vê o mesmo `close` de uma queda de internet. Este comando é o
+     * cliente contando a diferença ANTES de sumir — é a única fonte que
+     * existe, porque só ele sabe.
+     *
+     * Aceito em qualquer estado da sala, inclusive `PAUSADA`: se a mesa já
+     * pausou por causa de outra pessoa, avisar que estou no WhatsApp continua
+     * sendo informação verdadeira e útil.
+     */
+    case 'player:background': {
+      const jogador = room.players.find((p) => p.id === playerId);
+      if (!jogador) return failWith('VALIDATION_FAILED', 'JOGADOR_DESCONHECIDO');
+      // Repetir o mesmo estado não é erro nem mudança: o celular dispara
+      // `visibilitychange` mais de uma vez em alguns fluxos, e cada repetição
+      // viraria uma versão nova da sala para todo mundo baixar.
+      if (jogador.emSegundoPlano === command.payload.emSegundoPlano) {
+        return commit(room, ctx, []);
+      }
+
+      const players = replace(room.players, playerId, {
+        emSegundoPlano: command.payload.emSegundoPlano,
+        lastSeenAt: ctx.now,
+      });
+
+      // `maybeResume` por segurança, não porque este caminho costume retomar:
+      // mandar comando exige socket aberto, e socket aberto significa que a
+      // reconexão já rodou — e é ela que retoma. Fica aqui para o caso de a
+      // marca ser a última coisa segurando a pausa.
+      const emissions: Emission[] = [];
+      const depois = maybeResume({ ...room, players }, ctx, emissions);
+      return commit(depois.room, ctx, depois.emissions);
+    }
 
     case 'player:setProfile': {
       if (room.status !== 'LOBBY') return failWith('WRONG_STATUS', 'SO_NO_LOBBY');

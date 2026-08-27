@@ -41,6 +41,19 @@ export interface RoomPlayer {
   /** Quando o socket caiu. Base de `TRANSPORT_GRACE`. */
   socketLostAt: number | null;
   /**
+   * A pessoa avisou que saiu da tela — trocou de aplicativo, bloqueou o
+   * celular (RJ-117b).
+   *
+   * **Não é ausência.** Quem está em segundo plano continua na mesa: o prazo
+   * do turno corre, o auto-play cobre a vez dela, e a partida NÃO pausa.
+   *
+   * O celular fecha o WebSocket ao congelar a aba, e o servidor não tem como
+   * saber, olhando o `close`, se foi o sistema operacional ou a internet. Este
+   * campo é o que o cliente conta antes de sumir, e é a única diferença entre
+   * as duas coisas.
+   */
+  emSegundoPlano: boolean;
+  /**
    * Quando esta pessoa falou pela última vez. `null` = ainda não falou.
    *
    * Vive no jogador, e não numa tabela ao lado, porque é assim que ele
@@ -167,5 +180,9 @@ export function isOnline(player: RoomPlayer): boolean {
 
 /** Ausente para efeito de jogo: pausa a partida (RJ-117). */
 export function isAbsent(player: RoomPlayer): boolean {
+  // Em segundo plano não é ausente (RJ-117b): a pessoa está ali, com o
+  // telefone na mão, respondendo a outra coisa. Pausar a mesa de todo mundo
+  // porque alguém olhou uma mensagem é o defeito que esta linha conserta.
+  if (player.emSegundoPlano) return false;
   return player.connection === 'DESCONECTADO';
 }
