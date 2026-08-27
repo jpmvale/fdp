@@ -172,10 +172,31 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 | RF-080 | Avatares vivem num **depósito** com interface própria; disco e R2 são implementações da mesma, cobradas pela mesma suíte de contrato |
 | RF-081 | A foto **DEVE** ser servida pela nossa origem, nunca por URL do fornecedor: trocar de bucket não pode mudar uma linha do cliente, nem pedir origem nova na CSP |
 | RF-082 | Depósito indisponível **DEVE** ter motivo próprio (`DEPOSITO_INDISPONIVEL`, 503) e a mesa continua com o emoji no assento. Dizer "sua imagem está corrompida" manda a pessoa consertar o que não está quebrado |
+| RF-083 | No **lobby**, qualquer pessoa **PODE** sair da mesa para assistir e voltar a sentar-se. Sair libera o lugar; o host que vai assistir passa a mesa, e **nunca para um bot** |
+| RF-084 | Quem assiste **DEVE** ser identificado no chat e no balão. Ele vê a mão de todos (RJ-159), e conselho de quem vê tudo não é o mesmo que palpite de quem joga |
+| RF-085 | O assento **DEVE** mostrar quantas cartas a pessoa tem na mão, em **cartas viradas** do tamanho do coração. Acima de cinco vira número, como as vidas |
+| RF-086 | Em tela **larga** (≥ 900 px) o chat e o log vão para uma **lateral direita** grudada no topo; abaixo disso continuam empilhados no fim, como no celular |
 | RF-061 | Entrar com Google ou GitHub. Só provedor **configurado** vira botão: um botão que devolve 503 é pior que nenhum |
 | RF-062 | SSO com e-mail **verificado pelo provedor** assume a conta de senha, apaga a senha e derruba as sessões |
 | RF-063 | Entrar com senha numa conta assumida por SSO **DEVE** dizer o que houve — *"esta conta agora entra pelo Google"* —, nunca "senha inválida" |
 | RF-070 | Avatar por imagem, só para quem tem conta, reduzido **no servidor** para 256×256 WebP, com EXIF removido. O emoji e a cor **CONTINUAM** por baixo: são o que aparece enquanto a foto carrega e se ela falhar |
+
+RF-086 abre a casca de 460 px para 900 **só na mesa**, e é a única tela onde isso
+acontece. Em qualquer outra, a coluna continua estreita mesmo num monitor de 27" —
+um menu de duas opções esticado por 1400 px é pior de usar, não melhor. A mesa é a
+exceção porque é o único lugar com duas coisas para olhar ao mesmo tempo: o feltro
+e a conversa.
+
+O corte é do **CSS**, e não de JavaScript medindo a janela: a mesma árvore de
+componentes serve os dois casos, nada é montado duas vezes, e girar o aparelho não
+perde estado nenhum. O único uso de `matchMedia` é decidir se o painel de chat
+começa aberto — na lateral, fechado seria uma coluna vazia; no celular, aberto
+empurraria a mão de cartas para fora da tela.
+
+RF-085 mostra informação que **já era pública** (`handCounts`, RJ-102) e não estava
+em lugar nenhum: quem quisesse saber quantas cartas restavam ao adversário tinha de
+contar as mãos já jogadas de cabeça, no meio da rodada. Viradas porque o conteúdo é
+segredo — uma carta desenhada de frente prometeria informação que não existe.
 
 Na tela de conta, os botões de SSO vêm **antes** do formulário de senha. Sem recuperação de
 senha (§8 do plano 01), quem entra pelo Google nunca fica sem acesso — e a ordem dos botões é a

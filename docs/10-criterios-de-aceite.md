@@ -216,7 +216,7 @@ destes critérios existe por isso.
 | CA-335 | I | RF-017, RF-014 | **Dado** um espectador que entra com a partida em andamento, **então** ele vê o histórico anterior à entrada e pode escrever |
 | CA-336 | I | RF-018 | **Dado** uma mesa com bots, **então** nenhum bot envia mensagem, e `chat:send` em nome de um bot é recusado |
 | CA-337 | I | RF-017 | **Dado** um jogador que trocou de apelido ou saiu da sala, **então** as mensagens que ele já enviou continuam mostrando o apelido de quando foram enviadas |
-| CA-338 | U | INV-13, RNF-005 | **Dado** o payload de `EV-040`, **então** ele contém exatamente `{id, playerId, nickname, text, at}` — nenhum campo derivado do estado da partida, e o mesmo objeto para todos os destinatários |
+| CA-338 | U | INV-13, RNF-005 | **Dado** o payload de `EV-040`, **então** ele contém exatamente `{id, playerId, nickname, text, at, spectator}` — nenhum campo derivado do estado da partida, e o mesmo objeto para todos os destinatários |
 | CA-339 | I | RNF-010 | **Dado** um cliente que estoura o orçamento de comandos mandando mensagens, **então** recebe `ERR-009` como em qualquer outro comando — o chat não tem cota própria |
 | CA-340 | E | RF-017, RNF-030 | **Dado** uma mensagem contendo `<script>` ou outra marcação, **então** ela aparece como TEXTO na tela de todos, sem ser interpretada |
 | CA-341 | I | RF-017 | **Dado** uma sala que expira ou é encerrada, **então** o histórico morre com ela — não há chat recuperável depois |
@@ -240,6 +240,21 @@ CA-338 é o critério que protege a mecânica: `EV-040` é o único evento do jo
 que sai idêntico para todos, e é assim porque não há nada a projetar. Um campo a
 mais ali — "quantas cartas o autor tem na mão", para enfeitar a bolha — é
 exatamente como a rodada de testa vazaria.
+
+O `spectator` entrou em 26/08/2026 e passou pela mesma pergunta, que é a única
+que importa aqui: **ele revela algo da PARTIDA que o destinatário já não
+soubesse?** Não. Quem está sentado e quem está assistindo já é público em
+`room.players`, desde sempre — a mesa desenha os dois grupos separados. O campo
+não deriva de mão, aposta, vaza nem vida, e continua saindo idêntico para todos.
+
+Ele existe porque o espectador vê a mão de todo mundo (RJ-159), e "joga o 3 de
+paus" dito por quem está na mesa é palpite enquanto dito por quem vê tudo é
+outra coisa. Esconder de quem lê **de onde** veio o conselho seria esconder a
+única informação que permite avaliá-lo.
+
+A lista continua fechada, e o teste continua comparando a lista inteira: o
+critério nunca foi "cinco campos", foi "estes campos e nenhum outro". Crescer
+exige passar por aqui.
 
 CA-340 não é paranoia de formulário: o chat é o único lugar do produto onde um
 jogador escreve texto que aparece na tela dos outros. É a superfície de injeção
@@ -425,6 +440,13 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-383 | E | RF-077 | **Dado** provedores configurados, **então** cada botão de SSO traz a marca do provedor, servida da própria origem |
 | CA-384 | U | RNF-016 | **Dado** uma mensagem aceita, **quando** a mesma pessoa manda outra antes de 1 s, **então** é recusada com `RAPIDO_DEMAIS`, nada é publicado, e a recusa **não** move o prazo; no prazo exato passa, e o limite não alcança as outras pessoas da mesa |
 | CA-385 | U | RF-079 | **Dado** uma mensagem no teto de RNF-014, **então** o balão mostra no máximo 70 caracteres mais reticências, cortando no fim de uma palavra quando sobra mensagem para isso |
+| CA-396 | U | RJ-159 | **Dado** um espectador, **então** `allHands` traz a mão de todos os jogadores, iguais às deles; para quem JOGA, `allHands` sai vazio |
+| CA-397 | U | RF-083 | **Dado** o lobby, **quando** alguém pede para assistir, **então** o lugar é liberado; pedir o que já se é não emite evento; com partida em curso, recusa com `SO_NO_LOBBY` |
+| CA-398 | U | RF-084 | **Dado** quem assiste falando, **então** a mensagem sai com `spectator: true`, e a marca é **congelada** — sentar-se depois não reescreve o que foi dito de fora |
+| CA-399 | U | RF-083 | **Dado** qualquer caminho de sucessão — assistir, sair, cair —, **então** o host resultante **nunca é um bot**; sem candidato humano, o host não muda |
+| CA-400 | U | RF-018 | **Dado** só bots sentados, **então** começar a partida é recusado com `SO_BOTS_NA_MESA`, e o botão já vem desligado com a explicação |
+| CA-401 | E | RF-085 | **Dado** um jogador com N cartas, **então** o assento mostra N cartas viradas até 5, e `verso ×N` acima disso |
+| CA-402 | E | RF-086 | **Dado** uma janela de 900 px ou mais na mesa, **então** o chat e o log ficam à direita, grudados no topo; abaixo de 900, empilhados no fim |
 | CA-392 | U/I | RF-080 | **Dado** a suíte de contrato do depósito, **então** ela passa idêntica em disco, disco+cache e R2; o CI recusa o build se a do R2 tiver sido pulada |
 | CA-393 | U/I | RF-082 | **Dado** o depósito fora do ar, **então** o envio responde 503 `DEPOSITO_INDISPONIVEL`, a imagem RUIM continua sendo recusada pelo motivo dela, e criar sala e jogar seguem intactos |
 | CA-394 | U | RF-080 | **Dado** a migração, **quando** o conteúdo de um objeto não bate com o hash do próprio nome, **então** ele é **denunciado e não copiado**; a variante `-64` é isenta da conferência, porque carrega o hash da grande |

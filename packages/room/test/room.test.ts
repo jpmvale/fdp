@@ -18,7 +18,9 @@ import {
   nextDeadline,
   normalizeCode,
   reconnect,
+  seatedPlayers,
   snapshotFor,
+  spectators,
   tick,
   type Emission,
   type Room,
@@ -700,9 +702,188 @@ describe('CA-350: voltar ao lobby depois da partida', () => {
   });
 });
 
+/**
+ * RF-083: sentar-se à mesa ou sair dela para assistir, no lobby.
+ *
+ * Antes só havia um caminho para virar espectador — chegar com a partida em
+ * andamento — e nenhum de volta a não ser a próxima partida começar. Quem
+ * queria só olhar tinha de sair da sala, e quem entrou cedo demais ocupava um
+ * lugar sem querer.
+ */
+describe('CA-397 / RF-083: entrar e sair da mesa no lobby', () => {
+  const virar = (spectator: boolean) =>
+    ({ type: 'player:setSpectator', payload: { spectator } }) as const;
+
+  it('sai da mesa e volta, liberando e retomando o lugar', () => {
+    let room = roomWith(3);
+    expect(seatedPlayers(room)).toHaveLength(3);
+
+    room = ok(applyCommand(room, 'p2', virar(true), ctxAt(10))).room;
+    expect(seatedPlayers(room)).toHaveLength(2);
+    expect(spectators(room).map((p) => p.id)).toEqual(['p2']);
+
+    room = ok(applyCommand(room, 'p2', virar(false), ctxAt(20))).room;
+    expect(seatedPlayers(room)).toHaveLength(3);
+    expect(spectators(room)).toHaveLength(0);
+  });
+
+  it('pedir o que já se é não emite nada nem muda a versão', () => {
+    const room = roomWith(2);
+    const antes = room.stateVersion;
+    const r = applyCommand(room, 'p1', virar(false), ctxAt(10));
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // Um botão clicado duas vezes não é erro; emitir mudança sem mudança faria
+    // a tela de todo mundo repintar à toa.
+    expect(r.emissions).toEqual([]);
+    expect(r.room.stateVersion).toBe(antes);
+  });
+
+  it('só no lobby: com partida em curso, recusa', () => {
+    let room = roomWith(3);
+    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(10))).room;
+
+    // Sair da mesa no meio da partida é abandono, e tem caminho próprio; entrar
+    // nela é RF-014, que manda jogar na PRÓXIMA. Alternar aqui deixaria alguém
+    // escapar da rodada em que está perdendo.
+    const r = applyCommand(room, 'p2', virar(true), ctxAt(20));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toBe('SO_NO_LOBBY');
+  });
+
+  it('o host que vai assistir DEIXA de ser host', () => {
+    let room = roomWith(3);
+    expect(room.hostId).toBe('p1');
+
+    const r = ok(applyCommand(room, 'p1', virar(true), ctxAt(10)));
+    room = r.room;
+
+    // Sem isto a mesa fica com um dono que não está nela: incapaz de jogar, e
+    // o único capaz de começar. A sala travaria sem ninguém entender por quê.
+    expect(room.hostId).not.toBe('p1');
+    expect(seatedPlayers(room).map((p) => p.id)).toContain(room.hostId);
+    expect(r.emissions.some((e) => e.event.type === 'room:hostChanged')).toBe(true);
+  });
+
+  it('CA-399: bot NUNCA herda a mesa', () => {
+    // Isto derrubou a sala na primeira vez que testei no navegador: o host
+    // virou espectador, o mais antigo dos sentados era um bot, e a tela passou
+    // a dizer "esperando Bot Ada começar". Bot não aperta botão.
+    let room = roomWith(2);
+    room = ok(applyCommand(room, 'p1', { type: 'host:addBot', payload: { difficulty: 'MEDIO' } }, ctxAt(10))).room;
+    room = ok(applyCommand(room, 'p2', { type: 'player:leave', payload: {} }, ctxAt(20))).room;
+
+    // Sobra p1 (host) e um bot sentado. p1 vai assistir.
+    room = ok(applyCommand(room, 'p1', virar(true), ctxAt(30))).room;
+
+    const host = room.players.find((p) => p.id === room.hostId);
+    expect(host?.bot).toBeNull();
+    // Sem candidato humano sentado, o host CONTINUA sendo quem estava: ele
+    // ainda pode se sentar de volta, e a sala não fica governada por um bot.
+    expect(room.hostId).toBe('p1');
+  });
+
+  it('CA-399: nem pela sequência inteira — assistir, sentar, jogar e cair', () => {
+    /*
+     * A sequência exata em que vi um bot com a coroa no navegador. Cada passo
+     * dela mexe no host por um caminho diferente (`setSpectator`, `leave`,
+     * `disconnect` + `tick`), e o teste percorre os três de uma vez porque foi
+     * a COMBINAÇÃO que me confundiu — cada um isolado parecia correto.
+     */
+    let room = roomWith(1);
+    room = ok(applyCommand(room, 'p1', { type: 'host:addBot', payload: { difficulty: 'MEDIO' } }, ctxAt(10))).room;
+    room = ok(applyCommand(room, 'p1', { type: 'host:addBot', payload: { difficulty: 'MEDIO' } }, ctxAt(20))).room;
+
+    const humano = (r: Room) => r.players.find((p) => p.id === r.hostId)?.bot === null;
+
+    room = ok(applyCommand(room, 'p1', virar(true), ctxAt(30))).room;
+    expect(humano(room), 'depois de virar espectador').toBe(true);
+
+    room = ok(applyCommand(room, 'p1', virar(false), ctxAt(40))).room;
+    expect(humano(room), 'depois de sentar de volta').toBe(true);
+
+    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(50))).room;
+    expect(humano(room), 'depois de começar').toBe(true);
+
+    // Cai, e o tempo passa: a carência de transporte vira ausência, e é aí que
+    // a sucessão roda.
+    room = ok(disconnect(room, 'p1', ctxAt(60))).room;
+    for (let t = 100; t < 120_000; t += 5_000) room = tick(room, ctxAt(t)).room;
+    expect(humano(room), 'depois de cair e o tempo passar').toBe(true);
+
+    // E quando alguém novo chega, é ELE quem recebe a mesa — não um bot.
+    room = ok(join(room, { playerId: 'p9', nickname: 'Nova', avatar: { emoji: '🐝', color: 'lime' } }, ctxAt(130_000))).room;
+    room = ok(reconnect(room, 'p9', ctxAt(130_100))).room;
+    expect(humano(room), 'depois de alguém novo chegar').toBe(true);
+  });
+
+  it('CA-400: mesa só de bots não começa partida', () => {
+    let room = roomWith(1);
+    room = ok(applyCommand(room, 'p1', { type: 'host:addBot', payload: { difficulty: 'MEDIO' } }, ctxAt(10))).room;
+    room = ok(applyCommand(room, 'p1', { type: 'host:addBot', payload: { difficulty: 'MEDIO' } }, ctxAt(20))).room;
+
+    // Dois bots sentados passam no teto de `minPlayers`, e `maxBots` é
+    // `maxPlayers - 1` justamente para isto não acontecer — aritmética que
+    // parou de bastar quando o humano pôde sair da mesa sem sair da sala.
+    room = ok(applyCommand(room, 'p1', virar(true), ctxAt(30))).room;
+    expect(seatedPlayers(room)).toHaveLength(2);
+
+    const r = applyCommand(room, room.hostId!, { type: 'host:startMatch', payload: {} }, ctxAt(40));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toBe('SO_BOTS_NA_MESA');
+
+    // Sentando de volta, começa normalmente.
+    const sentado = ok(applyCommand(room, 'p1', virar(false), ctxAt(50))).room;
+    expect(applyCommand(sentado, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(60)).ok).toBe(true);
+  });
+
+  it('a sucessão prefere quem está SENTADO', () => {
+    let room = roomWith(3);
+    // p2 vira espectador ANTES, e é o mais antigo depois de p1. Pela ordem de
+    // chegada ele herdaria a mesa; por estar assistindo, não deve.
+    room = ok(applyCommand(room, 'p2', virar(true), ctxAt(10))).room;
+    room = ok(applyCommand(room, 'p1', virar(true), ctxAt(20))).room;
+
+    expect(room.hostId).toBe('p3');
+  });
+
+  it('bot não assiste', () => {
+    const room = ok(applyCommand(
+      roomWith(2), 'p1', { type: 'host:addBot', payload: { difficulty: 'FACIL' } }, ctxAt(10),
+    )).room;
+    const bot = room.players.find((p) => p.bot !== null)!;
+
+    const r = applyCommand(room, bot.id, virar(true), ctxAt(20));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toBe('BOT_NAO_ASSISTE');
+  });
+});
+
 describe('CA-330 a CA-341: chat da mesa', () => {
   const dizer = (text: string): Command => ({ type: 'chat:send', payload: { text } });
   const mensagens = (r: Room) => r.chat;
+
+  it('CA-398: a mensagem de quem assiste vai marcada, e a marca é congelada', () => {
+    const virar = (spectator: boolean): Command =>
+      ({ type: 'player:setSpectator', payload: { spectator } });
+
+    let room = roomWith(3);
+    room = ok(applyCommand(room, 'p2', virar(true), ctxAt(10))).room;
+    room = ok(applyCommand(room, 'p2', dizer('daqui de fora'), ctxAt(20))).room;
+    room = ok(applyCommand(room, 'p1', dizer('daqui de dentro'), ctxAt(20))).room;
+
+    expect(mensagens(room)[0]!.spectator).toBe(true);
+    expect(mensagens(room)[1]!.spectator).toBe(false);
+
+    // p2 senta de volta. O que ele disse DE FORA não pode passar a parecer
+    // dito de dentro — é o mesmo congelamento do apelido (CA-337).
+    room = ok(applyCommand(room, 'p2', virar(false), ctxAt(30))).room;
+    room = ok(applyCommand(room, 'p2', dizer('agora sentado'), ctxAt(30 + LIMITS.chatMinIntervalMs))).room;
+
+    expect(mensagens(room)[0]!.spectator).toBe(true);
+    expect(mensagens(room)[2]!.spectator).toBe(false);
+  });
 
   it('CA-330: a mensagem sai para TODOS, inclusive quem enviou', () => {
     const { room, emissions } = ok(applyCommand(roomWith(3), 'p2', dizer('boa noite'), ctxAt(50)));
@@ -714,15 +895,19 @@ describe('CA-330 a CA-341: chat da mesa', () => {
     expect(mensagens(room)[0]!.text).toBe('boa noite');
   });
 
-  it('CA-338: o payload tem exatamente os cinco campos, e nada da partida', () => {
+  it('CA-338: o payload tem exatamente estes campos, e nada da partida', () => {
     const { room, emissions } = ok(applyCommand(roomWith(2), 'p1', dizer('oi'), ctxAt(50)));
     const payload = (emissions.find((e) => e.event.type === 'chat:message')!.event as
       { payload: { message: Record<string, unknown> } }).payload;
 
-    // A lista fechada é o critério: um campo a mais aqui — "quantas cartas o
-    // autor tem na mão", para enfeitar a bolha — é como a rodada de testa
-    // vazaria, e o payload é opaco demais para alguém notar em revisão.
-    expect(Object.keys(payload.message).sort()).toEqual(['at', 'id', 'nickname', 'playerId', 'text']);
+    // A lista FECHADA é o critério, e não o número de campos: um a mais aqui —
+    // "quantas cartas o autor tem na mão", para enfeitar a bolha — é como a
+    // rodada de testa vazaria, e o payload é opaco demais para alguém notar em
+    // revisão. `spectator` entrou em 26/08/2026 e passou pela pergunta que este
+    // teste faz: ele não deriva de mão, aposta, vaza nem vida, e quem assiste
+    // já é público em `room.players`.
+    expect(Object.keys(payload.message).sort())
+      .toEqual(['at', 'id', 'nickname', 'playerId', 'spectator', 'text']);
     expect(mensagens(room)[0]).toEqual(payload.message);
   });
 

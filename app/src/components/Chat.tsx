@@ -113,6 +113,22 @@ export function Chat({ mensagens, eu, aoEnviar, inicialmenteAberto = false }: {
                   }}>
                     {m.nickname}
                   </span>
+                  {/* Quem assiste vê a mão de todo mundo (RJ-159). "Joga o 3 de
+                      paus" dito de dentro da mesa é palpite; dito de fora é
+                      outra coisa, e quem lê precisa poder distinguir. */}
+                  {m.spectator && (
+                    <span
+                      title="assistindo — vê as cartas de todo mundo"
+                      style={{
+                        marginLeft: 5, fontSize: 9, padding: '0 4px',
+                        borderRadius: 4, verticalAlign: 'middle',
+                        background: 'var(--superficie-2)', color: 'var(--texto-fraco)',
+                        boxShadow: 'inset 0 0 0 1px var(--linha)',
+                      }}
+                    >
+                      assiste
+                    </span>
+                  )}
                   <span style={{ color: 'var(--texto-apagado)' }}> · </span>
                   {/* `text` entra como filho, nunca como HTML (CA-340). */}
                   <span style={{ wordBreak: 'break-word' }}>{m.text}</span>

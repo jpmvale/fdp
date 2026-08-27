@@ -75,7 +75,7 @@ Requer Node 24+.
 npm install
 npm run build:client   # OBRIGATÓRIO antes do primeiro `npm start`
 npm start              # http://localhost:3000
-npm test               # 550 testes
+npm test               # 555 testes
 npm run typecheck
 ```
 

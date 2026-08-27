@@ -364,7 +364,9 @@ export function App() {
   const nome = (id: string) => retrato.players.find((p) => p.id === id)?.nickname ?? '—';
 
   return (
-    <Casca>
+    /* Largo só com partida em curso e não terminada: no lobby e no resumo do
+       fim não há chat lateral, e esticar a coluna só afastaria os botões. */
+    <Casca largo={partida !== null && !acabou}>
       <FaixaConexao estado={estado.conexao} />
 
       {retrato.status === 'PAUSADA' && (
@@ -478,6 +480,7 @@ export function App() {
           aoAbrirRegras={() => setRegrasAbertas(true)}
           aoSair={sairDaMesa}
           aoEnviarChat={(text) => enviar('chat:send', { text })}
+          aoAssistir={(assistir) => enviar('player:setSpectator', { spectator: assistir })}
         />
       )}
 
@@ -511,16 +514,20 @@ function Sobreposicao({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Casca({ children }: { children: React.ReactNode }) {
+function Casca({ children, largo = false }: { children: React.ReactNode; largo?: boolean }) {
   return (
-    <main style={{
-      maxWidth: 460,
-      margin: '0 auto',
-      padding: '12px 12px calc(16px + env(safe-area-inset-bottom))',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 12,
-    }}>
+    <main
+      /* A largura vive no CSS, e não aqui, porque ela depende de uma media
+         query — e `style` inline não tem media query. `largo` só é ligado na
+         MESA: é a única tela com duas coisas para olhar ao mesmo tempo. */
+      className={largo ? 'casca casca--mesa' : 'casca'}
+      style={{
+        padding: '12px 12px calc(16px + env(safe-area-inset-bottom))',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+      }}
+    >
       {children}
     </main>
   );

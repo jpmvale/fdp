@@ -19,6 +19,8 @@ export interface BalaoNaMesa {
   playerId: string;
   texto: string;
   tipo: 'chat' | 'vida';
+  /** Quem falou estava assistindo. Só faz sentido em `chat`. */
+  assiste?: boolean;
 }
 
 /** Quanto tempo cada tipo fica na tela. */
@@ -161,6 +163,20 @@ export function Balao({ balao, x, y, empilhado, aoSumir }: {
         fontWeight: vida ? 600 : 400,
       }}
     >
+      {/* O balão de quem assiste sai do assento como qualquer outro, mas com
+          a marca junto: ele vê as cartas da mesa inteira (RJ-159), e sem isto
+          o conselho dele pareceria o de um jogador comum. */}
+      {balao.assiste === true && (
+        <span
+          style={{
+            display: 'block', fontSize: 8, letterSpacing: 0.4,
+            color: 'var(--texto-apagado)', textTransform: 'uppercase',
+            marginBottom: 1,
+          }}
+        >
+          assiste
+        </span>
+      )}
       {balao.texto}
       {/* O bico: é ele que faz o balão SAIR de alguém em vez de flutuar perto. */}
       <span
@@ -213,6 +229,7 @@ export function useBaloes(chat: ChatMessage[], partida: PlayerView | null): {
         // vai mostrar, e o teste consegue perguntar isso sem montar a tela.
         texto: resumoDoBalao(m.text),
         tipo: 'chat' as const,
+        assiste: m.spectator,
       })),
     ]));
   }, [chat]);

@@ -320,7 +320,8 @@ Matriz canônica; implementa `04` §5 e as invariantes INV-07 e INV-13.
 |---|---|
 | RJ-100 | Na rodada de 1 carta, **enquanto as apostas estão abertas**, o `PlayerView` de um jogador **NÃO DEVE** conter, em nenhuma profundidade, o valor nem o naipe da própria carta — nem cifrado, nem codificado. Na fase `REVELACAO` ela passa a constar, para todos. |
 | RJ-101 | Na rodada de 1 carta, o `PlayerView` **DEVE** conter as cartas de todos os demais. |
-| RJ-102 | Em rodadas de N>1, o `PlayerView` **NÃO DEVE** conter carta alguma da mão alheia. |
+| RJ-102 | Em rodadas de N>1, o `PlayerView` de **quem joga** **NÃO DEVE** conter carta alguma da mão alheia. |
+| RJ-159 | O `PlayerView` de um **espectador** **DEVE** conter a mão de todos, em `allHands`. Para quem joga, `allHands` **DEVE** sair vazio. |
 
 RJ-100 é a regra de segurança mais delicada do jogo: é a única em que o servidor envia ao
 cliente cartas que ele exibe mas cujo equivalente próprio precisa ser suprimido. Ela tem
@@ -331,6 +332,23 @@ aposta seja às cegas, e em `REVELACAO` não há mais aposta a fazer. Sem esse r
 era o **único da mesa que nunca via a própria carta** — todos os outros a viram a rodada
 inteira, e ele passava direto para o acerto de contas sem saber o que tinha tirado. É o que
 CA-347 cobra, e `07` RF-035 já dizia ao marcar a fronteira em EV-023 e não na rodada.
+
+RJ-159 é uma exceção deliberada a RJ-102, aberta em 26/08/2026, e o recorte é "quem joga".
+
+O segredo da mão existe para proteger **decisão**: apostar e escolher carta sabendo o que o
+outro tem é jogar com as cartas do adversário à vista. Espectador não aposta, não joga e não
+tem mão própria — não há decisão dele para proteger, e esconder as cartas dele não deixa a
+partida mais justa em nada.
+
+O que a exceção **não** resolve é o espectador contar no chat o que viu. Isso é problema de
+moderação, não de projeção: nenhuma quantidade de esconder impede alguém de assistir por cima
+do ombro de um jogador e falar. A mesa é de amigos, e o host expulsa quem estragar o jogo.
+Enquanto não houver banimento, o risco é **aceito e nomeado**, e não disfarçado com uma
+restrição que dá falsa sensação de segurança.
+
+O "para quem joga, `allHands` sai VAZIO" não é detalhe de implementação. É a diferença entre
+não mandar e mandar escondendo na tela — a segunda seria batota disponível no console do
+navegador, e é exatamente o erro que RJ-100 existe para não cometer.
 
 ### 3.8 Ausência, pausa e tempo
 

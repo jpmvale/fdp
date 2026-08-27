@@ -307,8 +307,50 @@ describe('CA-281 a CA-286: projeção e vazamento', () => {
       expect(view.hand).toHaveLength(4);
       expect(Object.keys(view.foreheadCards)).toEqual([]);
       for (const id of state.playerOrder) expect(view.handCounts[id]).toBe(4);
+      // RJ-159: quem JOGA não recebe `allHands`. Vazio, e não "preenchido e
+      // ignorado pela tela" — a segunda opção seria batota disponível no
+      // console do navegador, que é o erro que RJ-100 existe para não cometer.
+      expect(view.allHands).toEqual({});
       expect(checkNoLeak(state, viewer)).toEqual([]);
     }
+  });
+
+  it('CA-396 / RJ-159: quem assiste vê a mão de todo mundo', () => {
+    let state = createMatch({ matchId: 'm', seed: 'plateia', playerIds: players(4) });
+    state = settle({ ...state, cardsThisRound: 4 }).state;
+
+    // Um id que não está em `playerOrder` é, por definição, quem assiste.
+    const view = project(state, 'quem-assiste');
+
+    expect(view.isSpectator).toBe(true);
+    expect(Object.keys(view.allHands).sort()).toEqual([...state.playerOrder].sort());
+    for (const id of state.playerOrder) expect(view.allHands[id]).toHaveLength(4);
+
+    // E não ganha mão própria: ele não joga, então não tem o que jogar.
+    expect(view.hand).toEqual([]);
+
+    // As cartas são as MESMAS que cada jogador tem — não uma cópia decorativa.
+    for (const id of state.playerOrder) {
+      const dono = project(state, id);
+      expect(view.allHands[id]!.map((c) => c.id).sort())
+        .toEqual(dono.hand.map((c) => c.id).sort());
+    }
+  });
+
+  it('CA-396: na rodada de testa quem assiste vê todas, e nenhuma é dele', () => {
+    // `settle` é o que reparte as cartas: sem ele a rodada existe mas ninguém
+    // tem mão, e o teste passaria a comparar dois vazios.
+    const state = settle(
+      createMatch({ matchId: 'm', seed: 'testa-plateia', playerIds: players(3) }),
+    ).state;
+    expect(state.round.isForeheadRound).toBe(true);
+
+    const view = project(state, 'quem-assiste');
+
+    // A rodada de testa já mostrava as cartas dos outros a todos; para quem
+    // assiste, "os outros" é a mesa inteira, e sempre foi assim.
+    expect(Object.keys(view.foreheadCards).sort()).toEqual([...state.playerOrder].sort());
+    expect(view.allHands['quem-assiste']).toBeUndefined();
   });
 
   it('o valor proibido só vai para quem está na vez', () => {

@@ -30,6 +30,8 @@ const FRASES: Record<string, string> = {
   SALA_ENCERRADA: 'Esta sala não existe mais.',
   SO_NO_LOBBY: 'Isso só dá para fazer antes de a partida começar.',
   JOGADORES_INSUFICIENTES: 'Faltam jogadores: são precisos 2.',
+  SO_BOTS_NA_MESA: 'Só há bots na mesa. Sente-se para começar.',
+  BOT_NAO_ASSISTE: 'Bot não assiste — ele joga ou sai.',
   COMANDO_EXIGE_HOST: 'Só quem é host pode fazer isso.',
   HOST_NAO_SE_EXPULSA: 'Você não pode se expulsar.',
   NAO_E_BOT: 'Esse jogador não é um bot.',

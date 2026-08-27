@@ -268,3 +268,68 @@ input:focus { border-color: var(--acento); }
     box-shadow: 0 0 14px 2px rgba(239, 77, 90, 0.38), inset 0 0 26px rgba(239, 77, 90, 0.16);
   }
 }
+
+/* ---------------------------------------------------------------------------
+   A mesa em tela larga: chat na lateral direita.
+   --------------------------------------------------------------------------- */
+
+/*
+ * A casca é estreita de propósito — o jogo nasceu para o celular, e 460 px é a
+ * largura em que uma coluna de texto se lê. Ela só abre NA MESA e só em tela
+ * larga, porque é o único lugar onde há duas coisas para olhar ao mesmo tempo:
+ * o feltro e a conversa.
+ *
+ * Em qualquer outra tela a coluna continua estreita mesmo num monitor de 27",
+ * e isso não é descuido: um menu de duas opções esticado por 1400 px é pior de
+ * usar, não melhor.
+ */
+.casca {
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+.mesa-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/*
+ * 900 px, e não um valor redondo qualquer: é onde 460 px de mesa + 320 px de
+ * chat + respiro passam a caber sem espremer nenhum dos dois. Abaixo disso o
+ * chat empilhado embaixo continua sendo o certo — foi assim que ele nasceu, e
+ * no celular é o único jeito.
+ */
+@media (min-width: 900px) {
+  .casca--mesa {
+    max-width: 900px;
+  }
+
+  .mesa-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
+    gap: 16px;
+  }
+
+  .mesa-principal,
+  .mesa-lateral {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  /*
+   * Grudada no topo: a conversa acompanha quem rola a mão de cartas para
+   * baixo. `max-height` com rolagem própria porque uma lateral mais alta que
+   * a janela rolaria a página inteira para ser lida, e aí ela deixaria de
+   * estar ao lado da mesa — que é o ponto de a pôr aqui.
+   */
+  .mesa-lateral {
+    position: sticky;
+    top: 12px;
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+  }
+}

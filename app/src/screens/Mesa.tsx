@@ -6,6 +6,8 @@ import { tocarSuaVez, tocarTique } from '../som';
 import { Carta } from '../components/Carta';
 import { Chat } from '../components/Chat';
 import { Historico } from '../components/Historico';
+import { Plateia } from '../components/Plateia';
+import { useTelaLarga } from '../telaLarga';
 import { Feltro } from '../components/Feltro';
 import { Vidas } from '../components/Vidas';
 import type { Retrato, PlayerView } from '../state/tipos';
@@ -30,9 +32,19 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
   const ausentes = new Set(retrato.pause?.absentPlayerIds ?? []);
   const minhaVez = partida.activePlayerId === eu;
   const pausada = retrato.status === 'PAUSADA';
+  const larga = useTelaLarga();
 
   return (
-    <div className="pilha">
+    /*
+     * Duas colunas em tela larga, uma no celular — e quem decide é o CSS.
+     *
+     * A mesma árvore serve os dois: o chat e o log entram na `mesa-lateral`,
+     * que abaixo de 900 px é só mais um bloco empilhado no fim, exatamente
+     * onde eles sempre estiveram. Nenhum componente é montado duas vezes e
+     * nenhum estado se perde ao girar o aparelho.
+     */
+    <div className="mesa-layout">
+      <div className="mesa-principal pilha">
       <Cabecalho partida={partida} retrato={retrato} aoAbrirRegras={aoAbrirRegras} />
 
       <AvisoDaVaza partida={partida} nome={nome} eu={eu} />
@@ -42,6 +54,11 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
       <Feltro retrato={retrato} eu={eu} partida={partida} aoAbrirPerfil={aoAbrirPerfil} />
 
       {!partida.isForeheadRound && <EmpateNaVaza partida={partida} />}
+
+      {/* Logo abaixo do feltro, e não no fim: quem assiste está aqui para
+          acompanhar as cartas, e elas precisam estar ao lado da mesa a que
+          pertencem. Para quem joga, este componente não renderiza nada. */}
+      <Plateia partida={partida} jogadores={retrato.players} />
 
       {!pausada && minhaVez && (
         partida.phase === 'APOSTAS'
@@ -69,9 +86,21 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
         />
       )}
 
-      <Chat mensagens={retrato.chat} eu={eu} aoEnviar={aoEnviarChat} />
+      </div>
 
-      <Historico partida={partida} jogadores={retrato.players} eu={eu} />
+      <aside className="mesa-lateral pilha">
+        {/* Aberto por padrão só quando tem lugar próprio: na lateral, fechado
+            seria uma coluna vazia ao lado da mesa; no celular, aberto empurra
+            a mão de cartas para fora da tela. */}
+        <Chat
+          mensagens={retrato.chat}
+          eu={eu}
+          aoEnviar={aoEnviarChat}
+          inicialmenteAberto={larga}
+        />
+
+        <Historico partida={partida} jogadores={retrato.players} eu={eu} />
+      </aside>
     </div>
   );
 }

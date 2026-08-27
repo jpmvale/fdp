@@ -3,6 +3,7 @@
  */
 
 import { apelidoLivre, avatarLivre, conflitosDe } from './identidade.js';
+import { garantirHost, passarHost } from './anfitriao.js';
 import {
   AVATAR_COLORS,
   AVATAR_EMOJIS,
@@ -295,32 +296,11 @@ export function leave(room: Room, playerId: PlayerId, ctx: RoomCtx): RoomResult 
     }
   }
 
-  next = succeedHost(next, emissions);
+  next = garantirHost(next, emissions);
   next = maybeResume(next, ctx, emissions).room;
   return commit(next, ctx, emissions);
 }
 
-/**
- * RF-013: o host passa ao jogador **online** com o menor `joinedAt`.
- *
- * Em `PAUSADA` isso é crítico: a decisão de RJ-150 precisa de alguém presente
- * para tomá-la, senão a sala só sai da pausa pelo `PAUSE_MAX`.
- */
-function succeedHost(room: Room, emissions: Emission[]): Room {
-  const host = room.players.find((p) => p.id === room.hostId);
-  if (host && isPresent(host) && isOnline(host)) return room;
-
-  const candidates = room.players
-    .filter((p) => isPresent(p) && isOnline(p))
-    .sort((a, b) => a.joinedAt - b.joinedAt);
-
-  const successor = candidates[0];
-  if (!successor) return room; // ninguém online; sucede na próxima conexão
-  if (successor.id === room.hostId) return room;
-
-  emissions.push(all({ type: 'room:hostChanged', payload: { hostId: successor.id } }));
-  return { ...room, hostId: successor.id };
-}
 
 function replace(
   players: RoomPlayer[],
@@ -476,6 +456,53 @@ export function applyCommand(
       ]);
     }
 
+    case 'player:setSpectator': {
+      /**
+       * Sentar-se à mesa ou sair dela para assistir (RF-083).
+       *
+       * **Só no lobby.** Com partida em curso, sair da mesa é abandono e já
+       * tem caminho próprio (`player:leave`), e entrar nela é a regra de
+       * RF-014: quem chega no meio joga na PRÓXIMA. Deixar alternar durante a
+       * partida faria alguém sair da rodada em que está perdendo.
+       */
+      if (room.status !== 'LOBBY') return failWith('WRONG_STATUS', 'SO_NO_LOBBY');
+      if (player.bot !== null) return failWith('VALIDATION_FAILED', 'BOT_NAO_ASSISTE');
+
+      const quer = command.payload.spectator;
+      // Já está como pediu: sucesso silencioso, sem evento nem versão nova. Um
+      // botão clicado duas vezes não é erro, e emitir mudança sem mudança faria
+      // a tela de todo mundo repintar à toa.
+      if (quer === player.isSpectator) return { ok: true, room, emissions: [] };
+
+      if (quer) {
+        if (spectators(room).length >= LIMITS.maxSpectators) {
+          return failWith('ROOM_FULL', 'ESPECTADORES_LOTADOS');
+        }
+      } else if (seatedPlayers(room).length >= LIMITS.maxPlayers) {
+        return failWith('ROOM_FULL', 'SALA_LOTADA');
+      }
+
+      const players = replace(room.players, playerId, { isSpectator: quer });
+      const atualizado = players.find((p) => p.id === playerId)!;
+
+      /**
+       * O host que vai assistir DEIXA de ser host.
+       *
+       * Quem assiste não pode começar a partida, mexer nas opções nem expulsar
+       * ninguém — e sem esta linha a mesa ficaria com um dono que não está
+       * nela, incapaz de jogar e único capaz de dar início. `passHost` escolhe
+       * o próximo entre quem está sentado.
+       */
+      const eventos: Emission[] = [
+        all({ type: 'room:playerUpdated', payload: { player: toPublicPlayer(atualizado) } }),
+      ];
+      const comHost = quer && room.hostId === playerId
+        ? passarHost({ ...room, players }, playerId, eventos)
+        : { ...room, players };
+
+      return commit(comHost, ctx, eventos);
+    }
+
     case 'chat:send': {
       // Sala encerrada não recebe mensagem: não há para quem falar, e o
       // histórico morre junto com ela (CA-331, CA-341).
@@ -508,6 +535,10 @@ export function applyCommand(
         nickname: player.nickname,
         text: texto,
         at: ctx.now,
+        // Congelado junto com o apelido, e pela mesma razão: espectador vira
+        // jogador na rodada seguinte, e o que ele disse de fora não pode
+        // passar a parecer dito de dentro.
+        spectator: player.isSpectator,
       };
 
       // A mais antiga cai quando entra a que passa do teto (RNF-015).
@@ -648,6 +679,19 @@ function startMatch(room: Room, ctx: RoomCtx): RoomResult {
   const seated = seatedPlayers(room);
   if (seated.length < LIMITS.minPlayers) return failWith('WRONG_STATUS', 'JOGADORES_INSUFICIENTES');
 
+  /**
+   * Pelo menos uma PESSOA sentada.
+   *
+   * `LIMITS.maxBots` é `maxPlayers - 1` justamente para uma mesa não ser só de
+   * bots (RF-018) — e essa aritmética parou de bastar quando RF-083 deixou o
+   * humano sair da mesa sem sair da sala. Dois bots sentados e a única pessoa
+   * assistindo passavam nos dois testes de contagem, e a partida começava sem
+   * ninguém para jogá-la: quatro horas de bots se enfrentando até o TTL.
+   */
+  if (!seated.some((p) => p.bot === null)) {
+    return failWith('WRONG_STATUS', 'SO_BOTS_NA_MESA');
+  }
+
   const match = createMatch({
     matchId: ctx.newId(),
     seed: ctx.randomSeed(),
@@ -764,7 +808,7 @@ function resolveAbsence(
     }));
   }
 
-  next = succeedHost(next, emissions);
+  next = garantirHost(next, emissions);
   return commit(next, ctx, emissions);
 }
 

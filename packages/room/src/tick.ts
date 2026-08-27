@@ -28,6 +28,7 @@ import {
   type Room,
   type RoomCtx,
 } from './types.js';
+import { garantirHost } from './anfitriao.js';
 
 const all = (event: Emission['event']): Emission => ({ audience: 'ALL', event });
 
@@ -141,7 +142,7 @@ function expireTransportGrace(room: Room, ctx: RoomCtx): { room: Room; emissions
     }));
   }
 
-  next = ensureHost(next, emissions);
+  next = garantirHost(next, emissions);
   return { room: next, emissions };
 }
 
@@ -166,21 +167,6 @@ function enterPause(room: Room, ctx: RoomCtx, emissions: Emission[]): Room {
 
   // INV-15: pausado, nenhum prazo de turno corre.
   return { ...room, status: 'PAUSADA', pause, phaseDeadline: null };
-}
-
-/** RF-013 aplicado por relógio: host que sumiu não pode segurar a decisão. */
-function ensureHost(room: Room, emissions: Emission[]): Room {
-  const host = room.players.find((p) => p.id === room.hostId);
-  if (host && isPresent(host) && isOnline(host)) return room;
-
-  const successor = room.players
-    .filter((p) => isPresent(p) && isOnline(p))
-    .sort((a, b) => a.joinedAt - b.joinedAt)[0];
-
-  if (!successor || successor.id === room.hostId) return room;
-
-  emissions.push(all({ type: 'room:hostChanged', payload: { hostId: successor.id } }));
-  return { ...room, hostId: successor.id };
 }
 
 /** RJ-150 e RJ-157: libera a decisão do host, e mata a pausa no teto. */

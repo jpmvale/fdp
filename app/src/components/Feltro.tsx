@@ -383,6 +383,7 @@ function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta, perdeu
   const aposta = partida.bets[jogador.id];
   const vazas = partida.tricksWon[jogador.id] ?? 0;
   const vidas = partida.lives[jogador.id] ?? 0;
+  const naMao = partida.handCounts[jogador.id] ?? 0;
 
   return (
     <div
@@ -473,6 +474,8 @@ function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta, perdeu
         </span>
       </div>
 
+      <CartasNaMao quantas={naMao} nome={souEu ? 'você' : jogador.nickname} />
+
       {(ausente || condenado || ehHost || puxa) && (
         <div style={{ display: 'flex', gap: 4, fontSize: 9, color: 'var(--texto-fraco)' }}>
           {/* Quem puxa vem primeiro na linha: é o que muda a leitura da mão em
@@ -485,5 +488,74 @@ function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta, perdeu
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Quantas cartas a pessoa ainda tem na mão, em cartas viradas.
+ *
+ * A informação já existia — `handCounts` vem na projeção, e é pública por
+ * RJ-102 — mas não estava em lugar nenhum da mesa. Quem quisesse saber quantas
+ * cartas ainda restam ao adversário tinha de contar as mãos já jogadas de
+ * cabeça, no meio de uma rodada, que é exatamente o tipo de conta que `07` §2.4
+ * pede para a tela fazer pela pessoa.
+ *
+ * **Viradas, e do tamanho do coração.** Viradas porque o conteúdo é segredo
+ * (RJ-102) e uma carta desenhada de frente prometeria uma informação que não
+ * existe; do tamanho do coração porque a linha de baixo do assento é uma linha
+ * de contadores, e um deles maior que os outros roubaria a leitura.
+ */
+function CartasNaMao({ quantas, nome }: { quantas: number; nome: string }) {
+  // Zero não vira uma linha vazia: no fim da rodada todo mundo fica sem cartas
+  // ao mesmo tempo, e oito espaços em branco piscando é ruído puro.
+  if (quantas <= 0) return null;
+
+  /**
+   * Acima de cinco vira número, como as vidas.
+   *
+   * Sete cartas desenhadas lado a lado não cabem nos 84 px do assento sem
+   * virar uma tira ilegível — e "sete" se lê mais rápido que sete retângulos
+   * que precisam ser contados. É a mesma regra do `♥×6` logo acima, e ser a
+   * mesma é metade do valor: a linha inteira se lê do mesmo jeito.
+   */
+  const desenhadas = quantas <= 5;
+
+  return (
+    <div
+      style={{ display: 'flex', gap: 2, alignItems: 'center', height: 12 }}
+      aria-label={`${nome}: ${String(quantas)} ${quantas === 1 ? 'carta na mão' : 'cartas na mão'}`}
+    >
+      {desenhadas ? (
+        Array.from({ length: quantas }, (_, i) => <Verso key={i} />)
+      ) : (
+        <>
+          <Verso />
+          <span aria-hidden style={{ fontSize: 10, color: 'var(--texto-fraco)' }}>
+            ×{quantas}
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** O verso de uma carta: 8×11, a proporção de um baralho de verdade. */
+function Verso() {
+  return (
+    <span
+      aria-hidden
+      style={{
+        width: 8,
+        height: 11,
+        borderRadius: 2,
+        // O mesmo tratamento do verso grande da mão, em miniatura: sem a
+        // textura ele viraria um retângulo cinza, que se confunde com
+        // separador.
+        background: 'linear-gradient(135deg, var(--acento) 0%, #4a3f7a 100%)',
+        boxShadow: 'inset 0 0 0 0.5px rgba(255,255,255,0.25)',
+        display: 'block',
+        flexShrink: 0,
+      }}
+    />
   );
 }

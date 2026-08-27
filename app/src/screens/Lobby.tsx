@@ -12,7 +12,7 @@ const DIFICULDADES: { valor: BotDifficulty; rotulo: string; explica: string }[] 
   { valor: 'REALISTA', rotulo: 'Realista', explica: 'Lê as apostas da mesa e mede o risco de cada carta. Ganha da maioria.' },
 ];
 
-export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRemoverBot, aoAbrirPerfil, aoAbrirRegras, aoSair, aoEnviarChat }: {
+export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRemoverBot, aoAbrirPerfil, aoAbrirRegras, aoSair, aoEnviarChat, aoAssistir }: {
   retrato: Retrato;
   eu: string;
   aoIniciar: () => void;
@@ -23,13 +23,22 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
   aoAbrirRegras: () => void;
   aoSair: () => void;
   aoEnviarChat: (texto: string) => void;
+  aoAssistir: (assistir: boolean) => void;
 }) {
   const [dificuldade, setDificuldade] = useState<BotDifficulty>('MEDIO');
   const jogadores = retrato.players.filter((p) => !p.isSpectator);
+  const plateia = retrato.players.filter((p) => p.isSpectator);
   const souHost = retrato.hostId === eu;
+  const assistindo = plateia.some((p) => p.id === eu);
+  const mesaCheia = jogadores.length >= LIMITS.maxPlayers;
+  const plateiaCheia = plateia.length >= LIMITS.maxSpectators;
   const bots = jogadores.filter((p) => p.bot);
   const cabeMaisBot = bots.length < LIMITS.maxBots && jogadores.length < LIMITS.maxPlayers;
   const suficiente = jogadores.length >= LIMITS.minPlayers;
+  // Uma pessoa sentada, no mínimo. `maxBots` = `maxPlayers - 1` deixou de
+  // bastar quando virou possível sair da mesa sem sair da sala (RF-083): dois
+  // bots sentados e o único humano assistindo passavam nas duas contagens.
+  const alguemJogando = jogadores.some((p) => !p.bot);
   const convite = `${location.origin}/?sala=${retrato.code}`;
 
   return (
@@ -85,6 +94,69 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
           </div>
         ))}
       </div>
+
+      {/* A plateia só aparece quando existe: um cartão vazio dizendo "0 de 4"
+          em toda sala ocuparia espaço para informar que não há informação. */}
+      {plateia.length > 0 && (
+        <div className="cartao pilha" style={{ gap: 4 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span className="rotulo">assistindo</span>
+            <span className="fraco">{plateia.length} de {LIMITS.maxSpectators}</span>
+          </div>
+          {plateia.map((p) => (
+            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <CartaoJogador
+                  jogador={p}
+                  partida={null}
+                  souEu={p.id === eu}
+                  /* O host pode estar assistindo: ele vira espectador e só
+                     passa a mesa se houver outra PESSOA para recebê-la. Sem a
+                     marca aqui, a sala pareceria não ter dono. */
+                  ehHost={retrato.hostId === p.id}
+                  ausente={false}
+                />
+              </div>
+              {souHost && p.id !== eu && (
+                <button
+                  className="fantasma"
+                  aria-label={`Expulsar ${p.nickname}`}
+                  onClick={() => aoExpulsar(p.id)}
+                  style={{ minWidth: 44, padding: 0 }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+          <p className="fraco" style={{ fontSize: 12 }}>
+            Quem assiste vê as cartas de todo mundo e pode falar no chat — as
+            mensagens saem marcadas.
+          </p>
+        </div>
+      )}
+
+      {/* RF-083: trocar de lado sem sair da sala.
+          Ficava faltando os dois caminhos. Quem entrou cedo demais ocupava um
+          lugar sem querer e só se livrava dele saindo; e quem chegou no meio da
+          partida anterior continuava na plateia sem jeito de sentar. */}
+      <button
+        className="fantasma"
+        disabled={assistindo ? mesaCheia : plateiaCheia}
+        onClick={() => aoAssistir(!assistindo)}
+      >
+        {assistindo ? 'Sentar à mesa' : 'Só assistir'}
+      </button>
+      {assistindo && mesaCheia && (
+        <p className="fraco" style={{ textAlign: 'center' }}>
+          A mesa está cheia: são {LIMITS.maxPlayers} no máximo.
+        </p>
+      )}
+      {!assistindo && plateiaCheia && (
+        <p className="fraco" style={{ textAlign: 'center' }}>
+          A plateia está cheia: são {LIMITS.maxSpectators} no máximo.
+        </p>
+      )}
 
       {souHost && (
         <div className="cartao pilha" style={{ gap: 10 }}>
@@ -153,10 +225,19 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
 
       {souHost ? (
         <div className="pilha" style={{ gap: 8 }}>
-          <button disabled={!suficiente} onClick={aoIniciar}>Começar a partida</button>
-          {!suficiente && (
+          <button disabled={!suficiente || !alguemJogando} onClick={aoIniciar}>
+            Começar a partida
+          </button>
+          {!suficiente ? (
             <p className="fraco">
               Falta gente: são precisos {LIMITS.minPlayers} para começar.
+            </p>
+          ) : !alguemJogando && (
+            /* O servidor também recusa, com `SO_BOTS_NA_MESA`. Aqui é para a
+               recusa não CHEGAR: um botão que aceita o toque e devolve erro
+               vermelho é pior que um botão desligado que diz o que fazer. */
+            <p className="fraco">
+              Só há bots na mesa. Sente-se para a partida começar.
             </p>
           )}
         </div>

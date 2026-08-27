@@ -130,6 +130,18 @@ export interface ChatMessage {
   nickname: string;
   text: string;
   at: number;
+  /**
+   * Quem falou estava assistindo, e não jogando.
+   *
+   * Copiado no envio pelo mesmo motivo do `nickname`: espectador vira jogador
+   * na rodada seguinte (RF-014), e sem congelar isto a conversa se reescreveria
+   * sozinha — o que ele disse de fora passaria a parecer dito de dentro.
+   *
+   * Importa porque o espectador VÊ a mão de todo mundo (RJ-159). "Joga o 3 de
+   * paus" dito por quem está na mesa é palpite; dito por quem vê todas as
+   * cartas é outra coisa, e quem lê precisa saber de qual das duas se trata.
+   */
+  spectator: boolean;
 }
 
 export interface PauseInfo {
@@ -154,6 +166,8 @@ export type Command =
   | { type: 'room:resync'; payload: Record<string, never> }
   | { type: 'player:setProfile'; payload: { nickname: string; avatar: Avatar } }
   | { type: 'player:leave'; payload: Record<string, never> }
+  /** Sentar-se à mesa ou sair dela para assistir. Só no lobby (RF-083). */
+  | { type: 'player:setSpectator'; payload: { spectator: boolean } }
   | { type: 'chat:send'; payload: { text: string } }
   | { type: 'host:kick'; payload: { playerId: PlayerId } }
   | { type: 'host:addBot'; payload: { difficulty: BotDifficulty } }

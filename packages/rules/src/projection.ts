@@ -58,6 +58,21 @@ export interface PlayerView {
   /** Só em rodada de testa: cartas dos **outros**, nunca a própria (RJ-101). */
   foreheadCards: Record<PlayerId, Card>;
 
+  /**
+   * A mão de **todo mundo**, e só para quem assiste (RJ-103).
+   *
+   * Espectador não joga, não aposta e não tem mão própria — esconder cartas
+   * dele não protege decisão nenhuma, porque ele não toma nenhuma. O que
+   * protege a partida é ele não poder FALAR o que viu, e isso é um problema de
+   * moderação, não de projeção: a mesa é de amigos, e o host expulsa quem
+   * estragar o jogo.
+   *
+   * Vazio para quem está jogando, sempre. É a diferença entre "não mandamos" e
+   * "mandamos e a tela não mostra" — a segunda seria batota disponível no
+   * console do navegador.
+   */
+  allHands: Record<PlayerId, Card[]>;
+
   stockCount: number;
   currentTrick: PublicTrick | null;
   resolvedTricks: PublicTrick[];
@@ -98,6 +113,15 @@ export function project(state: MatchState, viewerId: PlayerId): PlayerView {
     }
   } else if (!round.isForeheadRound && !isSpectator) {
     hand = (hidden.hands[viewerId] ?? []).map((id) => hidden.cards[id]!);
+  }
+
+  // RJ-103: quem assiste vê tudo. Montado só para ele — para quem joga, este
+  // objeto sai VAZIO no quadro, e não apenas ignorado pela tela.
+  const allHands: Record<PlayerId, Card[]> = {};
+  if (isSpectator) {
+    for (const [playerId, cardIds] of Object.entries(hidden.hands)) {
+      allHands[playerId] = cardIds.map((id) => hidden.cards[id]!);
+    }
   }
   // Depois da revelação as cartas já estão na mesa e chegam a todos — inclusive
   // ao dono — através de `resolvedTricks`, que é público (RJ-066).
@@ -144,6 +168,7 @@ export function project(state: MatchState, viewerId: PlayerId): PlayerView {
 
     handCounts,
     hand,
+    allHands,
     foreheadCards,
 
     stockCount: hidden.stock.length,

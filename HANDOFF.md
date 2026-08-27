@@ -27,7 +27,7 @@ npm run build:client   # OBRIGATÓRIO antes do primeiro `npm start`
 npm run redis          # opcional, noutro terminal
 npm run minio          # opcional: o outro lado do depósito de avatares
 npm start              # http://localhost:3000
-npm test               # 550 testes (2 pulados: Redis e Postgres, que só rodam com as env deles)
+npm test               # 555 testes (2 pulados: Redis e Postgres, que só rodam com as env deles)
 npm run typecheck
 ```
 
@@ -64,7 +64,7 @@ Para parar: `pkill -f "tsx server"`.
 | `packages/contas` | Contas, credenciais, identidades de SSO e histórico — memória **e Postgres**, mesma suíte |
 | `packages/avatares` | Depósito das fotos — disco **e R2**, mesma suíte. Mais cache, migração e escrita dupla |
 | `packages/protocol` | Contrato cliente ↔ servidor, tipos e validação separados |
-| `packages/room` | Máquina de sala: ciclo de vida, conexão, pausa, timers, auto-play, bots |
+| `packages/room` | Máquina de sala: ciclo de vida, conexão, pausa, timers, auto-play, bots, sucessão de host |
 | `server/` | HTTP de `06`, WebSocket de `05`, sessão, limites, persistência, `SIGTERM` |
 | `app/` | Cliente Vite + React com o design system Nocturne |
 
@@ -607,6 +607,76 @@ depois. Está escrito no `docker-compose.prod.yml`, ao lado das variáveis.
 O volume `avatares` **continua montado** depois do corte: é de onde a migração
 lê, e é a rede de segurança até o primeiro backup do bucket ser restaurado para
 valer. Só sai quando RNF-019 fechar.
+
+## Espectador, chat lateral e cartas na mão (26/08/2026)
+
+Quatro mudanças pedidas, e uma quinta que apareceu no caminho e valia mais que
+as outras.
+
+**RF-086 — chat na lateral em tela larga.** A casca de 460 px abre para 900 **só
+na mesa**, e o corte é do CSS: a mesma árvore de componentes serve os dois
+casos, nada é montado duas vezes, girar o aparelho não perde estado. O único
+`matchMedia` (`app/src/telaLarga.ts`) decide se o painel começa aberto — na
+lateral, fechado seria uma coluna vazia; no celular, aberto empurra a mão de
+cartas para fora da tela. Abaixo de 900 px **nada muda**, que era o pedido.
+
+**RF-085 — cartas viradas sob o coração.** `handCounts` já vinha na projeção e
+era público (RJ-102), e não estava em lugar nenhum: quem quisesse saber quantas
+cartas restavam ao adversário contava as mãos jogadas de cabeça. Viradas porque
+o conteúdo é segredo; do tamanho do coração porque aquela linha do assento é uma
+linha de contadores. Acima de cinco vira `verso ×N`, igual às vidas.
+
+**RJ-159 — quem assiste vê a mão de todos.** É uma exceção deliberada a RJ-102,
+e o recorte é "quem joga": o segredo existe para proteger DECISÃO, e espectador
+não aposta nem joga. Para quem joga, `allHands` sai **vazio** do servidor — não
+é a tela que esconde, que seria batota disponível no console. O risco de ele
+contar no chat é aceito e nomeado (moderação, não projeção).
+
+Não vai nos assentos: eles têm 84 px e uma carta `mini` tem 30. Um painel
+próprio (`Plateia.tsx`) abaixo do feltro, com o feltro **idêntico** ao de quem
+joga — se as cartas aparecessem nos assentos, jogador e espectador estariam
+olhando para duas mesas diferentes.
+
+**RF-083/084 — entrar e sair da mesa no lobby, e a marca no chat.** Só no lobby:
+com partida em curso, sair é abandono (tem caminho próprio) e entrar é RF-014.
+A marca `spectator` é congelada no envio como o apelido — quem falou de fora e
+depois sentou não pode ter o que disse reescrito.
+
+Isso obrigou a emendar **CA-338**, que trava o payload do chat numa lista
+fechada. A pergunta que o critério faz é a única que importa: o campo revela
+algo da PARTIDA que o destinatário já não soubesse? Não — quem está sentado e
+quem assiste já é público em `room.players`. A lista continua fechada.
+
+### A quinta: a mesma regra escrita em dois lugares
+
+Testando RF-083 no navegador, o host virou espectador e a mesa foi parar nas
+mãos do **Bot Ada**. Bot não aperta botão: a sala fica viva, com gente dentro, e
+sem nenhum caminho para começar a partida.
+
+Consertei `succeedHost` em `room.ts` para nunca entregar a mesa a um bot,
+escrevi teste, vi passar — **e a sala continuou caindo para o bot no
+navegador**. Havia uma segunda cópia: `ensureHost`, em `tick.ts`, rodando por
+relógio em vez de por comando. Duas implementações da mesma regra, escritas
+separadas, envelhecidas separadas.
+
+Foi o teste da SEQUÊNCIA inteira que pegou — assistir, sentar, jogar, cair —, e
+não os testes de cada passo, que passavam todos. Cada caminho isolado parecia
+correto; o que estava errado era haver dois.
+
+> Regra duplicada não é redundância: é uma regra que só vale onde alguém lembrou
+> de mantê-la. É o terceiro caso neste projeto (identidade única tinha três
+> cópias, a sucessão de host tinha duas), e o padrão é sempre o mesmo — o
+> conserto vai para a cópia que a pessoa está lendo, e a outra continua lá.
+
+Agora é `packages/room/src/anfitriao.ts`, uma função, e os dois chamam. A regra:
+**gente, e de preferência sentada**; sem candidato humano, o host não muda.
+Espectador entra como último recurso — dessa situação alguém se senta e a sala
+volta a andar, o que é melhor que host nenhum (RF-013).
+
+E junto veio **CA-400**: `maxBots = maxPlayers − 1` existia para uma mesa nunca
+ser só de bots, e essa aritmética parou de bastar quando o humano pôde sair da
+mesa sem sair da sala. Dois bots sentados e a única pessoa assistindo passavam
+nas duas contagens, e a partida começaria sem ninguém para jogá-la.
 
 ## O que fazer a seguir
 

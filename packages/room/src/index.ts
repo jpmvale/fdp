@@ -29,3 +29,4 @@ export {
   normalizeCode,
   type RandomBytes,
 } from './code.js';
+export { passarHost, garantirHost, hostServe } from './anfitriao.js';

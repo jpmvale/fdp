@@ -88,6 +88,10 @@ export const commandSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('player:leave'), payload: empty }),
   z.object({
+    type: z.literal('player:setSpectator'),
+    payload: z.object({ spectator: z.boolean() }).strict(),
+  }),
+  z.object({
     type: z.literal('chat:send'),
     // O teto aqui é sobre o texto CRU: o aparo acontece na sala, e recusar
     // 300 espaços antes de aparar é barato. O piso de 1 caractere depois de
