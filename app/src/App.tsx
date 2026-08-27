@@ -251,6 +251,7 @@ export function App() {
             conta={estado.conta}
             aoAbrirConta={() => setConta({ tela: 'entrar' })}
             aoEditarPerfil={() => { setIntencao({ tipo: 'SO_SALVAR' }); definir({ tela: 'perfil' }); }}
+            aoVerPerfil={() => { if (estado.conta) setPerfilPublico(estado.conta.slug); }}
             aoSairDaConta={() => {
               void sairDaConta().catch(() => {});
               definir({ conta: null });
@@ -329,6 +330,14 @@ export function App() {
 
         {estado.tela === 'sala' && !estado.retrato && <p className="fraco">Entrando na sala…</p>}
 
+        {/* Também aqui, e não só dentro da sala: é na home que alguém abre o
+            próprio perfil para olhar o histórico. */}
+        <FolhaDePerfil
+          slug={perfilPublico}
+          meuSlug={estado.conta?.slug}
+          aoFechar={() => setPerfilPublico(null)}
+        />
+
         <Erro texto={estado.erro} />
         {bloqueioAtual}
         {/* Fora da sala não há mesa para voltar nem partida para abandonar:
@@ -379,11 +388,11 @@ export function App() {
 
       {/* Perfil sobre a sala, como as regras: quem troca de cara no lobby
           quer voltar para o lobby, não recomeçar de algum lugar. */}
-      {perfilPublico && (
-        <Sobreposicao>
-          <PerfilPublico slug={perfilPublico} aoFechar={() => setPerfilPublico(null)} />
-        </Sobreposicao>
-      )}
+      <FolhaDePerfil
+        slug={perfilPublico}
+        meuSlug={estado.conta?.slug}
+        aoFechar={() => setPerfilPublico(null)}
+      />
 
       {perfilAberto && (
         <Sobreposicao>
@@ -511,6 +520,30 @@ function Sobreposicao({ children }: { children: React.ReactNode }) {
     }}>
       <div style={{ maxWidth: 460, margin: '0 auto' }}>{children}</div>
     </div>
+  );
+}
+
+/**
+ * O perfil público, sobre a tela que estiver aberta.
+ *
+ * Vive numa função porque é renderizado nos **dois** ramos do `App` — o de
+ * fora da sala e o de dentro dela. Ele estava só no de dentro, e por isso
+ * "meu perfil" na home não abria nada: o botão mudava o estado e nada na
+ * árvore daquele ramo olhava para ele.
+ *
+ * É o tipo de defeito que o typecheck não pega e o teste unitário não alcança,
+ * porque nada está errado — só ausente.
+ */
+function FolhaDePerfil({ slug, meuSlug, aoFechar }: {
+  slug: string | null;
+  meuSlug: string | undefined;
+  aoFechar: () => void;
+}) {
+  if (!slug) return null;
+  return (
+    <Sobreposicao>
+      <PerfilPublico slug={slug} meu={slug === meuSlug} aoFechar={aoFechar} />
+    </Sobreposicao>
   );
 }
 

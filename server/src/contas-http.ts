@@ -358,11 +358,29 @@ export function montarRotasDeConta(
     // D-4: público para quem tem o link, sem listagem nem busca. O que sai é
     // o que já aparece na mesa, mais o placar de vida inteira.
     const resumo = await dados.partidas.resumoDaConta(conta.id);
-    const recentes = await dados.partidas.porConta(conta.id, { limite: 10 });
+
+    /**
+     * A página do histórico (RF-090).
+     *
+     * O `10` sempre foi limite de TELA, e nunca de guarda: o banco tem tudo, e
+     * `resumo.partidas` já contava a vida inteira. Faltava a página seguinte —
+     * quem jogou 40 partidas via as 10 últimas e nenhum caminho para o resto,
+     * o que se parece com "o histórico só guarda 10".
+     *
+     * Teto de 50 por pedido para uma URL com `limite=100000` não virar uma
+     * varredura de tabela por conta de curioso.
+     */
+    const pular = Math.max(0, Number(c.req.query('pular') ?? 0) || 0);
+    const limite = Math.min(50, Math.max(1, Number(c.req.query('limite') ?? 10) || 10));
+    const recentes = await dados.partidas.porConta(conta.id, { limite, pular });
 
     return c.json({
       conta: contaPublica(conta),
       resumo,
+      // Onde esta página começa e se ainda há mais. Sem isto o cliente teria
+      // de adivinhar pelo tamanho do lote — e adivinharia errado no caso em
+      // que o total é múltiplo exato do limite.
+      pagina: { pular, limite, temMais: pular + recentes.length < resumo.partidas },
       /**
        * As partidas recentes, já reduzidas ao que a tela mostra.
        *

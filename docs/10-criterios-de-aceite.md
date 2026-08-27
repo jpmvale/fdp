@@ -447,6 +447,9 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-400 | U | RF-018 | **Dado** só bots sentados, **então** começar a partida é recusado com `SO_BOTS_NA_MESA`, e o botão já vem desligado com a explicação |
 | CA-401 | E | RF-085 | **Dado** um jogador com N cartas, **então** o assento mostra N cartas viradas até 5, e `verso ×N` acima disso |
 | CA-402 | E | RF-086 | **Dado** uma janela de 900 px ou mais na mesa, **então** o chat e o log ficam à direita, grudados no topo; abaixo de 900, empilhados no fim |
+| CA-411 | U/I | RF-090 | **Dado** uma conta com mais partidas que a página, **então** `porConta` pagina sem repetir nem pular — inclusive com duas partidas terminando no **mesmo instante** —, e `resumoDaConta` continua contando **tudo** |
+| CA-412 | I | RF-090 | **Dado** `/api/perfis/:slug`, **então** ele aceita `pular` e `limite`, devolve `pagina.temMais`, aplica teto de 50, e cai no padrão diante de query inválida |
+| CA-413 | E | RF-091 | **Dado** alguém logado na home, **então** existe **meu perfil** ali, e a folha abre com o histórico e o botão de ver mais |
 | CA-410 | U | RF-089 | **Dado** uma rodada em andamento, **então** o painel de quem assiste separa o que está na mão do que já foi jogado, com o número da mão em cada carta jogada; carta que apareça em `resolvedTricks` **e** em `currentTrick` conta uma vez só |
 | CA-406 | U | RJ-154 | **Dado** um id que **não está em `playerOrder`**, **então** `isActive` é falso; a jogada dele é recusada com `JOGADOR_INATIVO` e a retirada não o alcança |
 | CA-407 | U | RJ-154 | **Dado** uma partida em curso, **quando** um **espectador** sai da sala, **então** nada da partida se move e `round:aborted` **não** é emitido; quem estava JOGANDO e sai continua abortando a rodada |

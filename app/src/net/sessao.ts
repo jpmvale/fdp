@@ -143,9 +143,19 @@ export async function enviarAvatar(arquivo: File): Promise<{ conta: ContaPublica
 export const removerAvatar = () =>
   api<{ conta: ContaPublica }>('/api/eu/avatar', undefined, 'DELETE');
 
-export const perfilPublico = (slug: string) =>
-  api<{ conta: ContaPublica; resumo: { partidas: number; vitorias: number; notaMedia: number | null } }>(
-    `/api/perfis/${encodeURIComponent(slug)}`);
+export function perfilPublico(slug: string, pagina?: { pular?: number; limite?: number }) {
+  // Só manda o que foi pedido: uma URL sem query é a mesma para todo mundo, e
+  // o servidor já tem os padrões. Mandar `pular=0` sempre só sujaria o cache.
+  const q = new URLSearchParams();
+  if (pagina?.pular) q.set('pular', String(pagina.pular));
+  if (pagina?.limite) q.set('limite', String(pagina.limite));
+  const cauda = q.size > 0 ? `?${q.toString()}` : '';
+
+  return api<{
+    conta: ContaPublica;
+    resumo: { partidas: number; vitorias: number; notaMedia: number | null };
+  }>(`/api/perfis/${encodeURIComponent(slug)}${cauda}`);
+}
 
 /**
  * Cria a sala. Quem está logado tem a identidade tirada da CONTA pelo servidor,

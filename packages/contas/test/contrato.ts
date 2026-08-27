@@ -394,5 +394,47 @@ export function descreverContratoDeDados(harness: DadosHarness): void {
       comDados(async (d) => {
         expect(await d.partidas.porId('00000000-0000-4000-8000-000000000002')).toBeNull();
       }));
+
+    it('CA-411: `porConta` pagina sem repetir nem pular', () =>
+      comDados(async (d) => {
+        const a = await d.contas.criarComSenha({
+          apelido: 'Ana', avatar: AVATAR, email: 'a@exemplo.com', hash: 'h' });
+        if (!a.ok) throw new Error('cadastro falhou');
+
+        // Cinco partidas, DUAS terminando no mesmo instante: é o caso que
+        // quebra paginação ordenada só por tempo, e acontece de verdade —
+        // duas mesas podem acabar no mesmo milissegundo.
+        for (const t of [5_000, 4_000, 3_000, 3_000, 1_000]) {
+          await d.partidas.gravar(partida([jogador({ contaId: a.conta.id })], { terminouEm: t }));
+        }
+
+        const p1 = await d.partidas.porConta(a.conta.id, { limite: 2 });
+        const p2 = await d.partidas.porConta(a.conta.id, { limite: 2, pular: 2 });
+        const p3 = await d.partidas.porConta(a.conta.id, { limite: 2, pular: 4 });
+
+        expect([p1.length, p2.length, p3.length]).toEqual([2, 2, 1]);
+
+        // Nenhuma repetida, nenhuma perdida: as três páginas somam as cinco.
+        expect(new Set([...p1, ...p2, ...p3].map((p) => p.id)).size).toBe(5);
+
+        const tempos = [...p1, ...p2, ...p3].map((p) => p.terminouEm);
+        expect(tempos).toEqual([...tempos].sort((x, y) => y - x));
+      }));
+
+    it('CA-411: o limite é de PÁGINA; o resumo continua contando tudo', () =>
+      comDados(async (d) => {
+        const a = await d.contas.criarComSenha({
+          apelido: 'Ana', avatar: AVATAR, email: 'a@exemplo.com', hash: 'h' });
+        if (!a.ok) throw new Error('cadastro falhou');
+
+        for (let i = 0; i < 12; i++) {
+          await d.partidas.gravar(partida([jogador({ contaId: a.conta.id })], { terminouEm: 1_000 + i }));
+        }
+
+        // A distinção que a tela precisa: lista 10 e diz "12 partidas". Nada é
+        // apagado — o limite é de quanto se mostra por vez.
+        expect(await d.partidas.porConta(a.conta.id, { limite: 10 })).toHaveLength(10);
+        expect((await d.partidas.resumoDaConta(a.conta.id)).partidas).toBe(12);
+      }));
   });
 }

@@ -11,7 +11,7 @@ import { ROOM_CODE_LENGTH } from '@fdp/protocol';
  */
 export function Home({
   aoCriar, aoEntrar, aoAbrirRegras, codigoInicial, conta, aoAbrirConta, aoSairDaConta,
-  aoEditarPerfil,
+  aoEditarPerfil, aoVerPerfil,
 }: {
   aoCriar: () => void;
   aoEntrar: (codigo: string) => void;
@@ -23,6 +23,8 @@ export function Home({
   aoSairDaConta: () => void;
   /** Só com conta: sem ela não há nada que sobreviva ao fim da sala. */
   aoEditarPerfil: () => void;
+  /** O próprio perfil, com o histórico de partidas. */
+  aoVerPerfil: () => void;
 }) {
   const [codigo, setCodigo] = useState(codigoInicial.toUpperCase());
   const completo = codigo.length === ROOM_CODE_LENGTH;
@@ -81,9 +83,15 @@ export function Home({
               toda mesa só podiam ser trocados estando numa — e a foto, que é
               da conta e não da sala, junto. Aqui é o único lugar fora da
               partida em que a conta aparece, então é aqui que ela se edita. */}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+            {/* Ver o próprio perfil só existia DENTRO da partida, pelo assento
+                — e o assento é de quem está jogando, então quem não estava numa
+                mesa não tinha caminho nenhum até o próprio histórico. */}
+            <button className="fantasma" onClick={aoVerPerfil} style={{ minHeight: 36, padding: '0 12px' }}>
+              meu perfil
+            </button>
             <button className="fantasma" onClick={aoEditarPerfil} style={{ minHeight: 36, padding: '0 12px' }}>
-              editar perfil
+              editar
             </button>
             <button className="fantasma" onClick={aoSairDaConta} style={{ minHeight: 36, padding: '0 12px' }}>
               sair

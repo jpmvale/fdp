@@ -339,8 +339,11 @@ export async function criarDadosEmPostgres(opcoes: OpcoesPostgres): Promise<Dado
         `SELECT p.* FROM partidas p
            JOIN partida_jogadores j ON j.partida_id = p.id
           WHERE j.conta_id = $1
-          ORDER BY p.terminou_em DESC
-          LIMIT $2`, [contaId, opcoes.limite ?? 20]);
+          -- O desempate pelo id não é decoração: sem ele, duas partidas que
+          -- terminam no mesmo milissegundo podem trocar de lugar entre uma
+          -- página e a seguinte, e a paginação repete uma e engole a outra.
+          ORDER BY p.terminou_em DESC, p.id DESC
+          LIMIT $2 OFFSET $3`, [contaId, opcoes.limite ?? 20, opcoes.pular ?? 0]);
       if (rows.length === 0) return [];
 
       const ids = rows.map((r) => r.id as string);

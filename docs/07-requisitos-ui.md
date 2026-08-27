@@ -179,6 +179,8 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 | RF-087 | A mensagem de quem assiste **NÃO DEVE** virar balão no feltro. Ela aparece só no chat, com a marca de RF-084 |
 | RF-088 | Com partida em curso, o cabeçalho **DEVE** mostrar quantos assistem, e revelar os nomes ao passar o mouse ou tocar |
 | RF-089 | O painel de quem assiste **DEVE** distinguir o que ainda está na mão do que já foi jogado, dizendo **em que mão** cada carta saiu |
+| RF-090 | O histórico do perfil **DEVE** paginar: a tela mostra 10 por vez, diz quantas de quantas, e busca as seguintes sob demanda. Nada é apagado — o limite é de exibição |
+| RF-091 | Quem tem conta **DEVE** alcançar o próprio perfil pela **home**, sem precisar estar numa mesa |
 | RF-061 | Entrar com Google ou GitHub. Só provedor **configurado** vira botão: um botão que devolve 503 é pior que nenhum |
 | RF-062 | SSO com e-mail **verificado pelo provedor** assume a conta de senha, apaga a senha e derruba as sessões |
 | RF-063 | Entrar com senha numa conta assumida por SSO **DEVE** dizer o que houve — *"esta conta agora entra pelo Google"* —, nunca "senha inválida" |
@@ -208,6 +210,20 @@ cartas vale outra coisa. O número fica sempre visível porque é barato; os nom
 ficam sob demanda porque uma lista aberta o tempo todo rouba espaço de algo que
 quase nunca muda. Zero pessoas não vira "0 assistindo" — contador zerado
 permanente é ruído, e a ausência de plateia é o caso comum.
+
+RF-090 corrige uma impressão, não um limite. O `10` sempre foi de **tela**: o
+banco guarda tudo, e `resumo.partidas` já contava a vida inteira. O que faltava
+era a página seguinte — quem jogou 40 partidas via as 10 últimas e nenhum
+caminho para o resto, o que se lê como "o histórico só guarda 10". A tela agora
+diz **"10 de 40"**, e é essa frase que desfaz a impressão antes mesmo de alguém
+clicar.
+
+O teto de 50 por pedido não é sobre a tela: é para uma URL com `limite=100000`
+não virar varredura de tabela por conta de curioso.
+
+RF-091 fecha um buraco de caminho, não de dado. O perfil só era alcançável pelo
+**assento**, na mesa — e assento é de quem está jogando. Quem não estava numa
+partida não tinha caminho nenhum até o próprio histórico.
 
 RF-089 completa RJ-159, que sozinho respondia metade da pergunta. `allHands`
 traz só o que **resta** — o motor tira a carta da mão no instante em que ela é

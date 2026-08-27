@@ -177,7 +177,19 @@ export interface Partidas {
   gravar(partida: Omit<Partida, 'id'>): Promise<Partida | null>;
 
   porId(id: PartidaId): Promise<Partida | null>;
-  porConta(contaId: ContaId, opcoes?: { limite?: number }): Promise<Partida[]>;
+  /**
+   * As partidas de uma conta, da mais recente para a mais antiga.
+   *
+   * `limite` e `pular` são de PAGINAÇÃO, e não de retenção: nada é apagado, e
+   * o histórico inteiro continua no banco. Quem chama decide quanto quer de
+   * cada vez — a tela de perfil pede 10 e busca mais sob demanda.
+   *
+   * A ordem é estável (`terminou_em` decrescente, desempatada pelo `id`) para
+   * que paginar não repita nem pule partida quando duas terminam no mesmo
+   * instante — o que acontece de verdade, porque duas mesas podem acabar no
+   * mesmo milissegundo.
+   */
+  porConta(contaId: ContaId, opcoes?: { limite?: number; pular?: number }): Promise<Partida[]>;
   resumoDaConta(contaId: ContaId): Promise<ResumoDaConta>;
 }
 

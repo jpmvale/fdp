@@ -27,7 +27,7 @@ npm run build:client   # OBRIGATÓRIO antes do primeiro `npm start`
 npm run redis          # opcional, noutro terminal
 npm run minio          # opcional: o outro lado do depósito de avatares (R2)
 npm start              # http://localhost:3000
-npm test               # 571 testes (3 pulados: Redis, Postgres e R2 — só rodam com as env deles)
+npm test               # 603 testes (3 pulados: Redis, Postgres e R2 — só rodam com as env deles)
 npm run auditoria      # o que `docs/` promete e nenhum teste cobre
 npm run typecheck
 ```
@@ -849,6 +849,44 @@ carta saiu. Sem o número, as jogadas viram um monte indistinto assim que passam
 de duas. E a dedupe por id de carta não é zelo: entre resolver a mão e recolhê-la
 (fase `RECOLHIMENTO`) a mesma vaza aparece nos dois lugares, e contada em dobro
 ela sugeriria uma carta que nunca existiu.
+
+## O histórico não parava em 10, mas parecia (27/08/2026)
+
+Relatado como "o histórico de partidas só tá limitado a 10 itens?". A resposta
+curta é **não** — e a impressão era culpa nossa.
+
+Nada é apagado. O Postgres guarda todas as partidas, `resumoDaConta` sempre
+contou a vida inteira (`count(*)`), e o `10` era um argumento na rota do perfil:
+`porConta(conta.id, { limite: 10 })`. O repositório nem tinha o teto — o padrão
+dele era 20.
+
+O que faltava era **a página seguinte**. Quem jogou 40 partidas via as 10
+últimas e nenhum caminho para o resto, e isso se lê exatamente como "só guarda
+10". A tela mostrava dez linhas sem dizer dez **de quantas**.
+
+Agora: `porConta` aceita `pular`, a rota aceita `?pular=&limite=` com teto de 50,
+a resposta traz `pagina.temMais`, e a tela diz **"10 de 40"** com um botão de
+ver mais. A frase "10 de 40" é o que desfaz a impressão antes mesmo de alguém
+clicar.
+
+**O desempate pelo `id` no `ORDER BY` não é enfeite.** Duas partidas podem
+terminar no mesmo milissegundo — duas mesas acabam juntas —, e uma ordenação só
+por tempo deixa o banco livre para trocá-las de lugar entre uma página e a
+seguinte: a paginação repete uma e engole a outra. As duas implementações
+(memória e Postgres) desempatam igual, e CA-411 cobra isso com duas partidas no
+mesmo instante de propósito.
+
+### E o perfil só existia dentro da mesa
+
+O único caminho até o próprio perfil era **pelo assento**, na partida. Assento é
+de quem está jogando: quem não estava numa mesa não tinha como ver o próprio
+histórico. Agora há **meu perfil** na home (RF-091).
+
+Ao ligar isso apareceu um defeito que nem typecheck nem teste unitário pegam,
+porque nada estava errado — só ausente: a sobreposição do `PerfilPublico` era
+renderizada **só no ramo de dentro da sala** do `App`. O botão na home mudava o
+estado e nada na árvore daquele ramo olhava para ele. Virou `FolhaDePerfil`,
+usada nos dois ramos.
 
 ## O que fazer a seguir
 

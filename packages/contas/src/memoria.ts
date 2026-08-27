@@ -154,8 +154,12 @@ export function criarDadosEmMemoria(opcoes: OpcoesMemoria = {}): Dados {
     async porConta(contaId, opcoes = {}) {
       const minhas = [...partidas.values()]
         .filter((p) => p.jogadores.some((j) => j.contaId === contaId))
-        .sort((a, b) => b.terminouEm - a.terminouEm);
-      return clonar(minhas.slice(0, opcoes.limite ?? 20));
+        // O desempate pelo id espelha o do Postgres. Duas implementações que
+        // ordenam diferente passam a suíte de contrato e divergem na página 2.
+        .sort((a, b) => b.terminouEm - a.terminouEm || (a.id < b.id ? 1 : -1));
+
+      const pular = opcoes.pular ?? 0;
+      return clonar(minhas.slice(pular, pular + (opcoes.limite ?? 20)));
     },
 
     async resumoDaConta(contaId) {

@@ -230,6 +230,83 @@ describe('perfil público (D-4)', () => {
     const r = await chamar('/api/perfis/ana');
     expect(JSON.stringify(await corpo(r))).not.toContain('exemplo.com');
   });
+
+  /**
+   * CA-412: o histórico não para em 10.
+   *
+   * O `10` sempre foi limite de TELA — o banco guarda tudo, e `resumo.partidas`
+   * já contava a vida inteira. O que faltava era a página seguinte: quem jogou
+   * 25 partidas via as 10 últimas e nenhum caminho para o resto, o que se
+   * parece com "o histórico só guarda 10".
+   */
+  describe('CA-412: o histórico pagina', () => {
+    /** Uma conta com `quantas` partidas gravadas. */
+    async function comHistorico(quantas: number): Promise<void> {
+      const criada = await chamar('/api/contas', { method: 'POST', body: CADASTRO });
+      const conta = (await corpo(criada))['conta'] as unknown as { slug: string };
+      const interna = await dados.contas.porSlug(conta.slug);
+
+      for (let i = 0; i < quantas; i++) {
+        await dados.partidas.gravar({
+          salaCodigo: 'AB12C', comecouEm: 1_000 + i, terminouEm: 2_000 + i,
+          motivoFim: 'VITORIA', rodadas: 5,
+          opcoes: { vidasIniciais: 5, maxCartasPorRodada: 7, regraEmpate: 'EMPATE_ANULA_VAZA' } as never,
+          jogadores: [{
+            posicao: 0, contaId: interna!.id, apelido: 'Ana',
+            avatar: { emoji: '🦊', color: 'amber' }, bot: false, dificuldade: null,
+            colocacao: 1, vidasFinais: 3, eliminadoRodada: null, mortoEmVaza: null,
+            acertos: 4, jogadas: 5, erroMedio: 0.5, piorErro: 1, nota: 8,
+          }],
+        });
+      }
+    }
+
+    it('a primeira página traz 10, e diz que há mais', async () => {
+      await comHistorico(25);
+      const b = await corpo(await chamar('/api/perfis/ana'));
+
+      expect((b['partidas'] as unknown as unknown[])).toHaveLength(10);
+      // O total é da VIDA INTEIRA, e é o que desmente "só guarda 10".
+      expect((b['resumo'] as unknown as { partidas: number }).partidas).toBe(25);
+      expect(b['pagina']).toEqual({ pular: 0, limite: 10, temMais: true });
+    });
+
+    it('as páginas cobrem tudo, sem repetir, e a última diz que acabou', async () => {
+      await comHistorico(25);
+      const vistos: number[] = [];
+
+      for (let pular = 0; pular < 30; pular += 10) {
+        const b = await corpo(await chamar(`/api/perfis/ana?pular=${String(pular)}`));
+        for (const p of b['partidas'] as unknown as { quando: number }[]) vistos.push(p.quando);
+      }
+
+      expect(vistos).toHaveLength(25);
+      expect(new Set(vistos).size).toBe(25);
+
+      const ultima = await corpo(await chamar('/api/perfis/ana?pular=20'));
+      expect(ultima['pagina']).toMatchObject({ temMais: false });
+    });
+
+    it('o limite tem teto: `limite` absurdo não vira varredura', async () => {
+      await comHistorico(25);
+      const b = await corpo(await chamar('/api/perfis/ana?limite=100000'));
+
+      // 50 é o teto do servidor. Sem ele, uma URL de curioso puxa a tabela.
+      expect((b['partidas'] as unknown as unknown[]).length).toBeLessThanOrEqual(50);
+      expect(b['pagina']).toMatchObject({ limite: 50 });
+    });
+
+    it('lixo na query cai no padrão em vez de quebrar', async () => {
+      await comHistorico(3);
+      for (const q of ['?pular=-5', '?limite=abc', '?pular=abc&limite=0', '?limite=-1']) {
+        const r = await chamar(`/api/perfis/ana${q}`);
+        expect(r.status, q).toBe(200);
+        const pagina = (await corpo(r))['pagina'] as unknown as { pular: number; limite: number };
+        expect(pagina.pular, q).toBeGreaterThanOrEqual(0);
+        expect(pagina.limite, q).toBeGreaterThan(0);
+      }
+    });
+  });
 });
 
 describe('limite de tentativas', () => {
