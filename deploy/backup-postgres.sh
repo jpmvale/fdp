@@ -49,45 +49,28 @@ echo "ok $arquivo ($(du -h "$arquivo" | cut -f1))"
 # mais nada. Disco perdido, máquina trocada ou provedor com problema levam os
 # dois juntos — e é justamente nesses casos que alguém vai procurar o backup.
 #
-# Opcional de propósito, como o SSO e o R2 dos avatares: sem as variáveis, o
-# backup local continua funcionando igual e o script não falha. Quem roda numa
-# máquina de teste não precisa de bucket.
+# **Usa o `enviar-r2.sh` da máquina**, o mesmo de `backup-mongo.sh` e dos
+# outros. Ele já lê as credenciais de `~/.config/backup-r2.env`, aplica
+# retenção, e recusa mandar dump para o bucket PÚBLICO de mídia. Escrever um
+# segundo caminho aqui — com outro arquivo de credencial e outra variável de
+# bucket — seria uma convenção paralela para o mesmo problema, e a segunda
+# convenção é sempre a que alguém esquece de atualizar.
 #
-# **Bucket PRÓPRIO, e não o `R2_BUCKET` do `.env`.** Aquele é o dos avatares, e
-# o `.env` da aplicação o define — se este script lesse a mesma variável, o dump
-# do banco iria parar no bucket das fotos. Dois usos diferentes do mesmo R2
-# precisam de nomes diferentes, e o erro seria silencioso: subiria, daria "ok",
-# e ninguém olharia até o dia da restauração.
-if [ -n "${R2_BUCKET_BACKUPS:-}" ]; then
-  echo "enviando para o R2 (bucket $R2_BUCKET_BACKUPS)…"
-  # Dentro do container da API: ele tem node e o nosso código, e a VPS não
-  # precisa ganhar nada novo no host. `--network host` não é preciso — o
-  # container fala com a internet pela rede padrão dele.
-  # A imagem é a do container QUE ESTÁ NO AR, e nunca `:latest`.
-  #
-  # `latest` na VPS é o que sobrou de um `docker compose up` sem `IMAGE_TAG` —
-  # uma construção local, de commit indeterminado. O CI publica só a tag do sha,
-  # e é essa que o `deploy.sh` sobe. Perguntar ao container em execução dá
-  # sempre o artefato que de fato está servindo o jogo.
-  IMAGEM="${IMAGEM_FDP:-$(docker inspect fdp-api --format '{{.Config.Image}}' 2>/dev/null)}"
-  if [ -z "$IMAGEM" ]; then
-    echo "::erro:: não achei a imagem do fdp-api; defina IMAGEM_FDP" >&2
-    FALHOU_ENVIO=1
-  elif docker run --rm \
-      -v "$DESTINO":/backups:ro \
-      -e R2_ENDPOINT -e R2_ACCESS_KEY_ID -e R2_SECRET_ACCESS_KEY -e R2_REGIAO \
-      -e "R2_BUCKET=$R2_BUCKET_BACKUPS" \
-      "$IMAGEM" \
-      npx tsx server/src/enviar-para-r2.ts "/backups/$(basename "$arquivo")" \
-        "postgres/$(basename "$arquivo")"; then
+# Opcional de propósito: sem o `enviar-r2.sh` (máquina de teste, clone local),
+# o backup roda igual e o script não falha.
+ENVIAR="${HOME}/bin/enviar-r2.sh"
+if [ -x "$ENVIAR" ]; then
+  if "$ENVIAR" "$arquivo" "fdp/$(basename "$arquivo")" "${RETENCAO_R2_DIAS:-30}"; then
     echo "cópia fora da máquina ok"
   else
     # Falha no envio NÃO derruba o backup local, que já está gravado e
     # conferido. Mas sai com erro para o `com-alerta.sh` avisar: um backup que
     # deixou de sair da máquina em silêncio é o pior dos dois mundos.
-    echo "::erro:: o backup local está ok, mas a cópia para o R2 falhou" >&2
+    echo "[$(date -Is)] ERRO: backup local ok, mas o envio ao R2 falhou" >&2
     FALHOU_ENVIO=1
   fi
+else
+  echo "sem $ENVIAR: backup só local"
 fi
 
 # Descarte por idade. Sem isto o disco enche e o backup para de rodar

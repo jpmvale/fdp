@@ -957,16 +957,40 @@ a segunda vez que essa escolha do plano 01 se paga.
 O volume `fdp_avatares` **continua montado**, de propósito: é a rede de
 segurança até RNF-019 fechar. Só sai depois de uma restauração de verdade.
 
-### O bucket do backup precisou de variável própria
+### Eu escrevi um enviador que já existia
 
-Ao ligar o envio do dump, quase cometi um erro silencioso: `enviar-para-r2.ts`
-lê `R2_BUCKET`, e o `.env` da aplicação agora define `R2_BUCKET=fdp-avatares`. O
-dump do Postgres teria ido parar no bucket das fotos — subiria, diria "ok", e
-ninguém olharia até o dia da restauração.
+Ao ligar a cópia do dump para fora da máquina, escrevi um `enviar-para-r2.ts`,
+com assinatura própria, variável `R2_BUCKET_BACKUPS` e `docker run` montado à
+mão. Só **depois** fui olhar como os outros backups da VPS faziam.
 
-`backup-postgres.sh` usa `R2_BUCKET_BACKUPS`, e passa esse valor como
-`R2_BUCKET` para dentro do container do envio. Dois usos do mesmo R2 precisam de
-nomes diferentes.
+A máquina já tinha `~/bin/enviar-r2.sh`, usado por `backup-mongo.sh` e pelos
+demais. E ele é melhor que o que eu fiz em tudo que importa:
+
+- lê credencial de `~/.config/backup-r2.env`, uma convenção que já existe;
+- aplica **retenção** por dias, que o meu não fazia;
+- **recusa** mandar dump para o bucket público de mídia, um guarda que eu nem
+  tinha pensado em precisar;
+- tem `--listar`, que é como se confere o que subiu.
+
+Joguei o meu fora. `backup-postgres.sh` chama `enviar-r2.sh` como os outros, e
+o dump vai para `vps-backups/fdp/`.
+
+> A lição é a de sempre, e eu não a segui: **olhar o que a máquina já faz antes
+> de escrever o que ela vai passar a fazer.** Uma segunda convenção para o
+> mesmo problema não é redundância — é a que alguém esquece de atualizar. E
+> `R2_BUCKET_BACKUPS` no `.env` da aplicação era exatamente esse começo.
+
+**Exercitado de verdade em 27/08/2026:** `~/bin/backup-postgres.sh` gerou o
+dump, conferiu com `pg_restore --list`, enviou, e `enviar-r2.sh --listar fdp/`
+mostrou o objeto no bucket.
+
+**Atenção ao instalar:** `~/bin/backup-postgres.sh` é uma **cópia**, não um link
+para o repositório — é a convenção da máquina (a sonda `metrica-fdp.sh` é
+igual). Mexer no arquivo aqui **não** muda o que o cron roda; é preciso copiar:
+
+```
+scp deploy/backup-postgres.sh vps:~/bin/backup-postgres.sh
+```
 
 ## O que fazer a seguir
 
