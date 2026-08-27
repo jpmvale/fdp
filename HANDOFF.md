@@ -763,12 +763,16 @@ O defeito esteve **a um `touch` de distância de ser descoberto** por semanas. O
 que faltava era alguém dar o `touch` — e ninguém dá, se ninguém escreveu que
 alguém deveria. Agora o processo dá, toda vez que sobe.
 
-### Verificado na imagem de produção, não por dedução
+### Verificado na imagem de produção, e depois em produção
 
 Construí a imagem, montei um volume `root` vazio igual ao da VPS, subi o
 container e enviei a foto de 48 MP: gravou como `node:node`, serviu de volta, e
 o hash saiu **idêntico** ao produzido no macOS — o `sharp` do Alpine/musl dá o
 mesmo byte, que era a única incerteza que restava sobre o teto de pixels.
+
+**Confirmado em produção por envio real em 27/08/2026.** O envio de avatar
+funciona, e é a primeira vez que isso é verdade desde que a funcionalidade
+existe.
 
 ### Antes de dizer "a documentação está em dia"
 

@@ -34,8 +34,9 @@ volume montado como `root` com o processo rodando como `node`. Ver §12.
 
 ## 2. O que já foi corrigido, e o que sobrou
 
-Três coisas do pipeline estavam erradas e já estão consertadas. **Nenhuma delas
-era a causa** do envio não funcionar — essa era o volume, e está na §12. Ficam
+Quatro coisas quebravam o envio. As três primeiras eram do pipeline e estavam
+todas erradas; **nenhuma delas era a causa** de o envio nunca ter funcionado.
+Essa era a quarta, e está na §12. Ficam
 aqui porque são a evidência de que a régua deste subsistema foi escrita sem
 medição, que é o que este plano quer corrigir de vez.
 
@@ -44,6 +45,7 @@ medição, que é o que este plano quer corrigir de vez.
 | Orçamento de envio | Gastava o de cadastro: 10/h **por IP**, contando tentativas recusadas | 30/h **por conta** (RNF-017) |
 | Teto de bytes | 5 MB — abaixo de um JPEG de 12 MP comum | 25 MB, num único lugar (`LIMITS.avatarBytesMax`) |
 | Teto de pixels | 4096² = 16,7 MP — recusava 48, 50 e 108 MP | 16 000² = 256 MP (CA-391) |
+| **Gravação** | Volume `root`, processo `node` — **EACCES em tudo, sempre** | `chown` na imagem + sonda na subida (§12) |
 
 O teto de pixels é o que mais ensina. Ele existia contra a bomba de
 descompressão, e a bomba é real. Mas o número saiu de uma conta ingênua —
@@ -313,6 +315,9 @@ Com conteúdo dentro não alcança, e aí é `chown` na mão (ver HANDOFF).
 E RNF-020: uma **sonda de escrita** na subida, que grava, lê, confere e apaga.
 O defeito esteve a um `touch` de distância de ser descoberto por semanas, e o
 que faltava era alguém dar o `touch`.
+
+**Confirmado em produção em 27/08/2026**, por envio real: o avatar sobe, é
+gravado e é servido. Primeira vez desde que a funcionalidade existe.
 
 Isto **não** enfraquece o plano: reforça a §1. Um subsistema cujo armazenamento
 nunca foi exercitado por nada além do caminho feliz de produção é exatamente o
