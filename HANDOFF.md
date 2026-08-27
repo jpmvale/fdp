@@ -902,13 +902,19 @@ quase todo o trabalho restante.
 
 | O quê | Onde | Por que importa |
 |---|---|---|
-| **Nenhuma suíte E2E existe** | `11` §8 previa Playwright; não há `test/e2e/` nem a dependência | 20 critérios de nível `E` não são executados por ninguém, e o gate do M4 exige 100% dos `CA` de v1 passando. **É a dívida mais cara do projeto**: cinco bugs graves foram achados jogando ou por relato, nenhum por teste — INV-05 (sala travada), a pausa de fim de vaza, o `v: 1` que derrubou o jogo inteiro, o volume `root` que impediu todo envio de avatar desde sempre, e o espectador que reiniciava a rodada ao sair |
+| **Nenhuma suíte E2E existe** | `11` §8 previa Playwright; não há `test/e2e/` nem a dependência | 21 critérios de nível `E` não são executados por ninguém, e o gate do M4 exige 100% dos `CA` de v1 passando. **É a dívida mais cara do projeto**: cinco bugs graves foram achados jogando ou por relato, nenhum por teste — INV-05 (sala travada), a pausa de fim de vaza, o `v: 1` que derrubou o jogo inteiro, o volume `root` que impediu todo envio de avatar desde sempre, e o espectador que reiniciava a rodada ao sair |
 | **32 critérios sem teste, e nenhum deles é E2E** | `npm run auditoria` | RNF-102 diz que requisito sem teste que cite seu ID é requisito **não entregue**. São 24 `U`, 7 `I` e 1 `CI` — coisas que dava para testar e não se testou. Muitos são de desempenho (CA-160 a CA-164, que dependem do teste de carga) e de a11y manual, mas não todos |
 | **Nenhum teste de carga** | RNF-060: 500 salas, 2.000 sockets | Junto vão CA-160 a CA-164 (desempenho). Nada disso foi medido contra a VPS |
 | **Auditoria de segurança** | `09` §3.1 | A tabela de ameaças nunca foi percorrida em bloco |
 | **Os dois testes manuais de a11y** | `08` §5 — CA-141 (teclado) e CA-142 (leitor de tela) | São manuais por natureza e obrigatórios para o M4 |
 | **Roteiro de aceitação** | `10` §8 | 4 pessoas reais, 4 dispositivos |
 | **LGPD** | §13.3 do plano 01 | Contas guardam e-mail; o histórico guarda apelido de convidado. Falta retenção e apagamento de conta. Não bloqueia jogar — **bloqueia divulgar o jogo fora do círculo de amigos** |
+| **O SSH do deploy some de vez em quando** | `.github/workflows/deploy.yml`; ver "A esteira" | Aconteceu **duas vezes**: CI verde, deploy vermelho com `Connection timed out` nas três tentativas. Na segunda, conferido que a porta 22 respondia normalmente de fora — então é o IP do runner que está bloqueado, quase certo **fail2ban** na VPS banindo faixas do GitHub Actions. Repetir a execução resolve (IP novo), e a aplicação no ar nunca é tocada. Mas vai voltar, e um dia numa hora ruim |
+
+### Pedido e adiado
+
+- **Aprovação de entrada na sala** (27/08/2026): o host aprova quem tenta entrar.
+  Escopo combinado: **só no lobby**. Não começou.
 
 ### Herdado do plano 01, com risco aceito
 
