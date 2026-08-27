@@ -13,6 +13,9 @@ export default defineConfig({
       '@fdp/protocol': at('./packages/protocol/src/index.ts'),
       '@fdp/room': at('./packages/room/src/index.ts'),
       '@fdp/bot': at('./packages/bot/src/index.ts'),
+      '@fdp/avatares/assinatura': at('./packages/avatares/src/assinatura.ts'),
+      '@fdp/avatares/r2': at('./packages/avatares/src/r2.ts'),
+      '@fdp/avatares': at('./packages/avatares/src/index.ts'),
     },
   },
 });

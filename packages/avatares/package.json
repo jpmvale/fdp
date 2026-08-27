@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./r2": "./src/r2.ts"
+    "./r2": "./src/r2.ts",
+    "./assinatura": "./src/assinatura.ts"
   }
 }

@@ -50,6 +50,9 @@
       ],
       "@fdp/avatares/r2": [
         "./packages/avatares/src/r2.ts"
+      ],
+      "@fdp/avatares/assinatura": [
+        "./packages/avatares/src/assinatura.ts"
       ]
     }
   }

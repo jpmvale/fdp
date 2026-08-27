@@ -27,7 +27,7 @@ npm run build:client   # OBRIGATÓRIO antes do primeiro `npm start`
 npm run redis          # opcional, noutro terminal
 npm run minio          # opcional: o outro lado do depósito de avatares (R2)
 npm start              # http://localhost:3000
-npm test               # 603 testes (3 pulados: Redis, Postgres e R2 — só rodam com as env deles)
+npm test               # 610 testes (3 pulados: Redis, Postgres e R2 — só rodam com as env deles)
 npm run auditoria      # o que `docs/` promete e nenhum teste cobre
 npm run typecheck
 ```
@@ -887,6 +887,51 @@ porque nada estava errado — só ausente: a sobreposição do `PerfilPublico` e
 renderizada **só no ramo de dentro da sala** do `App`. O botão na home mudava o
 estado e nada na árvore daquele ramo olhava para ele. Virou `FolhaDePerfil`,
 usada nos dois ramos.
+
+## O backup do Postgres não saía da máquina (27/08/2026)
+
+Ao preparar o bucket dos avatares, olhei o `backup-postgres.sh` e ele grava em
+`~/backups/fdp` na própria VPS e apaga o que passa de 14 dias. **Nada sai da
+máquina.**
+
+O backup em si é bom: roda todo dia às 06:00 UTC, o `pg_dump` acontece dentro do
+container, e a restauração foi exercitada de verdade em 26/08/2026. O que faltava
+era a cópia fora — e um backup no mesmo disco do banco protege contra `DROP
+TABLE` e contra mais nada. Disco perdido, máquina trocada ou provedor com
+problema levam os dois juntos, que é exatamente quando alguém vai procurá-lo.
+
+> Vale registrar o erro de leitura que eu mesmo cometi: repeti várias vezes
+> nesta sessão que "o Postgres tem backup e os avatares não". Estava incompleto.
+> O Postgres tinha **dump diário verificado**, que não é a mesma coisa que
+> **backup fora da máquina** — e a diferença só aparece no cenário em que o
+> backup importa.
+
+Agora `backup-postgres.sh` manda a cópia para o R2 quando `R2_BUCKET` está
+definido (RNF-021). Opcional como o SSO: sem as variáveis, o backup local roda
+igual e o script não falha.
+
+Três decisões que valem explicação:
+
+- **Falha no envio não derruba o backup local**, que já está gravado e conferido
+  — mas o script **sai com erro**, para o `com-alerta.sh` avisar. Um backup que
+  deixou de sair da máquina em silêncio é o pior dos dois mundos.
+- **Só o local é descartado por idade.** A retenção do que está no bucket vive
+  no R2, que é onde ela deve viver: apagar remoto a partir daqui exigiria listar
+  o bucket, e um erro nessa listagem apagaria o que se quer guardar.
+- **O envio confere o objeto com um `HEAD`**, e não só o `200` do `PUT`. Um
+  `200` diz que o servidor aceitou, não que o objeto está lá com o tamanho
+  certo — é a mesma distinção entre "o dump rodou" e "o dump abre", que este
+  projeto já aprendeu no `pg_restore --list`.
+
+O `enviar-para-r2.ts` **não** reusa `DepositoDeAvatares` de propósito: aquela
+interface valida o nome como `<sha256>.webp`, e afrouxar essa validação para
+caber um dump seria enfraquecer a defesa de um caminho para atender outro. O que
+os dois compartilham é a **assinatura**, que é a mesma provada contra S3 real no
+CI.
+
+Ele também recusa arquivo vazio (um `pg_dump` que falhou em silêncio) e arquivo
+acima de 4 GB (não faz multipart — mandar assim produziria um objeto truncado, e
+backup truncado é pior que backup nenhum porque parece que existe).
 
 ## O que fazer a seguir
 
