@@ -1,4 +1,4 @@
-import type { PlayerView, MatchOptions } from '@fdp/rules';
+import type { Card, PlayerView, MatchOptions } from '@fdp/rules';
 import type { ChatMessage, PublicPlayer, RoomStatus } from '@fdp/protocol';
 
 /** O retrato de `EV-001`, já projetado para quem está olhando. */
@@ -20,4 +20,4 @@ export interface Retrato {
   match: PlayerView | null;
 }
 
-export type { PlayerView, PublicPlayer, ChatMessage };
+export type { Card, PlayerView, PublicPlayer, ChatMessage };

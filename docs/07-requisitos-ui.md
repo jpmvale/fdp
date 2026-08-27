@@ -178,6 +178,7 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 | RF-086 | Em tela **larga** (≥ 900 px) o chat e o log vão para uma **lateral direita** grudada no topo; abaixo disso continuam empilhados no fim, como no celular |
 | RF-087 | A mensagem de quem assiste **NÃO DEVE** virar balão no feltro. Ela aparece só no chat, com a marca de RF-084 |
 | RF-088 | Com partida em curso, o cabeçalho **DEVE** mostrar quantos assistem, e revelar os nomes ao passar o mouse ou tocar |
+| RF-089 | O painel de quem assiste **DEVE** distinguir o que ainda está na mão do que já foi jogado, dizendo **em que mão** cada carta saiu |
 | RF-061 | Entrar com Google ou GitHub. Só provedor **configurado** vira botão: um botão que devolve 503 é pior que nenhum |
 | RF-062 | SSO com e-mail **verificado pelo provedor** assume a conta de senha, apaga a senha e derruba as sessões |
 | RF-063 | Entrar com senha numa conta assumida por SSO **DEVE** dizer o que houve — *"esta conta agora entra pelo Google"* —, nunca "senha inválida" |
@@ -207,6 +208,23 @@ cartas vale outra coisa. O número fica sempre visível porque é barato; os nom
 ficam sob demanda porque uma lista aberta o tempo todo rouba espaço de algo que
 quase nunca muda. Zero pessoas não vira "0 assistindo" — contador zerado
 permanente é ruído, e a ausência de plateia é o caso comum.
+
+RF-089 completa RJ-159, que sozinho respondia metade da pergunta. `allHands`
+traz só o que **resta** — o motor tira a carta da mão no instante em que ela é
+jogada —, e numa rodada de 6 cartas, na terceira mão, quem assiste está
+justamente tentando lembrar o que já saiu.
+
+As cartas jogadas **já chegavam** ao espectador, em `resolvedTricks` e
+`currentTrick`, que são públicos (RJ-066). Não faltava dado no servidor;
+faltava juntar os dois lados na tela. Montar isso no cliente, em vez de mandar
+a mão original do servidor, evita um campo novo na projeção — e campo novo na
+projeção é superfície nova por onde uma carta pode vazar para quem não devia
+vê-la.
+
+A distinção **não** é só opacidade: há separador e o número da mão em que cada
+carta saiu (`08` §2 — nunca só a cor, e "meio apagado" não diz o que a diferença
+significa). Sem o número, as jogadas viram um monte indistinto assim que passam
+de duas.
 
 RF-085 mostra informação que **já era pública** (`handCounts`, RJ-102) e não estava
 em lugar nenhum: quem quisesse saber quantas cartas restavam ao adversário tinha de

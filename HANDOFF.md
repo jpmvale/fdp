@@ -27,7 +27,7 @@ npm run build:client   # OBRIGATÓRIO antes do primeiro `npm start`
 npm run redis          # opcional, noutro terminal
 npm run minio          # opcional: o outro lado do depósito de avatares (R2)
 npm start              # http://localhost:3000
-npm test               # 567 testes (3 pulados: Redis, Postgres e R2 — só rodam com as env deles)
+npm test               # 571 testes (3 pulados: Redis, Postgres e R2 — só rodam com as env deles)
 npm run auditoria      # o que `docs/` promete e nenhum teste cobre
 npm run typecheck
 ```
@@ -818,7 +818,7 @@ O teste vive nos **dois** níveis: CA-406 na raiz, e CA-407 no sintoma — porqu
 foi pelo sintoma que ele apareceu, e é pelo sintoma que alguém vai reconhecê-lo
 se voltar.
 
-### Junto, duas do espectador na tela
+### Junto, três do espectador na tela
 
 **RF-087 — a mensagem de quem assiste não vira balão.** Não é moderação, é
 geometria: o balão sai de um assento, e quem assiste não tem assento. O dele ia
@@ -829,6 +829,22 @@ mais fala. A mensagem continua no chat, com a marca de RF-084.
 tocar. É a outra metade de RJ-159: quem joga precisa saber que há gente vendo
 todas as cartas sem ter de abrir o chat e reparar numa etiqueta. Fecha ao tocar
 fora e no Esc, porque no celular não existe tirar o mouse de cima.
+
+**RF-089 — o painel separa o que está na mão do que já foi jogado.** RJ-159
+respondia metade da pergunta: `allHands` traz só o que **resta**, porque o motor
+tira a carta da mão no instante em que ela é jogada. Numa rodada de 6 cartas, na
+terceira mão, quem assiste está justamente tentando lembrar o que saiu.
+
+As jogadas **já chegavam** ao espectador, em `resolvedTricks` e `currentTrick`,
+que são públicos (RJ-066). Não faltava dado no servidor — faltava juntar os dois
+lados. Montei no cliente (`app/src/plateia.ts`) em vez de mandar a mão original:
+um campo novo na projeção é superfície nova por onde uma carta pode vazar.
+
+A distinção não é só opacidade — há separador e o número da mão em que cada
+carta saiu. Sem o número, as jogadas viram um monte indistinto assim que passam
+de duas. E a dedupe por id de carta não é zelo: entre resolver a mão e recolhê-la
+(fase `RECOLHIMENTO`) a mesma vaza aparece nos dois lugares, e contada em dobro
+ela sugeriria uma carta que nunca existiu.
 
 ## O que fazer a seguir
 
