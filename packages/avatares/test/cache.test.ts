@@ -37,7 +37,7 @@ function espiao(base: DepositoDeAvatares): { deposito: DepositoDeAvatares; leitu
   };
 }
 
-describe('RNF-018: o cache evita a ida ao depósito', () => {
+describe('CA-405 / RNF-018: o cache evita a ida ao depósito', () => {
   it('o segundo pedido do mesmo avatar não toca o depósito', async () => {
     const { deposito, leituras } = espiao(await emDisco());
     const d = comCache(deposito);
@@ -71,7 +71,7 @@ describe('RNF-018: o cache evita a ida ao depósito', () => {
   });
 });
 
-describe('RNF-018: o teto é em bytes', () => {
+describe('CA-405 / RNF-018: o teto é em bytes', () => {
   it('passando do teto, o mais antigo sai', async () => {
     const d = comCache(await emDisco(), 10 * 1024);
     const nomes: string[] = [];

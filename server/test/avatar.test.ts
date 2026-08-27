@@ -164,6 +164,26 @@ describe('o caminho feliz', () => {
     }
   });
 
+  it('CA-404: o caminho devolvido é da NOSSA origem, nunca do fornecedor', async () => {
+    const r = await processarAvatar(await png(300, 300), { deposito });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+
+    /*
+     * O depósito pode virar um bucket sem que uma linha do cliente mude, e é
+     * esta asserção que segura essa promessa (RF-081). A alternativa — servir
+     * por URL assinada ou pelo domínio público do R2 — vazaria o fornecedor
+     * para dentro do HTML e pediria origem nova na CSP.
+     */
+    expect(r.caminho).toBe(`/avatares/${r.hash}.webp`);
+    expect(r.caminho.startsWith('/')).toBe(true);
+    expect(r.caminho).not.toMatch(/^https?:/);
+    expect(r.caminho).not.toContain('://');
+    // Nem rastro de assinatura: `X-Amz-*` num caminho seria URL pré-assinada.
+    expect(r.caminho.toLowerCase()).not.toContain('x-amz');
+    expect(r.caminho).not.toContain('?');
+  });
+
   it('CA-388: AVIF entra, que é o HEIF que este servidor sabe abrir', async () => {
     const avif = await sharp({ create: { width: 400, height: 300, channels: 3, background: '#3a7d44' } })
       .avif()

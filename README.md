@@ -29,7 +29,8 @@ packages/bot/        ✅  decisão dos bots, quatro dificuldades
 packages/store/      ✅  RoomStore: interface, memória e Redis — mesma suíte
 packages/contas/     ✅  contas, credenciais, SSO e histórico — memória e Postgres
 packages/protocol/   ✅  contrato cliente ↔ servidor + validação
-packages/room/       ✅  máquina de sala, timers, pausa, auto-play, bots
+packages/room/       ✅  máquina de sala, timers, pausa, auto-play, bots, host
+packages/avatares/   ✅  depósito das fotos: disco e R2 — mesma suíte, mais cache
 server/              ✅  HTTP + WebSocket, sessão assinada, limites, SIGTERM
 app/                 ✅  cliente Vite + React com o design system Nocturne
 ```
@@ -75,8 +76,9 @@ Requer Node 24+.
 npm install
 npm run build:client   # OBRIGATÓRIO antes do primeiro `npm start`
 npm start              # http://localhost:3000
-npm test               # 559 testes
+npm test               # 560 testes
 npm run typecheck
+npm run auditoria      # docs vs. testes: o que ninguém cobre
 ```
 
 O servidor serve o cliente de `app/build/`, que o Vite gera e o git não guarda: sem

@@ -94,8 +94,11 @@ existe caminho de código separado para "recuperar partida".
 | `room:resync` | `{}` | qualquer | Devolve `room:snapshot` |
 | `player:setProfile` | `{ nickname, avatar }` | qualquer, só em `LOBBY` | Atualiza perfil |
 | `player:leave` | `{}` | qualquer | Sai da sala |
+| `player:setSpectator` | `{ spectator }` | qualquer, **exceto bot**, só em `LOBBY` | Sai da mesa para assistir, ou senta-se (RF-083). Pedir o que já se é não emite evento |
 | `chat:send` | `{ text }` | qualquer presente, **exceto bot**, em qualquer status menos `ENCERRADA` | Publica a mensagem para a sala (RF-017) |
 | `host:kick` | `{ playerId }` | host, só em `LOBBY` | Remove jogador |
+| `host:addBot` | `{ difficulty }` | host, só em `LOBBY` | Senta um bot (RF-018). Teto de `maxBots` |
+| `host:removeBot` | `{ playerId }` | host, só em `LOBBY` | Tira um bot da mesa |
 | `host:setOptions` | `{ options }` | host, só em `LOBBY` | Ajusta opções da partida |
 | `host:startMatch` | `{}` | host, só em `LOBBY` | Inicia partida |
 | `host:endMatch` | `{}` | host, só em `EM_PARTIDA` | Encerra sem vencedor |
@@ -252,6 +255,11 @@ interface ErrorPayload { code: string; params?: Record<string, unknown>; }
 | ERR-409 | `SESSION_TAKEN` | Sessão assumida por outra aba | Exibir "aberto em outra aba" |
 | ERR-410 | `STALE_MOVE` | Jogada de rodada/partida já encerrada | Descartar silenciosamente |
 | ERR-426 | `PROTOCOL_VERSION` | `v` incompatível | Pedir recarregar a página |
+
+Motivos que acompanham `VALIDATION_FAILED` e `WRONG_STATUS` e valem nomear, por
+mandarem quem lê a lugares diferentes: `RAPIDO_DEMAIS` (RNF-016, espere um
+segundo), `BOT_NAO_ASSISTE` (bot joga ou sai, não assiste) e `SO_BOTS_NA_MESA`
+(só bots sentados, ninguém para jogar — ver CA-400).
 
 > **O `v` do cliente é `PROTOCOL_VERSION`, nunca um número escrito à mão.**
 >

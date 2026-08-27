@@ -32,8 +32,15 @@ interface ChatMessage {
   nickname: string;          // COPIADO no envio, ver abaixo
   text: string;              // 1–280 chars, já aparado — RNF-014
   at: number;                // epoch ms, do servidor
+  spectator: boolean;        // COPIADO no envio, como o nickname — RF-084
 }
 ```
+
+O `spectator` é copiado pela **mesma** razão do `nickname`, e não por simetria:
+espectador vira jogador na rodada seguinte (RF-014), e sem congelar isto o que
+alguém disse de fora passaria a parecer dito de dentro. Importa porque quem
+assiste vê a mão de todos (RJ-159) — "joga o 3 de paus" dito por quem está na
+mesa é palpite, dito por quem vê tudo é outra coisa.
 
 O `nickname` é **copiado** para dentro da mensagem em vez de resolvido pelo
 `playerId` na hora de exibir. Quem trocou de apelido no lobby, ou saiu da sala,

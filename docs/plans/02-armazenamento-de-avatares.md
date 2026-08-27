@@ -28,15 +28,16 @@ Isso não é hipótese: o volume já foi esquecido uma vez no desenho e entrou n
 O segundo motivo é que já usamos R2 nos outros serviços da VPS, então a decisão
 de fornecedor não está sendo tomada aqui — está sendo repetida.
 
-E o terceiro apareceu enquanto este plano era escrito: **o pipeline de avatar
-estava recusando toda foto de celular moderno**, e a razão era um número
-escolhido por suposição. Vale consertar a régua junto com a mudança de lugar.
+E o terceiro apareceu enquanto este plano era escrito: **o envio de avatar
+nunca tinha funcionado em produção**. A causa não era nada do pipeline — era o
+volume montado como `root` com o processo rodando como `node`. Ver §12.
 
 ## 2. O que já foi corrigido, e o que sobrou
 
-Três coisas quebravam o envio de avatar, e as três já estão consertadas —
-descritas aqui porque **são a evidência de que a régua deste subsistema foi
-escrita sem medição**, que é o que este plano quer corrigir de vez.
+Três coisas do pipeline estavam erradas e já estão consertadas. **Nenhuma delas
+era a causa** do envio não funcionar — essa era o volume, e está na §12. Ficam
+aqui porque são a evidência de que a régua deste subsistema foi escrita sem
+medição, que é o que este plano quer corrigir de vez.
 
 | O quê | Estava | Ficou |
 |---|---|---|
@@ -275,3 +276,44 @@ informação que interessa antes de copiar: se há avatar corrompido no volume, 
 para saber sem escrever um byte. Corrupção falha o script de propósito, mesmo
 com todo o resto tendo copiado — os íntegros já foram, e rodar de novo é
 inofensivo porque a migração é idempotente.
+
+
+---
+
+## 12. A causa que nenhuma medição do pipeline ia achar
+
+Depois de consertar o orçamento, o teto de bytes e o teto de pixels, o envio de
+avatar **continuava falhando em produção** — e continuava porque nenhum dos três
+era o problema.
+
+O `Dockerfile` tem `USER node`. O `docker-compose.prod.yml` monta um volume
+nomeado em `/var/lib/fdp/avatares`, um caminho que **não existia na imagem** —
+e o Docker cria caminho ausente como `root:root 0755`. O usuário `node` não
+escreve nele. Toda gravação morria com `EACCES`, desde o primeiro dia.
+
+**Este plano é o que tornou isso visível.** Antes dele, a gravação vivia dentro
+do `try` do processamento de imagem e o `catch` traduzia tudo para
+`FALHA_AO_PROCESSAR` — *"não consegui abrir essa imagem, ela pode estar
+corrompida"*. Quem enviava ia procurar defeito na própria foto. Separar
+`DEPOSITO_INDISPONIVEL` (§10, RF-082) foi feito por argumento de desenho, e o
+retorno veio no mesmo dia: a frase certa apareceu na tela e a causa ficou
+localizável em minutos.
+
+> Vale registrar porque é o argumento inteiro a favor de mensagens de erro que
+> distinguem *quem* falhou. Não é cortesia com o usuário: é o que decide se as
+> próximas horas de investigação vão para o arquivo dele ou para a nossa
+> infraestrutura. Três consertos reais e corretos foram feitos no lugar errado
+> antes disso.
+
+O conserto é `mkdir -p` + `chown -R node:node` antes de `USER node`, e o Docker
+semeia a dona do diretório da imagem num volume **vazio** — o que alcança o
+volume que já está na VPS, justamente porque nenhuma gravação jamais deu certo.
+Com conteúdo dentro não alcança, e aí é `chown` na mão (ver HANDOFF).
+
+E RNF-020: uma **sonda de escrita** na subida, que grava, lê, confere e apaga.
+O defeito esteve a um `touch` de distância de ser descoberto por semanas, e o
+que faltava era alguém dar o `touch`.
+
+Isto **não** enfraquece o plano: reforça a §1. Um subsistema cujo armazenamento
+nunca foi exercitado por nada além do caminho feliz de produção é exatamente o
+que fica anos quebrado sem ninguém saber — e as fotos continuam sem backup.

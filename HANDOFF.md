@@ -4,7 +4,7 @@ Estado do projeto para retomar depois.
 
 **O jogo está no ar, jogável, em <https://fdp.imp-software.cloud>.**
 
-Última sessão: 26/08/2026. O **plano 01 foi entregue inteiro** — contas por
+Última sessão: 27/08/2026. O **plano 01 foi entregue inteiro** — contas por
 e-mail e senha, SSO com Google e GitHub, histórico de partidas, perfil público
 e avatar por imagem, tudo no ar. Antes dele, na mesma leva: identidade única na
 mesa, a vaza acontecendo no centro com pausa para ver quem levou, balões saindo
@@ -25,9 +25,10 @@ recente é a última.
 npm install
 npm run build:client   # OBRIGATÓRIO antes do primeiro `npm start`
 npm run redis          # opcional, noutro terminal
-npm run minio          # opcional: o outro lado do depósito de avatares
+npm run minio          # opcional: o outro lado do depósito de avatares (R2)
 npm start              # http://localhost:3000
-npm test               # 559 testes (2 pulados: Redis e Postgres, que só rodam com as env deles)
+npm test               # 560 testes (3 pulados: Redis, Postgres e R2 — só rodam com as env deles)
+npm run auditoria      # o que `docs/` promete e nenhum teste cobre
 npm run typecheck
 ```
 
@@ -769,6 +770,21 @@ container e enviei a foto de 48 MP: gravou como `node:node`, serviu de volta, e
 o hash saiu **idêntico** ao produzido no macOS — o `sharp` do Alpine/musl dá o
 mesmo byte, que era a única incerteza que restava sobre o teto de pixels.
 
+### Antes de dizer "a documentação está em dia"
+
+`npm run auditoria` mede a distância entre os critérios de `docs/10` e os testes
+que citam cada ID. Existe porque essa frase foi dita de memória mais de uma vez
+neste projeto, e de memória ela é sempre otimista.
+
+Nesta sessão a auditoria pegou seis coisas que eu teria jurado estarem certas:
+`player:setSpectator`, `host:addBot` e `host:removeBot` **não estavam na tabela
+de comandos de `05`**; `ChatMessage.spectator` não estava em `04`; e RF-081 e
+RNF-018 tinham sido escritos sem nenhum critério que os citasse.
+
+O script **não** falha o build. A dívida é grande demais para virar portão da
+noite para o dia, e um portão que dói demais é um portão que alguém desliga. Ele
+serve para o número ser lido, não lembrado.
+
 ## O que fazer a seguir
 
 O [plano 01](docs/plans/01-contas-perfis-e-historico.md) **está entregue** (F1–F5, 26/08/2026).
@@ -783,7 +799,8 @@ quase todo o trabalho restante.
 
 | O quê | Onde | Por que importa |
 |---|---|---|
-| **Nenhuma suíte E2E existe** | `11` §8 previa Playwright; não há `test/e2e/` nem a dependência | 17 dos 207 critérios são de nível `E`. Ninguém os executa hoje, e o gate do M4 exige 100% dos `CA` de v1 passando. **É a dívida mais cara do projeto**: três bugs graves foram achados jogando e nenhum por teste — INV-05 (sala travada), a pausa de fim de vaza, e o `v: 1` que derrubou o jogo inteiro em produção. Os três eram invisíveis para 500 testes unitários verdes |
+| **Nenhuma suíte E2E existe** | `11` §8 previa Playwright; não há `test/e2e/` nem a dependência | 19 critérios de nível `E` não são executados por ninguém, e o gate do M4 exige 100% dos `CA` de v1 passando. **É a dívida mais cara do projeto**: quatro bugs graves foram achados jogando ou por relato, nenhum por teste — INV-05 (sala travada), a pausa de fim de vaza, o `v: 1` que derrubou o jogo inteiro, e o volume `root` que impediu todo envio de avatar desde sempre |
+| **32 critérios sem teste, e nenhum deles é E2E** | `npm run auditoria` | RNF-102 diz que requisito sem teste que cite seu ID é requisito **não entregue**. São 24 `U`, 7 `I` e 1 `CI` — coisas que dava para testar e não se testou. Muitos são de desempenho (CA-160 a CA-164, que dependem do teste de carga) e de a11y manual, mas não todos |
 | **Nenhum teste de carga** | RNF-060: 500 salas, 2.000 sockets | Junto vão CA-160 a CA-164 (desempenho). Nada disso foi medido contra a VPS |
 | **Auditoria de segurança** | `09` §3.1 | A tabela de ameaças nunca foi percorrida em bloco |
 | **Os dois testes manuais de a11y** | `08` §5 — CA-141 (teclado) e CA-142 (leitor de tela) | São manuais por natureza e obrigatórios para o M4 |
