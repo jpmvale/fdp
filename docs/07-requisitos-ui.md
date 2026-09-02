@@ -200,6 +200,7 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 | RF-104 | Abandonar ranqueada custa o último lugar mais punição fixa, e o custo **DEVE** estar na tela **antes** de entrar na fila |
 | RF-105 | O perfil público mostra faixa e pontos; não há listagem nem classificação global |
 | RF-106 | Qualquer pessoa **PODE** esconder as mensagens de outra **para si**, sem passar pelo servidor e sem que a outra saiba |
+| RF-107 | O convite **DEVE** ser `/{origem}/j/{código}` e chegar nas conversas como cartão: título, descrição com a contagem da mesa e imagem. O formato antigo `?sala=` continua entrando |
 
 RF-086 abre a casca de 460 px para 900 **só na mesa**, e é a única tela onde isso
 acontece. Em qualquer outra, a coluna continua estreita mesmo num monitor de 27" —
@@ -278,6 +279,18 @@ autoridade social real — quem criou a mesa e convidou os outros. Entre estranh
 dar a um deles o botão de expulsar os outros quatro é entregar a partida a quem clicar primeiro.
 A consequência é RF-102: a decisão de pausa precisa de um host, então a ausência passa a
 resolver-se sozinha, pelo mesmo mecanismo do RF-096.
+
+**Por que o convite virou cartão (RF-107).** O convite é *como* se entra no FDP — a home diz
+"quem receber o link entra direto" —, e ele chegava nos grupos como uma URL crua. URL crua num
+grupo de amigos parece spam: o gesto mais importante do produto estava chegando sem cara nenhuma.
+
+Só **contagem** no cartão, nunca apelido. Quem busca essa página é um robô de pré-visualização, e o
+que ele traz aparece para qualquer um que veja a mensagem encaminhada adiante — inclusive fora do
+grupo. Contagem já é pública em `GET /api/rooms/:code`; nome de quem está jogando não é.
+
+E o `?sala=` antigo continua entrando. Links já foram mandados em conversas que ninguém vai voltar
+para corrigir, e link de convite que morre é a pior coisa que este jogo pode fazer com quem o
+divulgou.
 
 **Por que a punição do abandono é destruída, e não redistribuída (RF-104).** Uma mesa com abandono
 deixa de ser soma zero de propósito. Se os pontos caíssem no colo de quem ficou, a mesa passaria a

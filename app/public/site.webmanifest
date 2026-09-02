@@ -1,0 +1,14 @@
+{
+  "name": "FDP",
+  "short_name": "FDP",
+  "description": "Jogo de vazas, aposta e blefe. De 2 a 8 pessoas, direto no navegador.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080b14",
+  "theme_color": "#080b14",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/icone.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

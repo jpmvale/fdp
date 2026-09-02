@@ -5,6 +5,31 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#080b14">
 <title>FDP</title>
+<meta name="description" content="Jogo de vazas, aposta e blefe. De 2 a 8 pessoas, direto no navegador — sem conta, sem instalar nada.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icone.png">
+<link rel="manifest" href="/site.webmanifest">
+
+<!--
+  O cartão do link compartilhado.
+
+  Estas quatro linhas são o que o WhatsApp, o Telegram e o Discord mostram
+  quando alguém cola o convite — e o convite é COMO se entra no FDP. Sem elas o
+  link aparece como uma URL crua, e uma URL crua num grupo de amigos parece
+  spam: o que o jogo tem de mais importante é justamente o gesto de mandar o
+  link, e ele estava chegando sem cara nenhuma.
+
+  O servidor SOBRESCREVE `og:title` e `og:description` em `/j/{código}`, para o
+  cartão dizer que a mesa é de verdade e quantos já estão nela. Estes aqui são o
+  que vale na home e em qualquer outra rota.
+-->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FDP">
+<meta property="og:title" content="FDP">
+<meta property="og:description" content="Jogo de vazas, aposta e blefe. De 2 a 8 pessoas, direto no navegador — sem conta, sem instalar nada.">
+<meta property="og:image" content="/og.png">
+<meta property="og:locale" content="pt_BR">
+<meta name="twitter:card" content="summary_large_image">
 </head>
 <body>
 <div id="raiz"></div>

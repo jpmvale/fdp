@@ -119,6 +119,21 @@ mais grave do produto é justamente o mais silencioso.
 | RNF-102 | Todo `RF-*`, `RNF-*` e `RJ-*` referenciado por ao menos um teste que cite seu ID |
 | RNF-103 | Tipagem estrita, sem `any` na fronteira de dados |
 | RNF-104 | Contrato de `05` gerado a partir de uma fonte única de tipos, compartilhada entre cliente e servidor |
+| RNF-106 | Fase de plano **NÃO É** concluída sem um teste que cite, por ID, o critério do gate de saída dela |
+
+RNF-106 é o RNF-102 aplicado às **fases dos planos**, e existe porque a falha aconteceu: a F4 do
+plano 03 foi declarada concluída em 02/09/2026 citando um gate — *"uma partida ranqueada completa,
+com um abandono, do socket da fila até o número mudando nos dois perfis"* — que não tinha sido
+executado. Quando ele foi, encontrou uma regra de produto inteira que não acontecia: a punição por
+abandono nunca era aplicada, porque duas decisões corretas se atropelaram no vão entre elas.
+
+Não é sobre disciplina. É que o gate de uma fase é quase sempre uma **emenda** — o ponto em que
+duas partes já testadas se encontram —, e emenda é onde este projeto erra: o `v: 1` fixo no hub, o
+`isPresent` que deixava o expulso voltar, e agora a punição inerte. Os dois lados sempre estavam
+certos.
+
+Na prática: o gate vira um `CA` em `10`, e a fase só fecha quando `npm run auditoria` para de
+listar esse `CA` como descoberto.
 
 RNF-100 é o que torna possível testar regras em milissegundos e reproduzir qualquer bug a
 partir de `(seed, jogadas[])`. Injetar tempo e aleatoriedade é o que separa um jogo testável

@@ -304,3 +304,78 @@ describe('RNF-005 / RNF-078: cabeçalhos de segurança', () => {
     expect(outra.headers.get('access-control-allow-origin')).toBeNull();
   });
 });
+
+/**
+ * O cartão do link compartilhado (RF-107). CA-433.
+ *
+ * O convite é COMO se entra no FDP, e chegava nos grupos como uma URL crua —
+ * que num grupo de amigos parece spam.
+ */
+describe('CA-433: o cartão do convite', () => {
+  const meta = (html: string, chave: string): string | null =>
+    new RegExp(`<meta property="${chave}" content="([^"]*)">`).exec(html)?.[1] ?? null;
+
+  it('`/j/CÓDIGO` de sala viva diz que a mesa existe e quantos estão nela', async () => {
+    const { body } = await criar('Ana');
+    const html = await (await app.request(`/j/${body.roomCode!}`)).text();
+
+    expect(meta(html, 'og:title')).toBe(`Entre na mesa ${body.roomCode!} — FDP`);
+    expect(meta(html, 'og:description')).toContain('1 de 8 na mesa');
+    expect(html).toContain(`<title>Entre na mesa ${body.roomCode!} — FDP</title>`);
+  });
+
+  it('NUNCA sai apelido no cartão — o robô entrega isso a quem receber o encaminhado', async () => {
+    const { body } = await criar('Ana');
+    const html = await (await app.request(`/j/${body.roomCode!}`)).text();
+    // Contagem já é pública em `GET /api/rooms/:code`; nome de quem joga não é.
+    expect(html).not.toContain('Ana');
+  });
+
+  it('sala que não existe manda criar a sua, em vez de mentir que existe', async () => {
+    const html = await (await app.request('/j/ZZZZZ')).text();
+    expect(meta(html, 'og:title')).toBe('FDP');
+    expect(meta(html, 'og:description')).toContain('não existe mais');
+  });
+
+  it('código inválido não quebra a página — ela abre como a home', async () => {
+    const html = await (await app.request('/j/nao-e-um-codigo')).text();
+    expect(meta(html, 'og:title')).toBe('FDP');
+    expect(html).toContain('id="raiz"');
+  });
+
+  it('a home mantém o cartão padrão, e há UMA meta de cada', async () => {
+    const html = await (await app.request('/')).text();
+    expect(meta(html, 'og:title')).toBe('FDP');
+    // Duas `og:description` fariam cada leitor escolher uma, e eles não
+    // escolhem a mesma: o cartão sairia diferente no WhatsApp e no Telegram.
+    expect(html.match(/<meta property="og:description"/g)).toHaveLength(1);
+  });
+
+  it('`og:image` sai ABSOLUTA — relativa chega ao robô como nada', async () => {
+    const html = await (await app.request('/')).text();
+    // O WhatsApp busca a imagem de fora do contexto da página: não há "mesma
+    // origem" para resolver um caminho relativo contra. O cartão sairia sem
+    // figura, e sem erro nenhum para alguém notar.
+    const imagem = meta(html, 'og:image')!;
+    expect(() => new URL(imagem)).not.toThrow();
+    expect(imagem).toMatch(/^https?:\/\/.+\/og\.png$/);
+  });
+
+  it('o ícone e o manifesto são servidos da raiz', async () => {
+    const icone = await app.request('/favicon.svg');
+    expect(icone.status).toBe(200);
+    expect(icone.headers.get('content-type')).toContain('image/svg+xml');
+
+    const manifesto = await app.request('/site.webmanifest');
+    expect(manifesto.status).toBe(200);
+  });
+
+  it('a raiz é lista fechada: nada além dela é servido de lá', async () => {
+    // `/assets/` pode ser aberto porque todo nome ali tem hash do conteúdo.
+    // A raiz não tem essa garantia, e servi-la por prefixo faria qualquer
+    // arquivo que caísse no build virar público sem ninguém decidir isso.
+    const html = await (await app.request('/index.html')).text();
+    expect(html).toContain('id="raiz"');
+    expect(html).not.toContain('<!doctype html>\n<!doctype html>');
+  });
+});

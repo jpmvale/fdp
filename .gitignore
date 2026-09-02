@@ -23,3 +23,8 @@ app/src/*.d.ts
 # de design/Main.dc.html, que é a fonte. Versionar o gerado convida alguém a
 # editá-lo por engano — e a edição se perde na próxima publicação.
 design/*-nocturne.html
+
+# Playwright: rastros, vídeos e capturas do que falhou. Reproduzíveis rodando
+# de novo, e pesados demais para versionar.
+/test-results/
+/playwright-report/

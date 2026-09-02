@@ -8,6 +8,7 @@ import { frase } from './net/mensagens';
 import { quemSouEu, sairDaConta, salvarPerfilDaConta } from './net/sessao';
 import { jogadaAutomatica } from './jogada';
 import { alternarMudo, gravarMudos, lerMudos, limparOutrasSalas } from './mudos';
+import { codigoDoConvite } from './convite';
 import { carregarPreferenciaDeSom, despertarSomNoPrimeiroGesto } from './som';
 import { useEstado, definir, ler, avisar, errar } from './state/loja';
 import type { Retrato } from './state/tipos';
@@ -290,7 +291,7 @@ export function App() {
 
         {estado.tela === 'home' && (
           <Home
-            codigoInicial={new URLSearchParams(location.search).get('sala') ?? ''}
+            codigoInicial={codigoDoConvite(location)}
             aoAbrirRegras={() => setRegrasAbertas(true)}
             conta={estado.conta}
             aoAbrirConta={() => setConta({ tela: 'entrar' })}

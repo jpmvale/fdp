@@ -416,8 +416,40 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
     }
   });
 
+  /**
+   * Os ativos da RAIZ: ícone, manifesto, imagem do cartão de link.
+   *
+   * Lista fechada, e não um diretório inteiro servido. `/assets/` pode ser
+   * aberto porque todo nome ali tem hash do conteúdo — nada entra sem passar
+   * pelo build. A raiz não tem essa garantia, e servi-la por prefixo faria
+   * qualquer arquivo que caísse em `app/build/` virar público sem ninguém
+   * decidir isso.
+   *
+   * Sem hash no nome, então sem cache imutável: um dia estes arquivos mudam, e
+   * ícone errado preso no navegador de todo mundo por um ano é caro demais para
+   * o que se economiza.
+   */
+  const RAIZ_PUBLICA = new Set([
+    '/favicon.svg', '/favicon.ico', '/icone.png', '/og.png',
+    '/apple-touch-icon.png', '/site.webmanifest', '/robots.txt',
+  ]);
+
   app.get('*', (c) => {
     const caminho = new URL(c.req.url).pathname;
+
+    if (RAIZ_PUBLICA.has(caminho)) {
+      try {
+        return c.body(readFileSync(caminhoDe(clientPath, caminho)), 200, {
+          'content-type': TIPOS[extname(caminho)] ?? 'application/octet-stream',
+          'cache-control': 'public, max-age=3600',
+        });
+      } catch {
+        // Ativo declarado e ausente é o caso de `og.png` antes de alguém pôr a
+        // imagem lá. Um 404 aqui é a resposta certa: o cartão do link fica sem
+        // figura, e o resto do jogo não sente nada.
+        return c.notFound();
+      }
+    }
 
     // Ativos com hash no nome: imutáveis por definição, e o navegador pode
     // guardá-los para sempre. `..` fica de fora — o cliente escolhe o caminho,
@@ -438,10 +470,89 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
     const nonce = c.get('nonce' as never) as unknown as string;
     // O nonce entra nos scripts do build também: sem ele o CSP recusa o
     // bundle, e a tela fica branca sem erro visível no servidor.
-    const html = readFileSync(caminhoDe(clientPath, 'index.html'), 'utf8')
+    let html = readFileSync(caminhoDe(clientPath, 'index.html'), 'utf8')
       .replaceAll('<script type="module"', `<script type="module" nonce="${nonce}"`);
+
+    /**
+     * `og:image` precisa ser ABSOLUTA.
+     *
+     * O WhatsApp, o Telegram e o Discord buscam a imagem de fora do contexto da
+     * página — não há "mesma origem" para resolver um caminho relativo contra.
+     * `/og.png` no HTML fica bonito e chega ao robô como nada: o cartão sai sem
+     * figura, e sem erro nenhum para alguém notar.
+     *
+     * A origem vem do pedido, e não de configuração: o mesmo binário responde
+     * em `localhost` no desenvolvimento e no domínio em produção, e uma origem
+     * fixa acertaria um dos dois.
+     */
+    const origem = new URL(c.req.url).origin;
+    html = trocarMeta(html, 'og:image', `${origem}/og.png`);
+
+    /**
+     * O cartão do convite (RF-107).
+     *
+     * O convite é COMO se entra no FDP, e ele chegava nos grupos como uma URL
+     * crua — que num grupo de amigos parece spam. Aqui o cartão passa a dizer
+     * que a mesa é de verdade e quantos já estão nela.
+     *
+     * Só CONTAGEM, nunca apelido. Quem busca esta página é um robô de
+     * pré-visualização, e o que ele traz aparece para qualquer um que veja a
+     * mensagem encaminhada adiante — inclusive fora do grupo. Contagem já é
+     * pública em `GET /api/rooms/:code`; nome de quem está jogando não é.
+     */
+    const convite = /^\/j\/([^/]+)$/.exec(caminho);
+    if (convite) {
+      const alvo = roomCodeSchema.safeParse(convite[1]);
+      const sala = alvo.success ? hub.get(alvo.data) : undefined;
+      const viva = sala && sala.status !== 'ENCERRADA' ? sala : undefined;
+
+      const titulo = viva ? `Entre na mesa ${viva.code} — FDP` : 'FDP';
+      const descricao = viva
+        ? `${String(seatedPlayers(viva).length)} de ${String(LIMITS.maxPlayers)} na mesa. ` +
+          'Toque para entrar — sem conta, sem instalar nada.'
+        : 'Esta mesa não existe mais. Toque para criar a sua.';
+
+      html = trocarMeta(html, 'og:title', titulo);
+      html = trocarMeta(html, 'og:description', descricao);
+      html = trocarMeta(html, 'description', descricao, 'name');
+      html = html.replace('<title>FDP</title>', `<title>${escapar(titulo)}</title>`);
+    }
+
     return c.html(html);
   });
 
   return app;
+}
+
+/**
+ * Escapa para dentro de um atributo HTML.
+ *
+ * O código da sala já passou por `roomCodeSchema` e é um alfabeto fechado, e
+ * mesmo assim isto existe: o dia em que a descrição passar a incluir qualquer
+ * coisa vinda de fora, a defesa já está no lugar. Escapar depois é a ordem em
+ * que se esquece.
+ */
+function escapar(texto: string): string {
+  return texto
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
+/**
+ * Troca o `content` de uma meta que JÁ existe no `index.html`.
+ *
+ * Trocar em vez de acrescentar: duas `og:description` na mesma página fazem
+ * cada leitor escolher uma, e os leitores não escolhem a mesma — o cartão sairia
+ * diferente no WhatsApp e no Telegram, a partir do mesmo HTML.
+ */
+function trocarMeta(
+  html: string,
+  chave: string,
+  valor: string,
+  atributo: 'property' | 'name' = 'property',
+): string {
+  const alvo = new RegExp(`<meta ${atributo}="${chave}" content="[^"]*">`);
+  return html.replace(alvo, `<meta ${atributo}="${chave}" content="${escapar(valor)}">`);
 }

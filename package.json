@@ -15,9 +15,12 @@
     "redis": "docker run --rm -p 6379:6379 --name fdp-redis redis:7-alpine",
     "minio": "docker run --rm -p 9100:9000 --name fdp-minio -e MINIO_ROOT_USER=fdpteste -e MINIO_ROOT_PASSWORD=fdptestesenha minio/minio server /data",
     "dev:client": "vite --config app/vite.config.ts",
-    "build:client": "vite build --config app/vite.config.ts"
+    "build:client": "vite build --config app/vite.config.ts",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "^22.10.5",
     "@types/pg": "^8.23.1",
     "@types/react": "^19.2.18",

@@ -493,6 +493,8 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-429 | E | RF-105 | **Dado** o perfil público, **então** conta com ranqueada mostra faixa e pontos, e conta sem ranqueada não mostra a seção |
 | CA-430 | U | RF-106 | **Dado** a lista local de escondidos, **então** ela é por sala, sobrevive a recarregar, lê lixo como lista vazia, e um armazenamento que lança — ou que não existe — não quebra nada |
 | CA-431 | I | RF-098, RF-102, RF-103, RF-104 | **Dado** quatro contas na fila ranqueada, **quando** a mesa se forma, uma pessoa abandona e a partida é jogada até o fim, **então** os quatro perfis mostram elo; quem abandonou leva `−K − 25` e a marca de abandono; cada sobrevivente leva exatamente o que a colocação dele daria, sem lucrar com a saída alheia; e a mesma partida numa fila normal não mexe em elo nenhum |
+| CA-432 | U | RF-107 | **Dado** um link no formato antigo `?sala=`, **então** ele continua preenchendo o código — link de convite já mandado não morre |
+| CA-433 | I | RF-107 | **Dado** `/j/{código}` de sala viva, **então** o HTML traz título e descrição próprios com a contagem da mesa e **nenhum apelido**; sala inexistente convida a criar a sua; e há uma só meta de cada |
 
 CA-356 mede o defeito que consertou: a barra normalizava pelo prazo da aposta em todos os
 casos, então a vez de jogar carta nascia em 67% e a de um bot em 2%.

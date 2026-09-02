@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { LIMITS, type BotDifficulty } from '@fdp/protocol';
 import { CartaoJogador } from '../components/CartaoJogador';
 import { Chat } from '../components/Chat';
+import { linkDoConvite } from '../convite';
 import type { Retrato } from '../state/tipos';
 
 /** Só as que hoje jogam diferente. As outras duas ainda não existem. */
@@ -49,17 +50,30 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
   const euPronto = jogadores.find((p) => p.id === eu)?.pronto ?? false;
   const faltamProntos = jogadores.filter((p) => !p.pronto);
   const todosProntos = faltamProntos.length === 0;
-  const convite = `${location.origin}/?sala=${retrato.code}`;
+  // `/j/CÓDIGO` e não `?sala=`: é o formato que o servidor reconhece para
+  // escrever o cartão do link (RF-107), e é mais curto de ler em voz alta.
+  // O formato antigo continua entrando — ver `convite.ts`.
+  const convite = linkDoConvite(location.origin, retrato.code);
 
   return (
     <div className="pilha">
       <div className="cartao pilha" style={{ gap: 10 }}>
         <span className="rotulo">código da sala</span>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <span style={{
-            fontFamily: 'ui-monospace, monospace', fontSize: 32, fontWeight: 700,
-            letterSpacing: 6, color: 'var(--acento-claro)',
-          }}>
+          {/* `data-codigo` é para a suíte E2E.
+
+              Um atributo a mais no HTML, e é mais barato que a alternativa: o
+              E2E teria de achar o código por classe de estilo ou por posição, e
+              nas duas o teste quebraria no dia em que alguém mexesse no
+              espaçamento — falhando por um motivo que não tem nada a ver com o
+              que ele verifica. */}
+          <span
+            data-codigo={retrato.code}
+            style={{
+              fontFamily: 'ui-monospace, monospace', fontSize: 32, fontWeight: 700,
+              letterSpacing: 6, color: 'var(--acento-claro)',
+            }}
+          >
             {retrato.code}
           </span>
           <button

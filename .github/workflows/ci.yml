@@ -159,6 +159,40 @@ jobs:
           fi
           echo "fronteira preservada"
 
+      # A auditoria de `docs/` roda no CI por causa do RNF-106, e SÓ por causa
+      # dele: a dívida do RNF-102 é reportada e não falha (é grande demais para
+      # virar portão da noite para o dia), mas fase de plano marcada como
+      # concluída sem o teste do gate dela falha o build. A regra nasceu com
+      # dívida zero, e um portão só fica fechado se for fechado desde o
+      # primeiro dia.
+      - name: Gates de fase (RNF-106)
+        run: npm run auditoria
+
+      # A suíte E2E: os critérios `E` de `10`, que só existem num navegador de
+      # verdade — duas abas vendo a mesma sala, a área de transferência, o link
+      # de convite. Roda depois dos unitários de propósito: quando os dois
+      # quebram juntos, o unitário diz onde, e o E2E só diria que "não
+      # funcionou".
+      #
+      # `--with-deps` porque o runner do GitHub não traz as bibliotecas de
+      # sistema que o Chromium precisa; sem elas o navegador nem abre.
+      - name: Navegador do E2E
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E
+        run: npm run e2e
+        env:
+          CI: 'true'
+          DATABASE_URL: postgres://postgres:fdp@127.0.0.1:5432/postgres
+
+      - name: Guardar o rastro do E2E que falhou
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rastro-e2e
+          path: test-results/
+          retention-days: 7
+
       # RJ-140: tempo e aleatoriedade entram por parâmetro, nunca do ambiente.
       - name: Pureza do motor de regras
         run: |
