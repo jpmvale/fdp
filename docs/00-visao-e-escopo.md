@@ -68,9 +68,9 @@ O produto vive ou morre por três atributos, nesta ordem de prioridade:
 Registrado explicitamente para não haver ambiguidade — **não implementar**:
 
 - ~~Contas, login, senha, OAuth ou perfil persistente entre sessões.~~ — entraram no escopo em 26/08/2026, ver a decisão **P11** e o [plano 01](./plans/01-contas-perfis-e-historico.md). Continua fora o que seria **obrigação**: nada do jogo pode exigir conta, e entrar por link sem cadastro segue sendo o caminho principal.
-- Matchmaking público, salas abertas ou lista de partidas.
+- ~~Matchmaking público, salas abertas ou lista de partidas.~~ — entrou no escopo em 02/09/2026 como **filas** (normal e ranqueada), ver a decisão **P12** e o [plano 03](./plans/03-filas-e-ranqueada.md). Continua fora: lista de salas abertas para entrar e sair, e qualquer coisa que faça da fila o caminho principal — entrar por link sem conta segue sendo.
 - Chat de **voz**. (O grupo já está em chamada ou na mesma sala.) O chat de **texto** entrou no escopo em 25/08/2026 — ver RF-017 e a decisão P9.
-- Ranking global, conquistas, progressão, moeda ou cosméticos.
+- Ranking global, conquistas, progressão, moeda ou cosméticos. — **elo por colocação** nas partidas ranqueadas entrou em 02/09/2026 (P12, [plano 03](./plans/03-filas-e-ranqueada.md)), visível no perfil de quem tem o link. O resto da linha continua valendo, e a **tabela de classificação global continua fora**: elo aqui responde "quanto eu jogo bem", não "quem é o melhor".
 - ~~Bots~~ — entraram no escopo em 25/08/2026, ver RF-018 e a decisão P10. Fora continua o que seria **IA de verdade**: nada de modelo de linguagem decidindo jogada.
 - Modo local pass-and-play no mesmo dispositivo.
 - Aplicativo nativo, PWA instalável ou modo offline.
@@ -99,6 +99,7 @@ completar mesa, e persistência de histórico de partidas.
 | P9 | Chat de texto entra na v1 (decisão de 25/08/2026, revertendo a exclusão original) | RF-017; contrato em `05`, critérios em `10` §4.9; na Mesa não pode roubar altura das cartas nem do cartão de adversário (`07`) |
 | P10 | Bots entram na v1, com dificuldade declarada (decisão de 25/08/2026) | RF-018; decisão em `packages/bot`, pura e determinística, alimentada pela MESMA projeção de um humano |
 | P11 | Contas entram na v1 — SSO e e-mail/senha —, com perfil público, histórico persistente e avatar por imagem (decisão de 26/08/2026, revertendo a exclusão original) | [Plano 01](./plans/01-contas-perfis-e-historico.md). **Conta é acréscimo, nunca pedágio**: jogar sem conta continua inteiro (§4.2). Persistência em Postgres, separada do Redis das salas; o motor de regras não aprende o que é conta |
+| P12 | Filas públicas entram na v1 — normal e ranqueada —, com elo por colocação (decisão de 02/09/2026, revertendo duas exclusões) | [Plano 03](./plans/03-filas-e-ranqueada.md). A fila é **mais um** caminho, nunca o caminho: só a ranqueada exige conta. Sala de fila não tem host com poderes, e ausência nela vira bot sozinha (RF-096). O motor de regras não aprende o que é elo |
 
 ## 6. Riscos
 
