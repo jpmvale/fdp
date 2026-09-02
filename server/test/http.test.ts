@@ -361,6 +361,16 @@ describe('CA-433: o cartão do convite', () => {
     expect(imagem).toMatch(/^https?:\/\/.+\/og\.png$/);
   });
 
+  it('atrás do proxy a origem é a que o NAVEGADOR vê, não a interna', async () => {
+    // Em produção o Caddy termina o TLS e fala HTTP com o app. Sem isto o
+    // cartão aponta para `http://…/og.png` — defeito que ninguém vê, porque a
+    // única vítima é um robô de pré-visualização. Foi ao ar assim uma vez.
+    const html = await (await app.request('/', {
+      headers: { host: 'fdp.exemplo.com', 'x-forwarded-proto': 'https' },
+    })).text();
+    expect(meta(html, 'og:image')).toBe('https://fdp.exemplo.com/og.png');
+  });
+
   it('o ícone e o manifesto são servidos da raiz', async () => {
     const icone = await app.request('/favicon.svg');
     expect(icone.status).toBe(200);

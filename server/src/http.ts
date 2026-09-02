@@ -107,11 +107,26 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
     return c.env.incoming.socket.remoteAddress ?? 'desconhecido';
   };
 
-  const wsUrl = (c: { req: { header(name: string): string | undefined } }, code: string): string => {
+  /**
+   * A origem que o navegador vê — que não é a que este processo vê.
+   *
+   * Em produção o Caddy termina o TLS e fala HTTP com o app, então
+   * `c.req.url` diz `http://` e o host interno. Isso já era tratado no
+   * `wsUrl`, e não estava no `og:image`: o cartão do link saiu para produção
+   * apontando para `http://…/og.png`, que é o tipo de defeito que ninguém vê
+   * porque a única vítima é um robô de pré-visualização.
+   *
+   * Agora é um lugar só. Duas derivações da mesma origem é o desenho que
+   * garante que um dia elas discordem — e foi o que aconteceu.
+   */
+  const origemPublica = (c: { req: { header(name: string): string | undefined } }): string => {
     const host = c.req.header('host') ?? 'localhost';
-    const secure = (c.req.header('x-forwarded-proto') ?? '').split(',')[0]?.trim() === 'https';
-    return `${secure ? 'wss' : 'ws'}://${host}/api/rooms/${code}/ws`;
+    const proto = (c.req.header('x-forwarded-proto') ?? '').split(',')[0]?.trim();
+    return `${proto === 'https' ? 'https' : 'http'}://${host}`;
   };
+
+  const wsUrl = (c: { req: { header(name: string): string | undefined } }, code: string): string =>
+    `${origemPublica(c).replace(/^http/, 'ws')}/api/rooms/${code}/ws`;
 
   // RNF-005: cabeçalhos de segurança em toda resposta.
   app.use('*', async (c, next) => {
@@ -485,8 +500,7 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
      * em `localhost` no desenvolvimento e no domínio em produção, e uma origem
      * fixa acertaria um dos dois.
      */
-    const origem = new URL(c.req.url).origin;
-    html = trocarMeta(html, 'og:image', `${origem}/og.png`);
+    html = trocarMeta(html, 'og:image', `${origemPublica(c)}/og.png`);
 
     /**
      * O cartão do convite (RF-107).
