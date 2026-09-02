@@ -8,6 +8,7 @@ import {
   AVATAR_COLORS,
   AVATAR_EMOJIS,
   LIMITS,
+  NICKNAME_MAX,
   type BotDifficulty,
   type ChatMessage,
   type Command,
@@ -30,6 +31,7 @@ import {
   isAbsent,
   isOnline,
   isPresent,
+  foiExpulso,
   toPublicPlayer,
   type Emission,
   type JoinParams,
@@ -120,6 +122,7 @@ function newPlayer(params: JoinParams, now: number, isSpectator: boolean): RoomP
     emSegundoPlano: false,
     pronto: false,
     silenciado: false,
+    expulsoEm: null,
     lastChatAt: null,
     bot: null,
     conta: params.conta ?? null,
@@ -174,6 +177,7 @@ function newBot(
     // "desse pronto" por cada bot seria cerimônia sem decisão.
     pronto: true,
     silenciado: false,
+    expulsoEm: null,
     bot: { difficulty },
     // Bot nunca tem conta. Não é descuido: é o que impede uma mesa só de bots
     // de fazer uma partida entrar no histórico de alguém (RF-068).
@@ -243,6 +247,9 @@ export function reconnect(room: Room, playerId: PlayerId, ctx: RoomCtx): RoomRes
   const player = room.players.find((p) => p.id === playerId);
   if (!player) return failWith('VALIDATION_FAILED', 'JOGADOR_DESCONHECIDO');
   if (!isPresent(player)) return failWith('WRONG_STATUS', 'JOGADOR_SAIU');
+  // RF-096: o assento pode estar presente e jogando, e mesmo assim ser proibido
+  // para quem tem este token — porque quem tem este token foi expulso dele.
+  if (foiExpulso(player)) return failWith('WRONG_STATUS', 'EXPULSO');
 
   const wasAbsent = isAbsent(player);
   const players = replace(room.players, playerId, {
@@ -660,14 +667,32 @@ export function applyCommand(
     }
 
     case 'host:kick': {
-      if (room.status !== 'LOBBY') return failWith('WRONG_STATUS', 'SO_NO_LOBBY');
       const target = command.payload.playerId;
       if (target === playerId) return failWith('VALIDATION_FAILED', 'HOST_NAO_SE_EXPULSA');
-      if (!room.players.some((p) => p.id === target && isPresent(p))) {
-        return failWith('VALIDATION_FAILED', 'JOGADOR_DESCONHECIDO');
+      const alvo = room.players.find((p) => p.id === target && isPresent(p));
+      if (!alvo) return failWith('VALIDATION_FAILED', 'JOGADOR_DESCONHECIDO');
+
+      const emPartida = room.status === 'EM_PARTIDA' || room.status === 'PAUSADA';
+      if (room.status !== 'LOBBY' && !emPartida) return failWith('WRONG_STATUS', 'SO_NO_LOBBY');
+
+      /**
+       * RF-096: expulsar de uma partida em andamento **não** tira o assento da
+       * mesa — um bot assume a mão, a aposta e as vidas, e a rodada segue.
+       *
+       * Tirar o assento seria a retirada do RJ-154, que anula a rodada de todo
+       * mundo: quem apostou certo perderia a aposta certa porque o host cansou
+       * de um terceiro. O custo de expulsar não pode cair sobre a mesa.
+       *
+       * Espectador é outro caso: não tem mão nem aposta, então sai como sairia
+       * do lobby, sem bot e sem herança.
+       */
+      if (emPartida && room.match !== null && isActive(room.match, target)) {
+        if (alvo.bot !== null) return failWith('VALIDATION_FAILED', 'BOT_SAI_POR_REMOVEBOT');
+        return expulsarComBot(room, alvo, ctx);
       }
+
       return commit(
-        { ...room, players: replace(room.players, target, { connection: 'REMOVIDO' }) },
+        { ...room, players: replace(room.players, target, { connection: 'REMOVIDO', expulsoEm: ctx.now }) },
         ctx,
         [all({ type: 'room:playerLeft', payload: { playerId: target, reason: 'KICKED' } })],
       );
@@ -797,6 +822,91 @@ export function dealNow(room: Room, ctx: RoomCtx, emissions: Emission[]): Room {
     emissions.push(...translate(result.events, current));
   }
   return current;
+}
+
+/**
+ * Dificuldade de quem assume um assento expulso (RF-096).
+ *
+ * `MEDIO` de propósito, e não o bot mais forte: o substituto não está
+ * competindo pela vitória de ninguém, está terminando uma mão que uma pessoa
+ * já comprometeu com uma aposta. `MEDIO` joga para cumprir a aposta declarada,
+ * que é o comportamento que a mesa consegue prever; `FACIL` jogaria carta ao
+ * acaso e viraria ruído para a leitura de todo mundo, e `REALISTA` transformaria
+ * uma expulsão em vantagem tática para quem ficou.
+ */
+const DIFICULDADE_DO_SUBSTITUTO: BotDifficulty = 'MEDIO';
+
+/**
+ * O assento continua; quem estava nele, não (RF-096).
+ *
+ * O `playerId` é o mesmo de propósito: é ele que a partida usa para achar a
+ * mão, a aposta e as vidas. Trocar o id aqui seria reescrever a rodada inteira
+ * para renomear uma cadeira.
+ */
+function expulsarComBot(room: Room, alvo: RoomPlayer, ctx: RoomCtx): RoomResult {
+  // O nome carrega de quem era o assento. Quem entra agora, ou recarrega a
+  // página, precisa entender por que aquele bot já tem aposta e cartas na mão
+  // — e o aviso do sistema, que explica isso uma vez, some da tela.
+  const cabe = `Bot (${alvo.nickname})`;
+  const nickname = apelidoLivre(
+    room,
+    cabe.length <= NICKNAME_MAX ? cabe : `Bot (${alvo.nickname.slice(0, NICKNAME_MAX - 6)})`,
+    alvo.id,
+  );
+
+  const assento: RoomPlayer = {
+    ...alvo,
+    nickname,
+    bot: { difficulty: DIFICULDADE_DO_SUBSTITUTO },
+    expulsoEm: ctx.now,
+    // Bot está sempre conectado por construção. Sem isto, um assento expulso
+    // enquanto a pessoa caía continuaria "ausente" e seguraria a mesa pausada
+    // esperando alguém que já não pode voltar.
+    connection: 'CONECTADO',
+    socketLostAt: null,
+    emSegundoPlano: false,
+    pronto: true,
+    // Calar um bot não quer dizer nada: ele não fala.
+    silenciado: false,
+    // A conta NÃO é herdada. O bot vai terminar a partida, e creditar essa
+    // colocação no histórico de quem foi expulso seria atribuir a uma pessoa
+    // um resultado que ela não jogou (RF-068).
+    conta: null,
+    contaId: null,
+  };
+
+  let next: Room = { ...room, players: replace(room.players, alvo.id, assento) };
+  const emissions: Emission[] = [
+    all({ type: 'room:playerUpdated', payload: { player: toPublicPlayer(assento) } }),
+    all({
+      type: 'system:notice',
+      payload: { code: 'EXPULSO_BOT_ASSUMIU', params: { apelido: alvo.nickname, bot: nickname } },
+    }),
+  ];
+
+  // O host não pode ser o expulso (`HOST_NAO_SE_EXPULSA`), mas a sala nunca
+  // deve ficar com um bot na posição — a garantia mora aqui, não na suposição.
+  next = garantirHost(next, emissions);
+
+  // Se a mesa estava pausada esperando justamente esta pessoa, ela volta a
+  // andar agora: o assento tem quem o jogue.
+  const retomada = maybeResume(next, ctx, emissions);
+  next = retomada.room;
+
+  /**
+   * O relógio só é refeito se a vez era dele.
+   *
+   * `deadlineFor` conta a partir de agora, e um assento humano na vez ganharia
+   * 30 s de brinde porque o host expulsou outra pessoa. Quando a vez É do
+   * assento, refazer é obrigatório: o prazo de bot é o tempo de pensar, e
+   * deixar os 45 s de aposta de gente faria a mesa esperar por um relógio que
+   * não tem mais ninguém do outro lado.
+   */
+  if (next.status === 'EM_PARTIDA' && next.match?.round.activePlayerId === alvo.id) {
+    next = { ...next, phaseDeadline: deadlineFor(next, ctx.now) };
+  }
+
+  return commit(next, ctx, emissions);
 }
 
 function startMatch(room: Room, ctx: RoomCtx): RoomResult {

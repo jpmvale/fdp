@@ -40,6 +40,8 @@ const FRASES: Record<string, string> = {
   BOT_NAO_ASSISTE: 'Bot não assiste — ele joga ou sai.',
   COMANDO_EXIGE_HOST: 'Só quem é host pode fazer isso.',
   HOST_NAO_SE_EXPULSA: 'Você não pode se expulsar.',
+  BOT_SAI_POR_REMOVEBOT: 'Bot não se expulsa no meio da partida.',
+  EXPULSO: 'Você foi expulso desta sala.',
   NAO_E_BOT: 'Esse jogador não é um bot.',
   JOGADOR_DESCONHECIDO: 'Esse jogador não está na sala.',
 

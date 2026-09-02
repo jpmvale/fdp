@@ -8,12 +8,13 @@ import { Chat } from '../components/Chat';
 import { Historico } from '../components/Historico';
 import { Assistindo } from '../components/Assistindo';
 import { Plateia } from '../components/Plateia';
+import { Anfitriao } from '../components/Anfitriao';
 import { useTelaLarga } from '../telaLarga';
 import { Feltro } from '../components/Feltro';
 import { Vidas } from '../components/Vidas';
 import type { Retrato, PlayerView } from '../state/tipos';
 
-export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoApostar, aoJogar, aoAbrirRegras, aoEnviarChat, preJogada, aoPreJogar, aoAbrirPerfil, aoSilenciar }: {
+export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoApostar, aoJogar, aoAbrirRegras, aoEnviarChat, preJogada, aoPreJogar, aoAbrirPerfil, aoSilenciar, aoExpulsar }: {
   retrato: Retrato;
   eu: string;
   partida: PlayerView;
@@ -27,6 +28,7 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
   aoPreJogar: (id: string | null) => void;
   aoAbrirPerfil?: ((slug: string) => void) | undefined;
   aoSilenciar?: ((playerId: string, silenciado: boolean) => void) | undefined;
+  aoExpulsar?: ((playerId: string) => void) | undefined;
 }) {
   const nome = (id: string) => retrato.players.find((p) => p.id === id)?.nickname ?? '—';
 
@@ -122,6 +124,15 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
         />
 
         <Historico partida={partida} jogadores={retrato.players} eu={eu} />
+
+        {aoExpulsar && (
+          <Anfitriao
+            jogadores={retrato.players}
+            eu={eu}
+            souHost={retrato.hostId === eu}
+            aoExpulsar={aoExpulsar}
+          />
+        )}
       </aside>
     </div>
   );

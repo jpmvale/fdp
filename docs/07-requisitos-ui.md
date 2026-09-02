@@ -189,6 +189,7 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 | RF-093 | No desktop a mesa **DEVE** ser ampliada por `scale` sobre a largura de projeto, e não esticada. O zoom sai da ALTURA disponível, e nunca pode obrigar a rolar para ver a mesa e as próprias cartas juntas |
 | RF-094 | O host só começa a partida quando **todos os sentados** confirmarem. Bot nasce pronto. A tela **DEVE** nomear quem falta, e não dizer "aguardando jogadores" |
 | RF-095 | O host **PODE** silenciar alguém no chat, no lobby e **durante a partida**. Silenciar não tira ninguém da mesa — expulsar é outro gesto |
+| RF-096 | O host **PODE** expulsar alguém de uma partida em andamento. O assento **NÃO** sai da mesa: um bot assume a mão, a aposta e as vidas, e a rodada **continua**. Quem foi expulso não reentra na sala |
 
 RF-086 abre a casca de 460 px para 900 **só na mesa**, e é a única tela onde isso
 acontece. Em qualquer outra, a coluna continua estreita mesmo num monitor de 27" —
@@ -250,6 +251,19 @@ RF-085 mostra informação que **já era pública** (`handCounts`, RJ-102) e nã
 em lugar nenhum: quem quisesse saber quantas cartas restavam ao adversário tinha de
 contar as mãos já jogadas de cabeça, no meio da rodada. Viradas porque o conteúdo é
 segredo — uma carta desenhada de frente prometeria informação que não existe.
+
+**Por que expulsar não anula a rodada (RF-096).** Sair no meio de uma partida é retirada
+(RJ-154), e retirada anula a rodada de todo mundo — quem apostou certo perde a aposta certa. Faz
+sentido para quem escolheu sair; não faz para uma expulsão, em que o custo cairia sobre a mesa por
+uma decisão do host sobre um terceiro. Por isso o assento fica: mesmo `playerId`, mesma mão, mesma
+aposta, agora tocado por um bot `MEDIO` — que joga para cumprir a aposta declarada, em vez de
+jogar ao acaso (`FACIL`) ou de virar vantagem tática para quem ficou (`REALISTA`). A conta **não**
+é herdada: creditar no histórico de alguém uma colocação que um bot terminou seria registrar uma
+partida que a pessoa não jogou (RF-068).
+
+E o assento continuar presente é justamente o que impede `isPresent` de barrar a volta — daí
+`expulsoEm`, conferido no `reconnect`, no `/session` e no `upgrade` do socket. Sem isso o token de
+quem levou o pé devolveria o assento inteiro, agora com as cartas que o bot já viu.
 
 **Por que o pronto nomeia quem falta (RF-094).** "Aguardando jogadores" transforma a espera em
 adivinhação, e o host acaba expulsando quem não devia. A revanche **não** pede pronto de novo —

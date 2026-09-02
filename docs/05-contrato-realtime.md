@@ -96,6 +96,12 @@ existe caminho de código separado para "recuperar partida".
 | `player:background` | `{ emSegundoPlano }` | qualquer, inclusive `PAUSADA` | A aba foi para segundo plano, ou voltou (RJ-117b) |
 | `player:setPronto` | `{ pronto }` | só em `LOBBY`, e não para quem assiste | Confirma que está pronto (RF-094) |
 | `host:silenciar` | `{ playerId, silenciado }` | qualquer, **exceto** o próprio host e bots | Cala ou libera alguém no chat (RF-095) |
+
+`host:kick` deixou de ser só do lobby: em `EM_PARTIDA` e `PAUSADA` ele expulsa quem está sentado
+**sem tirar o assento da mesa** — o assento vira bot e a rodada segue (RF-096). Espectador sai como
+sairia do lobby. Bot é recusado com `BOT_SAI_POR_REMOVEBOT`. A mesa fica sabendo por
+`room:playerUpdated` (o assento agora tem `bot`) e por um `system:notice` de código
+`EXPULSO_BOT_ASSUMIU`, com `{ apelido, bot }`.
 | `player:leave` | `{}` | qualquer | Sai da sala |
 | `player:setSpectator` | `{ spectator }` | qualquer, **exceto bot**, só em `LOBBY` | Sai da mesa para assistir, ou senta-se (RF-083). Pedir o que já se é não emite evento |
 | `chat:send` | `{ text }` | qualquer presente, **exceto bot**, em qualquer status menos `ENCERRADA` | Publica a mensagem para a sala (RF-017) |

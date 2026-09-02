@@ -478,6 +478,8 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-371 | U | RF-070 | **Dado** uma imagem com EXIF — inclusive coordenada de GPS —, **então** o avatar gravado não carrega EXIF, XMP nem os textos; e a **rotação** do EXIF é aplicada antes de o metadado ser descartado |
 | CA-415 | U | RF-094 | **Dado** o lobby, **então** o host só começa com **todos** os sentados prontos; bot nasce pronto; desmarcar volta a travar; repetir não emite evento; a revanche não trava e `host:toLobby` zera |
 | CA-416 | U | RF-095 | **Dado** alguém silenciado pelo host, **então** o chat recusa com `SILENCIADO` **no servidor**, durante a partida também; só o host cala, o host não se cala, bot não se cala, liberar devolve a voz, e o silêncio sobrevive à volta ao lobby |
+| CA-417 | U | RF-096 | **Dado** o host expulsando alguém sentado numa partida, **então** o assento vira bot com a mesma mão, aposta e vidas, sem `round:aborted`; o nome diz de quem era e cabe no limite; a conta não é herdada; a pausa por ausência dele se levanta; o prazo só é refeito se a vez era dele; espectador sai sem bot; bot é recusado |
+| CA-418 | I | RF-096 | **Dado** alguém expulso no meio da partida, **então** o socket dele é recusado com `INVALID_TOKEN` e `/session` responde 401, mesmo com o assento presente e jogando |
 
 CA-356 mede o defeito que consertou: a barra normalizava pelo prazo da aposta em todos os
 casos, então a vez de jogar carta nascia em 67% e a de um bot em 2%.

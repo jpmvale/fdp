@@ -12,7 +12,7 @@ import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { CLOSE_CODES, LIMITS, type ServerEvent } from '@fdp/protocol';
 import { isWithinSizeLimit, parseClientMessage } from '@fdp/protocol/validate';
-import { applyCommand, disconnect, reconnect, snapshotFor } from '@fdp/room';
+import { applyCommand, disconnect, foiExpulso, reconnect, snapshotFor } from '@fdp/room';
 import type { PlayerId } from '@fdp/rules';
 import type { Hub } from './hub.js';
 import { createIdempotencyCache, createRateLimiter } from './limits.js';
@@ -105,6 +105,21 @@ export function attachWebSocket(server: Upgradable, options: WsOptions): { close
     if (!room || room.status === 'ENCERRADA') {
       hub.sendError(ws, { code: 'ROOM_NOT_FOUND' }, 0);
       ws.close(CLOSE_CODES.ROOM_NOT_FOUND, 'sala não existe');
+      return;
+    }
+
+    /**
+     * RF-096: expulso no meio da partida não abre socket.
+     *
+     * O assento existe e está jogando — com um bot dentro —, então nada abaixo
+     * recusaria esta conexão: o snapshot sairia, com a projeção do assento, e
+     * quem levou o pé continuaria vendo a mão que agora é do bot. A recusa
+     * precisa acontecer aqui, antes de qualquer envio.
+     */
+    const eu = room.players.find((p) => p.id === playerId);
+    if (eu && foiExpulso(eu)) {
+      hub.sendError(ws, { code: 'INVALID_TOKEN', params: { motivo: 'EXPULSO' } }, room.stateVersion);
+      ws.close(CLOSE_CODES.INVALID_TOKEN, 'expulso da sala');
       return;
     }
 

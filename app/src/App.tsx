@@ -455,6 +455,7 @@ export function App() {
             aoEnviarChat={(text) => enviar('chat:send', { text })}
             aoAbrirPerfil={(slug) => setPerfilPublico(slug)}
             aoSilenciar={(playerId, silenciado) => enviar('host:silenciar', { playerId, silenciado })}
+            aoExpulsar={(playerId) => enviar('host:kick', { playerId })}
             preJogada={estado.cartaPreJogada?.cardId ?? null}
             aoPreJogar={(cardId) => definir({
               // `null` é o toque que desarma. Armada, a carta anota a mão em
@@ -691,6 +692,12 @@ function narrar(msg: { type: string; payload: unknown }) {
       if ((p['code'] as unknown as string) === 'MATCH_DECIDED_EARLY') {
         const puladas = (p['params'] as unknown as { skippedTricks: number }).skippedTricks;
         avisar(`Já está decidido — ${puladas === 1 ? 'a última mão não muda' : `as ${puladas} mãos que faltam não mudam`} nada`);
+      }
+      if ((p['code'] as unknown as string) === 'EXPULSO_BOT_ASSUMIU') {
+        const q = p['params'] as unknown as { apelido: string; bot: string };
+        // "foi expulso"/"foi expulsa" obrigaria a adivinhar o gênero de um
+        // apelido. A voz ativa não concorda com nada e diz a mesma coisa.
+        avisar(`O host expulsou ${q.apelido} — ${q.bot} assumiu a mão e a aposta`);
       }
       break;
     default: break;

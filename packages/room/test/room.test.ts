@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { LIMITS, type Avatar, type Command } from '@fdp/protocol';
+import { LIMITS, NICKNAME_MAX, type Avatar, type Command } from '@fdp/protocol';
 import {
   applyCommand,
   checkRoomInvariants,
@@ -13,6 +13,7 @@ import {
   generateCode,
   generateFreeCode,
   isBlockedCode,
+  isPresent,
   join,
   leave,
   nextDeadline,
@@ -154,6 +155,135 @@ describe('CA-020 a CA-026: lobby', () => {
   it('o host não consegue expulsar a si mesmo', () => {
     const result = send(roomWith(3), 'p1', { type: 'host:kick', payload: { playerId: 'p1' } }, 50);
     expect(result.ok).toBe(false);
+  });
+
+  describe('CA-417: expulsar no meio da partida (RF-096)', () => {
+    const expulsar = (room: Room, alvo: string, now: number) =>
+      ok(send(room, room.hostId!, { type: 'host:kick', payload: { playerId: alvo } }, now));
+
+    it('o assento vira bot e herda mão, aposta e vidas — a rodada NÃO recomeça', () => {
+      const room = started(roomWith(4), 100);
+      const rodadaAntes = room.match!.roundNumber;
+      const maoAntes = room.match!.hidden.hands['p2'];
+      const vidasAntes = room.match!.lives['p2'];
+
+      const { room: depois, emissions } = expulsar(room, 'p2', 200);
+      const assento = depois.players.find((p) => p.id === 'p2')!;
+
+      expect(assento.bot).not.toBeNull();
+      expect(assento.expulsoEm).toBe(200);
+      // Herda TUDO: é o mesmo assento, com o mesmo id, na mesma rodada.
+      expect(depois.match!.roundNumber).toBe(rodadaAntes);
+      expect(depois.match!.hidden.hands['p2']).toEqual(maoAntes);
+      expect(depois.match!.lives['p2']).toBe(vidasAntes);
+      // O oposto da retirada do RJ-154: ninguém mais paga pela expulsão.
+      expect(types(emissions)).not.toContain('round:aborted');
+      expect(types(emissions)).toContain('room:playerUpdated');
+      expect(depois.status).toBe('EM_PARTIDA');
+      expect(checkRoomInvariants(depois)).toEqual([]);
+    });
+
+    it('o nome do assento diz de quem ele era, e o aviso nomeia os dois', () => {
+      const { room, emissions } = expulsar(started(roomWith(3), 100), 'p2', 200);
+      expect(room.players.find((p) => p.id === 'p2')!.nickname).toBe('Bot (J2)');
+      const aviso = emissions.find((e) => e.event.type === 'system:notice')!.event;
+      expect(aviso.payload).toEqual({
+        code: 'EXPULSO_BOT_ASSUMIU',
+        params: { apelido: 'J2', bot: 'Bot (J2)' },
+      });
+    });
+
+    it('apelido comprido cabe no limite do protocolo', () => {
+      let room = createRoom('K7QMP', { playerId: 'p1', nickname: 'Ana', avatar: AVATAR }, ctxAt(0));
+      room = ok(join(room, { playerId: 'p2', nickname: 'Maria Aparecida', avatar: AVATAR }, ctxAt(1))).room;
+      room = ok(join(room, { playerId: 'p3', nickname: 'J3', avatar: AVATAR }, ctxAt(2))).room;
+      const depois = expulsar(started(room, 100), 'p2', 200).room;
+      const nome = depois.players.find((p) => p.id === 'p2')!.nickname;
+      expect(nome.length).toBeLessThanOrEqual(NICKNAME_MAX);
+      expect(nome).toBe('Bot (Maria Apar)');
+    });
+
+    it('quem foi expulso não reentra — o assento existe, e mesmo assim é dele que não é', () => {
+      const depois = expulsar(started(roomWith(3), 100), 'p2', 200).room;
+      // `isPresent` continua verdadeiro: é justamente por isso que a barreira
+      // não pode depender dele.
+      expect(isPresent(depois.players.find((p) => p.id === 'p2')!)).toBe(true);
+      const volta = reconnect(depois, 'p2', ctxAt(300));
+      expect(volta.ok).toBe(false);
+      if (!volta.ok) expect(volta.motivo).toBe('EXPULSO');
+      const entrada = join(depois, { playerId: 'p2', nickname: 'J2', avatar: AVATAR }, ctxAt(310));
+      expect(entrada.ok).toBe(false);
+    });
+
+    it('expulsar quem caiu levanta a pausa: o assento tem quem o jogue', () => {
+      let room = started(roomWith(3), 100);
+      room = ok(disconnect(room, 'p2', ctxAt(1000))).room;
+      room = tick(room, ctxAt(1000 + LIMITS.transportGraceMs + 1)).room;
+      expect(room.status).toBe('PAUSADA');
+
+      const { room: depois } = expulsar(room, 'p2', 20_000);
+      expect(depois.status).toBe('EM_PARTIDA');
+      expect(depois.pause).toBeNull();
+      expect(depois.phaseDeadline).not.toBeNull();
+      expect(checkRoomInvariants(depois)).toEqual([]);
+    });
+
+    it('o prazo só é refeito quando a vez era do expulso', () => {
+      const room = started(roomWith(3), 100);
+      const daVez = room.match!.round.activePlayerId!;
+      const outro = seatedPlayers(room).map((p) => p.id).find((id) => id !== daVez && id !== room.hostId)!;
+
+      // Expulsar quem NÃO está na vez não pode dar tempo de brinde a quem está.
+      const prazoAntes = room.phaseDeadline;
+      expect(expulsar(room, outro, 200).room.phaseDeadline).toBe(prazoAntes);
+
+      // Expulsar quem ESTÁ na vez refaz: o relógio de gente não serve a um bot.
+      if (daVez !== room.hostId) {
+        const depois = expulsar(room, daVez, 200).room;
+        expect(depois.phaseDeadline).toBe(200 + LIMITS.botThinkMs);
+      }
+    });
+
+    it('a conta não é herdada: o bot não joga colocação no histórico de ninguém', () => {
+      let room = createRoom('K7QMP', { playerId: 'p1', nickname: 'Ana', avatar: AVATAR }, ctxAt(0));
+      room = ok(join(room, { playerId: 'p2', nickname: 'J2', avatar: AVATAR, conta: 'j2', contaId: 'c2' }, ctxAt(1))).room;
+      room = ok(join(room, { playerId: 'p3', nickname: 'J3', avatar: AVATAR }, ctxAt(2))).room;
+      const depois = expulsar(started(room, 100), 'p2', 200).room;
+      expect(depois.players.find((p) => p.id === 'p2')!.conta).toBeNull();
+      expect(depois.players.find((p) => p.id === 'p2')!.contaId).toBeNull();
+    });
+
+    it('espectador em partida sai como sairia do lobby: sem bot, sem herança', () => {
+      let room = started(roomWith(3), 100);
+      room = ok(join(room, { playerId: 'p9', nickname: 'J9', avatar: AVATAR }, ctxAt(150))).room;
+      expect(room.players.find((p) => p.id === 'p9')!.isSpectator).toBe(true);
+
+      const { room: depois, emissions } = expulsar(room, 'p9', 200);
+      expect(depois.players.find((p) => p.id === 'p9')!.connection).toBe('REMOVIDO');
+      expect(depois.players.find((p) => p.id === 'p9')!.bot).toBeNull();
+      expect(types(emissions)).toContain('room:playerLeft');
+    });
+
+    it('bot na mesa não se expulsa: sai por host:removeBot, no lobby', () => {
+      let room = roomWith(2);
+      room = ok(send(room, 'p1', { type: 'host:addBot', payload: { difficulty: 'FACIL' } }, 50)).room;
+      const bot = room.players.find((p) => p.bot !== null)!;
+      const depois = send(started(room, 100), 'p1', { type: 'host:kick', payload: { playerId: bot.id } }, 200);
+      expect(depois.ok).toBe(false);
+      if (!depois.ok) expect(depois.motivo).toBe('BOT_SAI_POR_REMOVEBOT');
+    });
+
+    it('o host segue sem poder se expulsar, com partida em andamento', () => {
+      const room = started(roomWith(3), 100);
+      const r = send(room, 'p1', { type: 'host:kick', payload: { playerId: 'p1' } }, 200);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.motivo).toBe('HOST_NAO_SE_EXPULSA');
+    });
+
+    it('quem não é host não expulsa ninguém', () => {
+      const room = started(roomWith(3), 100);
+      expect(send(room, 'p2', { type: 'host:kick', payload: { playerId: 'p3' } }, 200).ok).toBe(false);
+    });
   });
 
   it('CA-023: host que sai passa a coroa ao conectado mais antigo', () => {

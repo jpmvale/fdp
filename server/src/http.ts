@@ -24,6 +24,7 @@ import {
   createRoom,
   generateFreeCode,
   isPresent,
+  foiExpulso,
   join,
   seatedPlayers,
   spectators,
@@ -305,7 +306,11 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
 
     const player = room.players.find((p) => p.id === verified.claims.playerId);
     // Quem saiu ou foi expulso não retoma: refaz o join como qualquer um.
-    if (!player || !isPresent(player)) return c.json(fail('INVALID_TOKEN'), 401);
+    // `foiExpulso` é uma pergunta à parte porque o assento de quem foi expulso
+    // no meio da partida CONTINUA presente, tocado por um bot (RF-096).
+    if (!player || !isPresent(player) || foiExpulso(player)) {
+      return c.json(fail('INVALID_TOKEN'), 401);
+    }
 
     return c.json({
       roomCode: room.code,

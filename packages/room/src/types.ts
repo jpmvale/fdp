@@ -69,6 +69,17 @@ export interface RoomPlayer {
    * quando o host libera, ou quando a pessoa sai da sala.
    */
   silenciado: boolean;
+
+  /**
+   * Quando o host expulsou esta pessoa no meio da partida (RF-096).
+   *
+   * O assento **continua na mesa** — com a mão, a aposta e as vidas dela — e
+   * passa a ser tocado por um bot. Por isso `isPresent` não serve para barrar
+   * a volta: o assento está presente, quem foi expulso é que não pode voltar
+   * a ocupá-lo. Sem esta marca, o token de quem levou o pé faria `reconnect`
+   * devolver o assento inteiro, agora com as cartas que o bot já viu.
+   */
+  expulsoEm: number | null;
   /**
    * Quando esta pessoa falou pela última vez. `null` = ainda não falou.
    *
@@ -185,6 +196,14 @@ export function toPublicPlayer(player: RoomPlayer): PublicPlayer {
 
 /** Bot nunca está ausente: não tem socket para cair. */
 export const isBot = (player: RoomPlayer): boolean => player.bot !== null;
+
+/**
+ * Foi expulso no meio da partida e o assento virou bot (RF-096).
+ *
+ * Separado de `isPresent` porque as duas coisas são diferentes: o assento está
+ * presente e jogando, e ainda assim ninguém pode entrar nele.
+ */
+export const foiExpulso = (player: RoomPlayer): boolean => player.expulsoEm !== null;
 
 /** Está na sala de verdade: nem saiu, nem foi removido. */
 export function isPresent(player: RoomPlayer): boolean {

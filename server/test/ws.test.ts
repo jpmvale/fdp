@@ -152,6 +152,50 @@ describe('05 §2: handshake', () => {
   });
 });
 
+describe('CA-418: expulso no meio da partida não volta pelo socket (RF-096)', () => {
+  it('o assento continua jogando, e o socket de quem foi expulso é recusado', async () => {
+    const sala = await criarSala('Ana');
+    const beto = await entrar(sala.code, 'Beto');
+    const carla = await entrar(sala.code, 'Carla');
+
+    const host = await connect(sala.code, sala.token);
+    const cBeto = await connect(sala.code, beto.token);
+    const cCarla = await connect(sala.code, carla.token);
+    await host.waitFor('room:snapshot');
+
+    for (const c of [host, cBeto, cCarla]) c.send('player:setPronto', { pronto: true });
+    await host.quiet(50);
+    host.send('host:startMatch', {});
+    await host.waitFor('match:started');
+
+    host.send('host:kick', { playerId: beto.playerId });
+    const aviso = await host.waitFor('system:notice');
+    expect(aviso.payload.code).toBe('EXPULSO_BOT_ASSUMIU');
+
+    // O socket antigo cai; o token dele não abre outro. É a diferença entre
+    // "fechei a aba" e "levei o pé": o assento existe, jogando, e mesmo assim
+    // não é mais dele.
+    const devolta = await connect(sala.code, beto.token);
+    expect((await devolta.waitFor('error')).payload.code).toBe('INVALID_TOKEN');
+    expect((await devolta.closed).code).toBe(CLOSE_CODES.INVALID_TOKEN);
+
+    // E a rota de retomada diz o mesmo: as duas portas fecham juntas.
+    const retomada = await fetch(
+      `${base.replace('ws://', 'http://')}/api/rooms/${sala.code}/session`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionToken: beto.token }),
+      },
+    );
+    expect(retomada.status).toBe(401);
+
+    // A mesa segue: quem ficou continua na mesma partida, sem rodada anulada.
+    await cCarla.quiet(50);
+    expect(cCarla.frames.map((f) => f.type)).not.toContain('round:aborted');
+  });
+});
+
 describe('CA-008: token inválido', () => {
   it('token de outra sala recebe ERR-003 e o socket é fechado', async () => {
     const primeira = await criarSala('Ana');
