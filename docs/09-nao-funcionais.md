@@ -135,6 +135,11 @@ certos.
 Na prática: o gate vira um `CA` em `10`, e a fase só fecha quando `npm run auditoria` para de
 listar esse `CA` como descoberto.
 
+A auditoria conhece `test/` **e** `e2e/`. Foi preciso arrumar: `path.join('.', 'e2e')` não tem
+barra na frente, e a suíte inteira ficou invisível para ela por um momento — a auditoria continuaria
+dizendo "sem teste" sobre critérios que já tinham um, que é a única coisa pior que não ter a
+auditoria.
+
 RNF-100 é o que torna possível testar regras em milissegundos e reproduzir qualquer bug a
 partir de `(seed, jogadas[])`. Injetar tempo e aleatoriedade é o que separa um jogo testável
 de um jogo em que "só acontece às vezes".

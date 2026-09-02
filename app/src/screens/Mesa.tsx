@@ -162,7 +162,14 @@ function Cabecalho({ partida, retrato, aoAbrirRegras }: {
           <div style={{ fontWeight: 600 }}>
             Rodada {partida.roundNumber} · {partida.cardsThisRound} {partida.cardsThisRound === 1 ? 'carta' : 'cartas'}
           </div>
-          <div className="fraco">
+          {/* Os `data-*` desta tela são ganchos da suíte E2E (CA-040, CA-041).
+
+              O E2E precisa comparar mão, fase e vidas ANTES e DEPOIS de uma
+              queda, e a alternativa a um atributo é procurar por texto ou por
+              posição: nas duas o teste quebraria no dia em que alguém mexesse
+              numa palavra — falhando por um motivo que não tem nada a ver com
+              o que ele verifica. */}
+          <div className="fraco" data-fase>
             {fase}{daVez ? ' · vez de você' : ''}
             {partida.phase !== 'APOSTAS' && !partida.isForeheadRound &&
               ` · mão ${partida.trickNumber} de ${partida.cardsThisRound}`}
@@ -411,7 +418,11 @@ function Apostas({ partida, aoApostar }: { partida: PlayerView; aoApostar: (v: n
   return (
     <div className="cartao pilha" style={{ gap: 10 }}>
       <span className="rotulo">sua aposta</span>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {/* Gancho da suíte E2E: o rótulo do botão muda entre a rodada de testa
+          ("Ganho"/"Perco") e as outras (números), e uma das opções pode estar
+          PROIBIDA (RJ-051). O teste precisa de "aposte o que der", não de um
+          rótulo. */}
+      <div data-apostas style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {opcoes.map((valor) => {
           const proibida = partida.forbiddenBet === valor;
           // Na testa, "Ganho"/"Perco" em vez de 1/0: é o que a pessoa está
@@ -485,7 +496,7 @@ function Mao({ partida, selecionada, preJogada, aoSelecionar, aoPreJogar, podeJo
           /* RJ-023: nenhuma carta fica desabilitada — todas são sempre jogáveis. */
           : <span className="fraco">{podePreJogar ? 'toque para deixar engatilhada' : 'toda carta é jogável'}</span>}
       </div>
-      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '10px 2px 4px' }}>
+      <div data-mao style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '10px 2px 4px' }}>
         {partida.hand.map((carta) => {
           const engatilhada = preJogada === carta.id;
           return (

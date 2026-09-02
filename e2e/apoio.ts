@@ -74,3 +74,54 @@ const extras: BrowserContext[] = [];
 export async function fecharAbasExtras(): Promise<void> {
   await Promise.all(extras.splice(0).map((c) => c.close()));
 }
+
+/**
+ * Aposta o que a mesa deixar.
+ *
+ * Não escolhe valor: o rótulo muda entre a rodada de testa ("Ganho"/"Perco") e
+ * as demais (números), e a última pessoa a apostar tem uma opção **proibida**
+ * (RJ-051) — que fica desabilitada. Um teste que clicasse no primeiro botão
+ * esperaria para sempre por um botão que nunca vai habilitar.
+ */
+export async function apostarQualquerCoisa(page: Page): Promise<void> {
+  await page.locator('[data-apostas] button:not([disabled])').first().click();
+}
+
+/**
+ * Derruba a conexão de verdade, por `ms`, e devolve o controle depois.
+ *
+ * `context.setOffline(true)` NÃO serve aqui, e foi preciso medir para
+ * descobrir: com ele, o WebSocket já aberto continua vivo — a mesa ficou
+ * "estável" por 22 s de "offline", e o teste teria passado sem testar nada.
+ * Ele bloqueia requisições novas, não conexões existentes.
+ *
+ * Interceptar o WebSocket é o que reproduz uma queda de verdade: o socket em
+ * uso é fechado, e cada tentativa de reconexão durante a janela é fechada
+ * também. É o que o metrô entrando num túnel faz.
+ */
+export async function quedaDeRede(page: Page, ms: number): Promise<void> {
+  let caiu = false;
+  let derrubarAtual: (() => void) | null = null;
+
+  await page.routeWebSocket(/\/api\/rooms\/.*\/ws/, (ws) => {
+    if (caiu) {
+      // Tentativa de reconexão durante a queda: morre antes de chegar ao
+      // servidor, como morreria sem rede.
+      ws.close();
+      return;
+    }
+    ws.connectToServer();
+    derrubarAtual = () => ws.close();
+  });
+
+  // O socket em uso foi aberto ANTES da interceptação, e não passa pelo
+  // roteador. Uma recarga o refaz sob controle — e o CA-040, que roda antes
+  // deste, já provou que recarregar não custa nada.
+  await page.reload();
+  await page.waitForTimeout(500);
+
+  caiu = true;
+  derrubarAtual?.();
+  await page.waitForTimeout(ms);
+  caiu = false;
+}

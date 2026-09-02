@@ -242,6 +242,20 @@ vulnerabilidade alta.
 | Propriedade | 1.000 partidas simuladas (CA-310, CA-311) | s | Todo commit |
 | Integração | Comando → estado → evento, com store em memória | s | Todo commit |
 | E2E | 2 a 4 navegadores reais, partida completa | min | Todo PR |
+
+A suíte E2E vive em `e2e/`, roda com `npm run e2e` e sobe o servidor de verdade (`npm start`
+servindo o cliente construído) — a topologia de produção. **Sem `retries`**: E2E instável é pior que
+nenhum, porque ensina a ignorar a luz vermelha; se piscar, conserta-se a causa.
+
+Duas coisas que só se descobrem escrevendo E2E, e ficam registradas para o próximo:
+
+- **`context.setOffline(true)` não derruba um WebSocket já aberto.** Ele bloqueia requisições novas.
+  Com ele, a mesa ficou "estável" durante 22 s de "offline" e o teste de reconexão teria passado sem
+  testar nada. O que reproduz uma queda de verdade é interceptar o socket (`routeWebSocket`) e
+  fechar tanto a conexão em uso quanto as tentativas de reconexão da janela.
+- **Ler texto de um elemento que anima dá o estado do meio da animação.** Os corações debitados caem
+  de dentro do mesmo `<span>` das vidas, então o texto dizia "♥♥♥♥♥" onde já eram quatro. O
+  `aria-label` sai do número e só dele — e é mais um motivo para rótulo acessível não ser enfeite.
 | Carga | 500 salas, 2.000 sockets contra a VPS | min | Antes da entrega |
 | Manual | Roteiro de `10` §8 | — | Antes da entrega |
 

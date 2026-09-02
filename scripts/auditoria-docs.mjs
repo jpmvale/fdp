@@ -71,7 +71,7 @@ console.log(`sem teste que cite o ID: ${String(semTeste.length)}`);
 for (const [nivel, quantos] of Object.entries(porNivel).sort()) {
   // `E` é a dívida do E2E, que tem seção própria no HANDOFF. Os outros níveis
   // são a dívida silenciosa: dava para testar, e não se testou.
-  const nota = nivel === 'E' ? ' (suíte E2E ausente — dívida conhecida)' : ' ← dava para testar';
+  const nota = nivel === 'E' ? ' (suíte E2E em construção — ver `e2e/`)' : ' ← dava para testar';
   console.log(`  ${nivel}: ${String(quantos)}${nota}`);
 }
 

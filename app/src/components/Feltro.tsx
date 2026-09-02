@@ -454,6 +454,10 @@ function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta, perdeu
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span
+          // Gancho da suíte E2E (CA-040, CA-041): só no MEU assento, para o
+          // teste comparar as minhas vidas antes e depois de uma queda sem
+          // depender de posição na mesa — que muda com o número de jogadores.
+          {...(souEu ? { 'data-minhas-vidas': true } : {})}
           style={{ color: vidas > 0 ? 'var(--vidas)' : 'var(--texto-apagado)', fontSize: 10, letterSpacing: 1 }}
           aria-label={`${vidas} ${vidas === 1 ? 'vida' : 'vidas'}`}
         >
