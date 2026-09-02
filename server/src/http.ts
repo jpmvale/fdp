@@ -113,7 +113,7 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
    * Em produção o Caddy termina o TLS e fala HTTP com o app, então
    * `c.req.url` diz `http://` e o host interno. Isso já era tratado no
    * `wsUrl`, e não estava no `og:image`: o cartão do link saiu para produção
-   * apontando para `http://…/og.png`, que é o tipo de defeito que ninguém vê
+   * apontando para `http://…/og.jpg`, que é o tipo de defeito que ninguém vê
    * porque a única vítima é um robô de pré-visualização.
    *
    * Agora é um lugar só. Duas derivações da mesma origem é o desenho que
@@ -387,6 +387,7 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
     '.svg': 'image/svg+xml',
     '.woff2': 'font/woff2',
     '.png': 'image/png',
+    '.jpg': 'image/jpeg',
     '.ico': 'image/x-icon',
     '.webmanifest': 'application/manifest+json',
   };
@@ -445,7 +446,7 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
    * o que se economiza.
    */
   const RAIZ_PUBLICA = new Set([
-    '/favicon.svg', '/favicon.ico', '/icone.png', '/og.png',
+    '/favicon.svg', '/favicon.ico', '/icone.png', '/og.jpg',
     '/apple-touch-icon.png', '/site.webmanifest', '/robots.txt',
   ]);
 
@@ -459,7 +460,7 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
           'cache-control': 'public, max-age=3600',
         });
       } catch {
-        // Ativo declarado e ausente é o caso de `og.png` antes de alguém pôr a
+        // Ativo declarado e ausente é o caso de `og.jpg` antes de alguém pôr a
         // imagem lá. Um 404 aqui é a resposta certa: o cartão do link fica sem
         // figura, e o resto do jogo não sente nada.
         return c.notFound();
@@ -493,14 +494,14 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
      *
      * O WhatsApp, o Telegram e o Discord buscam a imagem de fora do contexto da
      * página — não há "mesma origem" para resolver um caminho relativo contra.
-     * `/og.png` no HTML fica bonito e chega ao robô como nada: o cartão sai sem
+     * `/og.jpg` no HTML fica bonito e chega ao robô como nada: o cartão sai sem
      * figura, e sem erro nenhum para alguém notar.
      *
      * A origem vem do pedido, e não de configuração: o mesmo binário responde
      * em `localhost` no desenvolvimento e no domínio em produção, e uma origem
      * fixa acertaria um dos dois.
      */
-    html = trocarMeta(html, 'og:image', `${origemPublica(c)}/og.png`);
+    html = trocarMeta(html, 'og:image', `${origemPublica(c)}/og.jpg`);
 
     /**
      * O cartão do convite (RF-107).

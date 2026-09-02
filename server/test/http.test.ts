@@ -358,17 +358,17 @@ describe('CA-433: o cartão do convite', () => {
     // figura, e sem erro nenhum para alguém notar.
     const imagem = meta(html, 'og:image')!;
     expect(() => new URL(imagem)).not.toThrow();
-    expect(imagem).toMatch(/^https?:\/\/.+\/og\.png$/);
+    expect(imagem).toMatch(/^https?:\/\/.+\/og\.jpg$/);
   });
 
   it('atrás do proxy a origem é a que o NAVEGADOR vê, não a interna', async () => {
     // Em produção o Caddy termina o TLS e fala HTTP com o app. Sem isto o
-    // cartão aponta para `http://…/og.png` — defeito que ninguém vê, porque a
+    // cartão aponta para `http://…/og.jpg` — defeito que ninguém vê, porque a
     // única vítima é um robô de pré-visualização. Foi ao ar assim uma vez.
     const html = await (await app.request('/', {
       headers: { host: 'fdp.exemplo.com', 'x-forwarded-proto': 'https' },
     })).text();
-    expect(meta(html, 'og:image')).toBe('https://fdp.exemplo.com/og.png');
+    expect(meta(html, 'og:image')).toBe('https://fdp.exemplo.com/og.jpg');
   });
 
   it('o ícone e o manifesto são servidos da raiz', async () => {
@@ -378,6 +378,22 @@ describe('CA-433: o cartão do convite', () => {
 
     const manifesto = await app.request('/site.webmanifest');
     expect(manifesto.status).toBe(200);
+  });
+
+  it('os arquivos da marca existem e são servidos — o cartão sem figura é mudo', async () => {
+    // Ausência aqui não dá erro em lugar nenhum: a página abre, o jogo
+    // funciona, e o convite volta a chegar como uma URL crua. Só um teste
+    // percebe.
+    const arquivos: [string, string][] = [
+      ['/og.jpg', 'image/jpeg'],
+      ['/icone.png', 'image/png'],
+      ['/apple-touch-icon.png', 'image/png'],
+    ];
+    for (const [caminho, tipo] of arquivos) {
+      const r = await app.request(caminho);
+      expect(r.status, caminho).toBe(200);
+      expect(r.headers.get('content-type'), caminho).toContain(tipo);
+    }
   });
 
   it('a raiz é lista fechada: nada além dela é servido de lá', async () => {
