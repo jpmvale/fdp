@@ -311,6 +311,21 @@ describe('RNF-005 / RNF-078: cabeçalhos de segurança', () => {
  * O convite é COMO se entra no FDP, e chegava nos grupos como uma URL crua —
  * que num grupo de amigos parece spam.
  */
+describe('o teto de salas por hora fala português', () => {
+  it('estourar o teto responde com `motivo` próprio, e não só o código', async () => {
+    for (let i = 0; i < 10; i++) await criar('Ana');
+    const { response, body } = await criar('Ana');
+
+    expect(response.status).toBe(429);
+    // Dois tetos usam `RATE_LIMITED` — o de comandos do socket e este. Sem um
+    // `motivo` para separá-los, a tela não tem como dizer qual espera é essa,
+    // e mostrava a palavra crua do protocolo: quem batia no teto lia
+    // "RATE_LIMITED", em inglês, num produto que só fala português (P6).
+    expect(body.code).toBe('RATE_LIMITED');
+    expect((body as unknown as { params: { motivo: string } }).params.motivo).toBe('SALAS_DEMAIS');
+  });
+});
+
 describe('CA-433: o cartão do convite', () => {
   const meta = (html: string, chave: string): string | null =>
     new RegExp(`<meta property="${chave}" content="([^"]*)">`).exec(html)?.[1] ?? null;

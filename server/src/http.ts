@@ -57,6 +57,8 @@ export interface HttpOptions {
    * não pode tirar o jogo do ar.
    */
   dados?: Dados | null;
+  /** Ver `createLimit`. Só a suíte E2E mexe nisto. */
+  limiteDeSalasPorHora?: number | undefined;
   /** Sem TLS em teste, o cookie não pode exigir `Secure`. */
   cookieSeguro?: boolean;
   /** Onde os avatares enviados ficam. Ausente = envio desligado. */
@@ -93,7 +95,21 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
   const version = options.version ?? 'dev';
 
   // RNF-003. Janelas de uma hora, por IP.
-  const createLimit = createRateLimiter({ limit: 10, windowMs: 60 * 60_000 });
+  /**
+   * Quantas salas um mesmo IP cria por hora.
+   *
+   * Configurável **só** para a suíte E2E, que legitimamente cria vinte salas em
+   * dois minutos — e ao estourar o teto fazia cinco testes falharem por um
+   * motivo que não era o deles. O limite continua sendo regra de produto, e
+   * continua testado onde deve estar: em `http.test.ts`, com o teto real.
+   *
+   * Não é porta dos fundos: o padrão é o mesmo de sempre, e produção não define
+   * a variável.
+   */
+  const createLimit = createRateLimiter({
+    limit: options.limiteDeSalasPorHora ?? 10,
+    windowMs: 60 * 60_000,
+  });
   const joinLimit = createRateLimiter({ limit: 60, windowMs: 60 * 60_000 });
 
   const app = new Hono<{ Bindings: HttpBindings }>();
@@ -176,7 +192,11 @@ export function createHttpApp(options: HttpOptions): Hono<{ Bindings: HttpBindin
 
   app.post('/api/rooms', async (c) => {
     const rate = createLimit.check(clientIp(c), now());
-    if (!rate.allowed) return c.json(limited(rate.retryAfterMs), 429);
+    // `motivo` distingue este teto do teto de comandos do socket: os dois usam
+    // `RATE_LIMITED`, e querem dizer coisas diferentes para quem lê.
+    if (!rate.allowed) {
+      return c.json({ code: 'RATE_LIMITED', params: { motivo: 'SALAS_DEMAIS', retryAfterMs: rate.retryAfterMs } }, 429);
+    }
 
     // Mesma regra da entrada: logado, a identidade vem da conta (§5).
     const conta = await contaDoCookie(

@@ -71,7 +71,19 @@ export default defineConfig({
     // Vite de desenvolvimento. Construir aqui é o que impede a suíte de passar
     // contra um pacote velho — foi assim que "o botão não faz nada" apareceu
     // uma vez, e não era o botão.
-    command: `npm run build:client && PORT=${String(PORTA)} npm start`,
+    /**
+     * `LIMITE_SALAS_POR_HORA` alto de propósito.
+     *
+     * O teto de produção é 10 salas por hora por IP, e a suíte inteira sai do
+     * mesmo `127.0.0.1`: ela cria mais de vinte salas em dois minutos e, ao
+     * estourar, cinco testes falhavam com a tela parada no Perfil — por um
+     * motivo que não era o deles. Levou duas execuções completas para ficar
+     * claro que não era instabilidade.
+     *
+     * O limite continua sendo regra de produto e continua testado com o teto
+     * real em `server/test/http.test.ts`.
+     */
+    command: `npm run build:client && PORT=${String(PORTA)} LIMITE_SALAS_POR_HORA=500 npm start`,
     url: `http://127.0.0.1:${String(PORTA)}/api/health`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

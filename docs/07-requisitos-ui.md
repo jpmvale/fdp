@@ -280,6 +280,12 @@ dar a um deles o botão de expulsar os outros quatro é entregar a partida a que
 A consequência é RF-102: a decisão de pausa precisa de um host, então a ausência passa a
 resolver-se sozinha, pelo mesmo mecanismo do RF-096.
 
+**Por que o erro de rota HTTP passa por `frase()`.** O caminho do socket já traduzia; o do HTTP
+caía no `code` e mostrava a palavra crua do protocolo. Quem batia no teto de salas por hora lia
+**"RATE_LIMITED"** — em inglês, num produto que só fala português (P6), e sem dizer o que fazer com
+a espera. Dois tetos usam esse mesmo código e querem dizer coisas diferentes, então a resposta
+carrega um `motivo` que a tela usa para escolher a frase certa.
+
 **Por que o convite virou cartão (RF-107).** O convite é *como* se entra no FDP — a home diz
 "quem receber o link entra direto" —, e ele chegava nos grupos como uma URL crua. URL crua num
 grupo de amigos parece spam: o gesto mais importante do produto estava chegando sem cara nenhuma.

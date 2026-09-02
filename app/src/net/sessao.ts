@@ -49,8 +49,12 @@ async function api<T>(caminho: string, corpo?: unknown, metodo?: string): Promis
   const r = await fetch(caminho, init);
   const dados = (await r.json()) as Record<string, string>;
   if (!r.ok) {
+    const params = (dados as unknown as { params?: { motivo?: string } }).params;
     throw new ErroApi(
-      dados.code ?? 'ERRO',
+      // O `motivo` de RNF-001 vem DENTRO de `params`, e é ele que distingue
+      // dois usos do mesmo código — "muitos comandos" e "salas demais" chegam
+      // os dois como `RATE_LIMITED`. Ler só o `code` apagava a diferença.
+      params?.motivo ?? dados.code ?? 'ERRO',
       dados.motivo ?? dados.code ?? 'Deu errado.',
       (dados as unknown as { params?: Record<string, unknown> }).params,
     );

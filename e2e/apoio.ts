@@ -100,6 +100,24 @@ export async function apostarQualquerCoisa(page: Page): Promise<void> {
  * também. É o que o metrô entrando num túnel faz.
  */
 export async function quedaDeRede(page: Page, ms: number): Promise<void> {
+  const rede = await controlarRede(page);
+  rede.derrubar();
+  await page.waitForTimeout(ms);
+  rede.voltar();
+}
+
+/**
+ * O mesmo, com o controle na mão de quem chama.
+ *
+ * Existe porque há testes que precisam olhar OUTRA tela enquanto esta está
+ * fora do ar — a mesa esperando por quem sumiu só se verifica assim. Com a
+ * queda embrulhada num `await`, não há momento em que o teste esteja acordado
+ * durante ela.
+ */
+export async function controlarRede(page: Page): Promise<{
+  derrubar: () => void;
+  voltar: () => void;
+}> {
   let caiu = false;
   let derrubarAtual: (() => void) | null = null;
 
@@ -115,13 +133,13 @@ export async function quedaDeRede(page: Page, ms: number): Promise<void> {
   });
 
   // O socket em uso foi aberto ANTES da interceptação, e não passa pelo
-  // roteador. Uma recarga o refaz sob controle — e o CA-040, que roda antes
-  // deste, já provou que recarregar não custa nada.
+  // roteador. Uma recarga o refaz sob controle — e o CA-040 já provou que
+  // recarregar não custa nada.
   await page.reload();
   await page.waitForTimeout(500);
 
-  caiu = true;
-  derrubarAtual?.();
-  await page.waitForTimeout(ms);
-  caiu = false;
+  return {
+    derrubar: () => { caiu = true; derrubarAtual?.(); },
+    voltar: () => { caiu = false; },
+  };
 }

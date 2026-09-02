@@ -253,6 +253,11 @@ Duas coisas que só se descobrem escrevendo E2E, e ficam registradas para o pró
   Com ele, a mesa ficou "estável" durante 22 s de "offline" e o teste de reconexão teria passado sem
   testar nada. O que reproduz uma queda de verdade é interceptar o socket (`routeWebSocket`) e
   fechar tanto a conexão em uso quanto as tentativas de reconexão da janela.
+- **Uma suíte E2E estoura limites feitos para uma pessoa.** O teto de 10 salas por hora por IP é
+  generoso para gente e apertado para uma suíte que cria vinte em dois minutos — e o sintoma foi
+  cinco testes falhando com a tela parada, por um motivo que não era o deles. Levou duas execuções
+  completas para ficar claro que não era instabilidade. O teto virou configurável só para a suíte, e
+  continua testado com o valor real no nível de integração.
 - **Ler texto de um elemento que anima dá o estado do meio da animação.** Os corações debitados caem
   de dentro do mesmo `<span>` das vidas, então o texto dizia "♥♥♥♥♥" onde já eram quatro. O
   `aria-label` sai do número e só dele — e é mais um motivo para rótulo acessível não ser enfeite.

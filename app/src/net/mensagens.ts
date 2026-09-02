@@ -67,6 +67,11 @@ const FRASES: Record<string, string> = {
 
   // Limites de `05` §7.
   RATE_LIMITED: 'Devagar — muitos comandos de uma vez.',
+  // O mesmo código chega por dois caminhos e quer dizer coisas diferentes: no
+  // socket é comando repetido, no HTTP é sala demais na mesma hora. A frase
+  // acima cobre o socket; esta cobre a porta de entrada, que é onde a pessoa
+  // está tentando começar a jogar e precisa saber o que fazer com a espera.
+  SALAS_DEMAIS: 'Você criou muitas salas na última hora. Espere um pouco, ou entre na sala de alguém pelo código.',
   MENSAGEM_INVALIDA: 'Essa mensagem não vai: vazia ou longa demais.',
   RAPIDO_DEMAIS: 'Espere um segundo entre uma mensagem e outra.',
 };

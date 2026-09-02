@@ -183,6 +183,10 @@ async function main(): Promise<void> {
     trustProxy: TRUST_PROXY,
     version: VERSION,
     dados,
+    // Só a suíte E2E define isto. Ver `createLimit` em `http.ts`.
+    ...(process.env.LIMITE_SALAS_POR_HORA
+      ? { limiteDeSalasPorHora: Number(process.env.LIMITE_SALAS_POR_HORA) }
+      : {}),
     sso: configuracaoDoAmbiente(process.env),
     // Sem depósito, o envio de avatar responde 503 e o resto funciona —
     // mesma lógica das contas e do SSO (I-1).

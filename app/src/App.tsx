@@ -694,14 +694,28 @@ function Avisos({ avisos }: { avisos: { id: string; texto: string }[] }) {
   );
 }
 
+/**
+ * O erro de uma rota HTTP, dito em português.
+ *
+ * `ErroApi.message` cai no `code` quando a resposta não traz `motivo` — e
+ * então a tela mostrava a palavra crua do protocolo. Quem batia no teto de
+ * salas por hora lia **"RATE_LIMITED"**, em inglês, num produto que só fala
+ * português (P6). O caminho do socket já passava por `frase()`; o do HTTP não,
+ * e a diferença não tinha razão de ser.
+ */
+const erroEmPortugues = (e: unknown): string => {
+  const erro = e as { codigo?: string; message?: string };
+  return frase(erro.codigo, erro.codigo ?? erro.message ?? 'ERRO');
+};
+
 async function criar(apelido: string, avatar: AvatarProto, entrar: (s: sessao.Sessao) => void) {
   try { entrar(await sessao.criarSala(apelido, avatar)); }
-  catch (e) { errar((e as Error).message); }
+  catch (e) { errar(erroEmPortugues(e)); }
 }
 
 async function juntar(codigo: string, apelido: string, avatar: AvatarProto, entrar: (s: sessao.Sessao) => void) {
   try { entrar(await sessao.entrarNaSala(codigo, apelido, avatar)); }
-  catch (e) { errar((e as Error).message); }
+  catch (e) { errar(erroEmPortugues(e)); }
 }
 
 /**
