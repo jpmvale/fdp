@@ -13,11 +13,19 @@ import type { ChatMessage } from '../state/tipos';
  * cumpre CA-340 — este é o único lugar do produto onde alguém escreve algo que
  * aparece na tela dos outros, então é a superfície de injeção inteira.
  */
-export function Chat({ mensagens, eu, aoEnviar, inicialmenteAberto = false }: {
+export function Chat({
+  mensagens, eu, aoEnviar, inicialmenteAberto = false,
+  souHost = false, silenciados, estouSilenciado = false, aoSilenciar,
+}: {
   mensagens: ChatMessage[];
   eu: string;
   aoEnviar: (texto: string) => void;
   inicialmenteAberto?: boolean;
+  /** RF-095: o host cala quem incomoda, ali onde a mensagem aparece. */
+  souHost?: boolean;
+  silenciados?: Set<string> | undefined;
+  estouSilenciado?: boolean;
+  aoSilenciar?: ((playerId: string, silenciado: boolean) => void) | undefined;
 }) {
   const [aberto, setAberto] = useState(inicialmenteAberto);
   const [texto, setTexto] = useState('');
@@ -116,6 +124,26 @@ export function Chat({ mensagens, eu, aoEnviar, inicialmenteAberto = false }: {
                   {/* Quem assiste vê a mão de todo mundo (RJ-159). "Joga o 3 de
                       paus" dito de dentro da mesa é palpite; dito de fora é
                       outra coisa, e quem lê precisa poder distinguir. */}
+                  {/* RF-095. Aqui, e não numa lista de gente à parte: você
+                      vê a mensagem que incomoda e cala o autor no mesmo lugar,
+                      sem procurar quem é numa segunda tela. */}
+                  {souHost && m.playerId !== eu && aoSilenciar && (
+                    <button
+                      className="fantasma"
+                      aria-pressed={silenciados?.has(m.playerId) ?? false}
+                      aria-label={silenciados?.has(m.playerId)
+                        ? `Devolver a voz a ${m.nickname}`
+                        : `Silenciar ${m.nickname}`}
+                      onClick={() => aoSilenciar(m.playerId, !(silenciados?.has(m.playerId) ?? false))}
+                      style={{
+                        all: 'unset', cursor: 'pointer', marginLeft: 5,
+                        fontSize: 10, verticalAlign: 'middle',
+                        opacity: silenciados?.has(m.playerId) ? 1 : 0.45,
+                      }}
+                    >
+                      {silenciados?.has(m.playerId) ? '🔇' : '🔈'}
+                    </button>
+                  )}
                   {m.spectator && (
                     <span
                       title="assistindo — vê as cartas de todo mundo"
@@ -141,16 +169,21 @@ export function Chat({ mensagens, eu, aoEnviar, inicialmenteAberto = false }: {
           <div style={{ display: 'flex', gap: 6 }}>
             <input
               value={texto}
+              disabled={estouSilenciado}
               onChange={(e) => setTexto(e.target.value.slice(0, LIMITS.chatTextMax))}
               onKeyDown={(e) => { if (e.key === 'Enter') enviar(); }}
               maxLength={LIMITS.chatTextMax}
-              placeholder="Escreva para a mesa"
+              // Diz o ESTADO no lugar onde a pessoa vai tentar escrever.
+              // Um campo desabilitado sem explicação lê como defeito.
+              placeholder={estouSilenciado
+                ? 'O host silenciou você nesta mesa'
+                : 'Escreva para a mesa'}
               aria-label="Mensagem para a mesa"
               style={{ flex: 1 }}
             />
             <button
               onClick={enviar}
-              disabled={!podeEnviar}
+              disabled={!podeEnviar || estouSilenciado}
               aria-label={emEspera ? 'Espere um segundo para enviar de novo' : 'Enviar mensagem'}
               style={{ minWidth: 64 }}
             >

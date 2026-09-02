@@ -454,6 +454,7 @@ export function App() {
             aoAbrirRegras={() => setRegrasAbertas(true)}
             aoEnviarChat={(text) => enviar('chat:send', { text })}
             aoAbrirPerfil={(slug) => setPerfilPublico(slug)}
+            aoSilenciar={(playerId, silenciado) => enviar('host:silenciar', { playerId, silenciado })}
             preJogada={estado.cartaPreJogada?.cardId ?? null}
             aoPreJogar={(cardId) => definir({
               // `null` é o toque que desarma. Armada, a carta anota a mão em
@@ -490,6 +491,8 @@ export function App() {
           aoSair={sairDaMesa}
           aoEnviarChat={(text) => enviar('chat:send', { text })}
           aoAssistir={(assistir) => enviar('player:setSpectator', { spectator: assistir })}
+          aoDarPronto={(pronto) => enviar('player:setPronto', { pronto })}
+          aoSilenciar={(playerId, silenciado) => enviar('host:silenciar', { playerId, silenciado })}
         />
       )}
 

@@ -185,8 +185,10 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 | RF-062 | SSO com e-mail **verificado pelo provedor** assume a conta de senha, apaga a senha e derruba as sessões |
 | RF-063 | Entrar com senha numa conta assumida por SSO **DEVE** dizer o que houve — *"esta conta agora entra pelo Google"* —, nunca "senha inválida" |
 | RF-070 | Avatar por imagem, só para quem tem conta, reduzido **no servidor** para 256×256 WebP, com EXIF removido. O emoji e a cor **CONTINUAM** por baixo: são o que aparece enquanto a foto carrega e se ela falhar |
-| RF-083 | O contador de cartas na mão **DEVE** desenhar o MESMO verso do baralho, em miniatura, e não uma forma genérica: dois versos diferentes no mesmo jogo fazem o pequeno ler como barra de progresso |
-| RF-084 | No desktop a mesa **DEVE** ser ampliada por `scale` sobre a largura de projeto, e não esticada. O zoom sai da ALTURA disponível, e nunca pode obrigar a rolar para ver a mesa e as próprias cartas juntas |
+| RF-092 | O contador de cartas na mão **DEVE** desenhar o MESMO verso do baralho, em miniatura, e não uma forma genérica: dois versos diferentes no mesmo jogo fazem o pequeno ler como barra de progresso |
+| RF-093 | No desktop a mesa **DEVE** ser ampliada por `scale` sobre a largura de projeto, e não esticada. O zoom sai da ALTURA disponível, e nunca pode obrigar a rolar para ver a mesa e as próprias cartas juntas |
+| RF-094 | O host só começa a partida quando **todos os sentados** confirmarem. Bot nasce pronto. A tela **DEVE** nomear quem falta, e não dizer "aguardando jogadores" |
+| RF-095 | O host **PODE** silenciar alguém no chat, no lobby e **durante a partida**. Silenciar não tira ninguém da mesa — expulsar é outro gesto |
 
 RF-086 abre a casca de 460 px para 900 **só na mesa**, e é a única tela onde isso
 acontece. Em qualquer outra, a coluna continua estreita mesmo num monitor de 27" —
@@ -249,7 +251,19 @@ em lugar nenhum: quem quisesse saber quantas cartas restavam ao adversário tinh
 contar as mãos já jogadas de cabeça, no meio da rodada. Viradas porque o conteúdo é
 segredo — uma carta desenhada de frente prometeria informação que não existe.
 
-**Por que o zoom é `scale` e não layout fluido (RF-084).** A geometria do feltro é medida em
+**Por que o pronto nomeia quem falta (RF-094).** "Aguardando jogadores" transforma a espera em
+adivinhação, e o host acaba expulsando quem não devia. A revanche **não** pede pronto de novo —
+ela não passa pelo lobby, e travá-la daria ao host um erro que ele não tem como resolver; quem
+está na sala quando a partida acaba viu a partida acabar. Já `host:toLobby` zera, porque arrumar
+a mesa muda bots e opções, e o pronto de antes confirmava outra mesa.
+
+**Por que silenciar fica no chat (RF-095).** O controle aparece ao lado da mensagem: você vê o
+que incomoda e cala o autor no mesmo lugar, sem procurar quem é numa segunda tela. E a recusa é
+do **servidor** — silêncio que só existe na interface não é silêncio, porque um cliente
+adulterado manda o comando do mesmo jeito. Quem está calado lê isso no próprio campo de texto,
+já que campo desabilitado sem explicação lê como defeito.
+
+**Por que o zoom é `scale` e não layout fluido (RF-093).** A geometria do feltro é medida em
 pixels — CA-362 defende a faixa onde o aviso "É A SUA VEZ!" cabe, entre as cartas jogadas e o
 assento de baixo. Esticar a largura moveria essas medidas e, pior, deixava a mesa achatada no
 monitor: os assentos se espalhavam e cada um continuava com os mesmos 104 px, com a altura presa

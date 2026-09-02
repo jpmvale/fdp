@@ -102,6 +102,19 @@ export interface PublicPlayer {
   isSpectator: boolean;
   joinedAt: number;
   /**
+   * Deu pronto no lobby (RF-094). Bot nasce pronto — ele não tem o que decidir.
+   *
+   * Público porque a mesa inteira precisa ver quem falta: um "aguardando" sem
+   * dizer de quem transforma a espera em adivinhação.
+   */
+  pronto: boolean;
+  /**
+   * Calado pelo host (RF-095). Público pelo mesmo motivo do `pronto`: quem
+   * está calado precisa saber, e a mesa também — silêncio sem explicação
+   * parece defeito.
+   */
+  silenciado: boolean;
+  /**
    * Slug PÚBLICO da conta, quando há conta (plano 01 §5). `null` em convidado
    * e em bot.
    *
@@ -178,6 +191,10 @@ export type Command =
    * o lado seguro.
    */
   | { type: 'player:background'; payload: { emSegundoPlano: boolean } }
+  /** "Estou pronto" / "ainda não" no lobby (RF-094). */
+  | { type: 'player:setPronto'; payload: { pronto: boolean } }
+  /** O host cala ou libera alguém no chat (RF-095). */
+  | { type: 'host:silenciar'; payload: { playerId: PlayerId; silenciado: boolean } }
   | { type: 'player:leave'; payload: Record<string, never> }
   /** Sentar-se à mesa ou sair dela para assistir. Só no lobby (RF-083). */
   | { type: 'player:setSpectator'; payload: { spectator: boolean } }

@@ -476,6 +476,8 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-369 | I | RF-071 | **Dado** o gancho de histórico estourando, **então** a sala segue viva e a falha vira log; **e** a mesma partida nunca é gravada duas vezes |
 | CA-370 | U | RF-070 | **Dado** um envio que não é imagem, é vazio, passa de 5 MB, é um SVG, é um JPEG truncado, ou é uma **bomba de descompressão**, **então** é recusado com motivo próprio e o processo continua atendendo o próximo |
 | CA-371 | U | RF-070 | **Dado** uma imagem com EXIF — inclusive coordenada de GPS —, **então** o avatar gravado não carrega EXIF, XMP nem os textos; e a **rotação** do EXIF é aplicada antes de o metadado ser descartado |
+| CA-415 | U | RF-094 | **Dado** o lobby, **então** o host só começa com **todos** os sentados prontos; bot nasce pronto; desmarcar volta a travar; repetir não emite evento; a revanche não trava e `host:toLobby` zera |
+| CA-416 | U | RF-095 | **Dado** alguém silenciado pelo host, **então** o chat recusa com `SILENCIADO` **no servidor**, durante a partida também; só o host cala, o host não se cala, bot não se cala, liberar devolve a voz, e o silêncio sobrevive à volta ao lobby |
 
 CA-356 mede o defeito que consertou: a barra normalizava pelo prazo da aposta em todos os
 casos, então a vez de jogar carta nascia em 67% e a de um bot em 2%.

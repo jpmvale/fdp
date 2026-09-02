@@ -623,8 +623,17 @@ describe('CA-372: conta e convidado na mesma mesa', () => {
     expect(antes.players.map((p) => p.conta)).toEqual(['ana', null]);
 
     // Começa a partida pelo caminho de verdade — o comando do host.
+    // RF-094: todos confirmam antes.
+    const prontos = antes.players
+      .filter((p) => !p.isSpectator && p.bot === null)
+      .reduce((r, p) => {
+        const res = applyCommand(r, p.id,
+          { type: 'player:setPronto', payload: { pronto: true } }, hub.ctx());
+        return res.ok ? res.room : r;
+      }, antes);
+
     const inicio = applyCommand(
-      antes, antes.hostId!, { type: 'host:startMatch', payload: {} }, hub.ctx());
+      prontos, prontos.hostId!, { type: 'host:startMatch', payload: {} }, hub.ctx());
     expect(inicio.ok).toBe(true);
     if (!inicio.ok) return;
     hub.commit(inicio);

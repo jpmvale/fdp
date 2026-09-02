@@ -85,6 +85,10 @@ describe('CA-342: o estado reduzido não diverge do retrato do servidor', () => 
     };
 
     comando('p1', { type: 'chat:send', payload: { text: 'bora' } });
+    // RF-094: todo mundo confirma antes de o host começar.
+    for (const id of ['p1', 'p2', 'p3']) {
+      comando(id, { type: 'player:setPronto', payload: { pronto: true } });
+    }
     comando('p1', { type: 'host:startMatch', payload: {} });
     relogio();
 

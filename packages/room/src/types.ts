@@ -54,6 +54,22 @@ export interface RoomPlayer {
    */
   emSegundoPlano: boolean;
   /**
+   * Deu pronto no lobby (RF-094).
+   *
+   * Zerado em `host:toLobby` — arrumar a mesa muda bots e opções, e o pronto
+   * de antes confirmava outra mesa. **Preservado na revanche**, que não muda
+   * nada e onde exigir seis toques resolveria um problema que não existe.
+   */
+  pronto: boolean;
+  /**
+   * Calado pelo host (RF-095).
+   *
+   * Sobrevive à volta ao lobby de propósito, ao contrário do `pronto`: o host
+   * calou alguém por um motivo, e a revanche não é perdão automático. Sai
+   * quando o host libera, ou quando a pessoa sai da sala.
+   */
+  silenciado: boolean;
+  /**
    * Quando esta pessoa falou pela última vez. `null` = ainda não falou.
    *
    * Vive no jogador, e não numa tabela ao lado, porque é assim que ele
@@ -158,6 +174,8 @@ export function toPublicPlayer(player: RoomPlayer): PublicPlayer {
     connection: player.connection === 'RECONECTANDO' ? 'CONECTADO' : player.connection,
     isSpectator: player.isSpectator,
     joinedAt: player.joinedAt,
+    pronto: player.pronto,
+    silenciado: player.silenciado,
     conta: player.conta,
     // Só aparece quando É bot: um campo `bot: null` em todo jogador humano
     // seria ruído em cada quadro, e o cliente já lê a ausência como "humano".

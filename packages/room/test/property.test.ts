@@ -16,12 +16,29 @@ import {
   join,
   nextDeadline,
   reconnect,
+  seatedPlayers,
   tick,
   type Room,
   type RoomCtx,
 } from '@fdp/room';
 
 const AVATAR: Avatar = { emoji: '🦊', color: 'amber' };
+
+/**
+ * Todo mundo dá pronto antes de começar (RF-094).
+ *
+ * O teste de propriedade sorteia quedas e decisões, mas o começo da partida é
+ * determinístico: sem isto, todas as mil sementes falhariam em `FALTA_PRONTO`
+ * e o teste provaria só que a regra nova existe.
+ */
+function todosProntos(room: Room, now: number, ctx: (n: number) => RoomCtx): Room {
+  return seatedPlayers(room)
+    .filter((p) => p.bot === null && !p.pronto)
+    .reduce((r, p) => {
+      const res = applyCommand(r, p.id, { type: 'player:setPronto', payload: { pronto: true } }, ctx(now));
+      return res.ok ? res.room : r;
+    }, room);
+}
 
 /** LCG simples e determinístico: o caso falho é reproduzível pelo seed. */
 function lcg(seed: number): () => number {
@@ -63,7 +80,7 @@ function simulate(seed: number, playerCount: number): Outcome {
   };
 
   now += 100;
-  const start = applyCommand(room, room.hostId!, { type: 'host:startMatch', payload: {} }, ctxAt(now, seedStr));
+  const start = applyCommand(todosProntos(room, now, (n) => ctxAt(n, seedStr)), room.hostId!, { type: 'host:startMatch', payload: {} }, ctxAt(now, seedStr));
   if (!start.ok) throw new Error(`startMatch falhou: ${start.motivo}`);
   room = start.room;
   audit();
@@ -168,7 +185,7 @@ describe('CA-311: propriedade da sala sob desconexão', () => {
     for (const id of ['p2', 'p3']) {
       room = (join(room, { playerId: id, nickname: id, avatar: AVATAR }, ctxAt(10, 's')) as { room: Room }).room;
     }
-    const start = applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(100, 's'));
+    const start = applyCommand(todosProntos(room, 100, (n) => ctxAt(n, 's')), 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(100, 's'));
     if (!start.ok) throw new Error('falhou');
     room = start.room;
 

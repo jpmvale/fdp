@@ -59,6 +59,15 @@ function partidaCompleta(comContas: (string | null)[]): { room: Room; estado: Ma
     room = r.room;
   }
 
+  // RF-094: todo mundo sentado confirma antes de o host começar.
+  room = room.players
+    .filter((p) => !p.isSpectator && p.bot === null)
+    .reduce((r, p) => {
+      const res = applyCommand(r, p.id,
+        { type: 'player:setPronto', payload: { pronto: true } }, ctx());
+      return res.ok ? res.room : r;
+    }, room);
+
   const inicio = applyCommand(room, room.hostId!, { type: 'host:startMatch', payload: {} }, ctx());
   if (!inicio.ok) throw new Error('não começou');
   room = inicio.room;

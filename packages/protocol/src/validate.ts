@@ -90,6 +90,14 @@ export const commandSchema = z.discriminatedUnion('type', [
     type: z.literal('player:background'),
     payload: z.object({ emSegundoPlano: z.boolean() }).strict(),
   }),
+  z.object({
+    type: z.literal('player:setPronto'),
+    payload: z.object({ pronto: z.boolean() }).strict(),
+  }),
+  z.object({
+    type: z.literal('host:silenciar'),
+    payload: z.object({ playerId: z.string().min(1), silenciado: z.boolean() }).strict(),
+  }),
   z.object({ type: z.literal('player:leave'), payload: empty }),
   z.object({
     type: z.literal('player:setSpectator'),

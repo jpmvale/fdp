@@ -23,6 +23,14 @@ function salaEmPartida(): Room {
     if (!result.ok) throw new Error(result.code);
     room = result.room;
   }
+  // RF-094: todo mundo confirma antes de o host começar.
+  for (let i = 1; i <= 4; i++) {
+    const r = applyCommand(room, `p${i}`,
+      { type: 'player:setPronto', payload: { pronto: true } }, ctxAt(50 + i));
+    if (!r.ok) throw new Error(r.code);
+    room = r.room;
+  }
+
   const start: Command = { type: 'host:startMatch', payload: {} };
   const started = applyCommand(room, 'p1', start, ctxAt(100));
   if (!started.ok) throw new Error(started.code);

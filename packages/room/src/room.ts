@@ -118,6 +118,8 @@ function newPlayer(params: JoinParams, now: number, isSpectator: boolean): RoomP
     lastSeenAt: now,
     socketLostAt: null,
     emSegundoPlano: false,
+    pronto: false,
+    silenciado: false,
     lastChatAt: null,
     bot: null,
     conta: params.conta ?? null,
@@ -168,6 +170,10 @@ function newBot(
     lastChatAt: null,
     // Bot nunca sai da tela: não tem tela.
     emSegundoPlano: false,
+    // Bot nasce pronto: ele não tem o que confirmar, e exigir que o host
+    // "desse pronto" por cada bot seria cerimônia sem decisão.
+    pronto: true,
+    silenciado: false,
     bot: { difficulty },
     // Bot nunca tem conta. Não é descuido: é o que impede uma mesa só de bots
     // de fazer uma partida entrar no histórico de alguém (RF-068).
@@ -477,6 +483,56 @@ export function applyCommand(
       return commit(depois.room, ctx, depois.emissions);
     }
 
+    /**
+     * RF-094. O host só começa quando todo mundo confirmou.
+     *
+     * Existe porque "todos conectados" nunca significou "todos olhando": no
+     * lobby a pessoa entra pelo link, larga o telefone e volta cinco minutos
+     * depois — e a partida começava sem ela, que perdia a rodada de testa
+     * inteira sem ter visto uma carta.
+     */
+    case 'player:setPronto': {
+      if (room.status !== 'LOBBY') return failWith('WRONG_STATUS', 'SO_NO_LOBBY');
+      const alvo = room.players.find((p) => p.id === playerId);
+      if (!alvo) return failWith('VALIDATION_FAILED', 'JOGADOR_DESCONHECIDO');
+      // Quem assiste não joga, então não tem o que confirmar.
+      if (alvo.isSpectator) return failWith('VALIDATION_FAILED', 'ESPECTADOR_NAO_JOGA');
+      if (alvo.pronto === command.payload.pronto) return commit(room, ctx, []);
+
+      const players = replace(room.players, playerId, { pronto: command.payload.pronto });
+      return commit({ ...room, players }, ctx, [all({
+        type: 'room:playerUpdated',
+        payload: { player: toPublicPlayer(players.find((p) => p.id === playerId)!) },
+      })]);
+    }
+
+    /**
+     * RF-095. O host cala alguém no chat.
+     *
+     * Só o chat, e de propósito: calar não tira ninguém da partida. Expulsar é
+     * outro gesto, com outro custo, e confundir os dois faria o host escolher
+     * entre aguentar o spam e acabar com a partida de alguém.
+     */
+    case 'host:silenciar': {
+      if (room.status === 'ENCERRADA') return failWith('WRONG_STATUS', 'SALA_ENCERRADA');
+      const alvoId = command.payload.playerId;
+      // O host não se cala. Não é regra de etiqueta: é que ele é quem
+      // desfaria, e ninguém deve conseguir se trancar do lado de fora.
+      if (alvoId === playerId) return failWith('VALIDATION_FAILED', 'HOST_NAO_SE_SILENCIA');
+
+      const alvo = room.players.find((p) => p.id === alvoId && isPresent(p));
+      if (!alvo) return failWith('VALIDATION_FAILED', 'JOGADOR_DESCONHECIDO');
+      // Bot não fala (CA-336), então calá-lo não significa nada.
+      if (alvo.bot !== null) return failWith('VALIDATION_FAILED', 'BOT_NAO_FALA');
+      if (alvo.silenciado === command.payload.silenciado) return commit(room, ctx, []);
+
+      const players = replace(room.players, alvoId, { silenciado: command.payload.silenciado });
+      return commit({ ...room, players }, ctx, [all({
+        type: 'room:playerUpdated',
+        payload: { player: toPublicPlayer(players.find((p) => p.id === alvoId)!) },
+      })]);
+    }
+
     case 'player:setProfile': {
       if (room.status !== 'LOBBY') return failWith('WRONG_STATUS', 'SO_NO_LOBBY');
 
@@ -556,6 +612,11 @@ export function applyCommand(
       // mandar; a guarda existe porque "impossível hoje" e "impossível" são
       // coisas diferentes, e a barata é conferir.
       if (player.bot !== null) return failWith('VALIDATION_FAILED', 'BOT_NAO_FALA');
+
+      // RF-095. Recusado no SERVIDOR, e não só escondido na tela: um cliente
+      // adulterado mandaria o comando do mesmo jeito, e o silêncio que só
+      // existe na interface não é silêncio.
+      if (player.silenciado) return failWith('VALIDATION_FAILED', 'SILENCIADO');
 
       // Aparar antes de medir: 280 espaços não são uma mensagem, e " oi " e
       // "oi" são a mesma (RNF-014).
@@ -658,8 +719,24 @@ export function applyCommand(
 
     case 'host:rematch': {
       if (room.status !== 'FIM_DE_PARTIDA') return failWith('WRONG_STATUS', 'SEM_FIM_DE_PARTIDA');
-      // Espectadores viram jogadores na volta ao lobby (RF-014).
-      const players = room.players.map((p) => (isPresent(p) ? { ...p, isSpectator: false } : p));
+      /**
+       * A revanche PRESERVA o pronto de RF-094; o `host:toLobby` zera.
+       *
+       * São gestos diferentes. "Revanche com o mesmo grupo" não muda nada — o
+       * baralho, os bots e as opções são os mesmos, e quem acabou de jogar
+       * está demonstravelmente ali. Exigir que todos confirmem de novo
+       * transformaria um toque em seis, para resolver um problema que não
+       * existe nesse momento.
+       *
+       * **A revanche nunca trava por pronto**, nem para quem estava assistindo.
+       * Tentei o contrário primeiro — espectador que senta entra sem pronto —
+       * e o resultado foi o host clicando "revanche" e recebendo um erro que
+       * ele não tinha como resolver, porque a revanche não passa pelo lobby.
+       * Quem está na sala quando a partida acaba viu a partida acabar; o botão
+       * do host é a confirmação do grupo.
+       */
+      const players = room.players.map((p) =>
+        isPresent(p) ? { ...p, isSpectator: false, pronto: true } : p);
       const lobby: Room = { ...room, status: 'LOBBY', match: null, pause: null, phaseDeadline: null, players };
       return startMatch(lobby, ctx);
     }
@@ -671,7 +748,12 @@ export function applyCommand(
       if (room.status !== 'FIM_DE_PARTIDA') return failWith('WRONG_STATUS', 'SEM_FIM_DE_PARTIDA');
       // Espectadores viram jogadores na volta ao lobby (RF-014), como na
       // revanche: quem chegou no meio da partida passada joga a próxima.
-      const players = room.players.map((p) => (isPresent(p) ? { ...p, isSpectator: false } : p));
+      //
+      // E o pronto de RF-094 é ZERADO aqui, ao contrário da revanche: voltar
+      // para arrumar a mesa significa que bots, opções e gente vão mudar, e um
+      // pronto herdado confirmaria uma mesa que já não é a mesma.
+      const players = room.players.map((p) =>
+        isPresent(p) ? { ...p, isSpectator: false, pronto: false } : p);
       const lobby: Room = {
         ...room, status: 'LOBBY', match: null, pause: null, phaseDeadline: null, players,
       };
@@ -732,9 +814,30 @@ function startMatch(room: Room, ctx: RoomCtx): RoomResult {
    * assistindo passavam nos dois testes de contagem, e a partida começava sem
    * ninguém para jogá-la: quatro horas de bots se enfrentando até o TTL.
    */
+  /**
+   * RF-094: todo mundo sentado precisa ter confirmado.
+   *
+   * Bot nasce pronto, então uma mesa de gente + bots só espera pela gente. E
+   * quem está no lobby sem confirmar tem duas saídas para o host: esperar ou
+   * expulsar — `host:kick` já existe no lobby e é o escape.
+   */
   if (!seated.some((p) => p.bot === null)) {
     return failWith('WRONG_STATUS', 'SO_BOTS_NA_MESA');
   }
+
+  /**
+   * RF-094: todo mundo sentado precisa ter confirmado.
+   *
+   * **Depois** da checagem de "só bots", e não antes: uma mesa sem gente é um
+   * problema mais fundamental que uma confirmação faltando, e reportar
+   * "falta pronto" para uma mesa de dois bots mandaria o host procurar quem
+   * confirmar entre jogadores que não confirmam nada.
+   *
+   * Bot nasce pronto, então uma mesa de gente + bots só espera pela gente. E
+   * quem está no lobby sem confirmar tem duas saídas para o host: esperar ou
+   * expulsar — `host:kick` já existe no lobby e é o escape.
+   */
+  if (seated.some((p) => !p.pronto)) return failWith('WRONG_STATUS', 'FALTA_PRONTO');
 
   const match = createMatch({
     matchId: ctx.newId(),

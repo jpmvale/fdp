@@ -31,6 +31,12 @@ const FRASES: Record<string, string> = {
   SO_NO_LOBBY: 'Isso só dá para fazer antes de a partida começar.',
   JOGADORES_INSUFICIENTES: 'Faltam jogadores: são precisos 2.',
   SO_BOTS_NA_MESA: 'Só há bots na mesa. Sente-se para começar.',
+  FALTA_PRONTO: 'Ainda falta gente dar pronto.',
+  ESPECTADOR_NAO_JOGA: 'Quem está assistindo não precisa dar pronto.',
+  // RF-095. A frase diz o ESTADO e quem o desfaz — "não foi possível enviar"
+  // faria a pessoa tentar de novo achando que foi a rede.
+  SILENCIADO: 'O host silenciou você no chat desta mesa.',
+  HOST_NAO_SE_SILENCIA: 'O host não pode se silenciar.',
   BOT_NAO_ASSISTE: 'Bot não assiste — ele joga ou sai.',
   COMANDO_EXIGE_HOST: 'Só quem é host pode fazer isso.',
   HOST_NAO_SE_EXPULSA: 'Você não pode se expulsar.',

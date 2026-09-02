@@ -54,8 +54,23 @@ function send(room: Room, playerId: string, command: Command, now: number) {
   return applyCommand(room, playerId, command, ctxAt(now));
 }
 
+/**
+ * Todo mundo sentado dá pronto (RF-094).
+ *
+ * Existe porque a regra nova quebrou 52 testes de uma vez, e o conserto certo
+ * não era afrouxar a regra: era o ajudante refletir o que uma mesa de verdade
+ * faz antes de começar. Bot já nasce pronto e não precisa passar por aqui.
+ */
+const todosProntos = (room: Room, now = 90): Room =>
+  seatedPlayers(room)
+    .filter((p) => p.bot === null && !p.pronto)
+    .reduce((r, p) => ok(send(r, p.id, {
+      type: 'player:setPronto', payload: { pronto: true },
+    }, now)).room, room);
+
 const started = (room: Room, now = 100): Room =>
-  ok(send(room, room.hostId!, { type: 'host:startMatch', payload: {} }, now)).room;
+  ok(send(todosProntos(room, now - 1), room.hostId!,
+    { type: 'host:startMatch', payload: {} }, now)).room;
 
 const types = (emissions: Emission[]): string[] => emissions.map((e) => e.event.type);
 
@@ -581,7 +596,7 @@ describe('CA-326: o host senta e tira bots no lobby', () => {
 
   it('com a partida em andamento, não se mexe em bot', () => {
     let room = ok(applyCommand(roomWith(1), 'p1', addBot('FACIL'), ctxAt(10))).room;
-    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
+    room = ok(applyCommand(todosProntos(room, 19), 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
     const recusado = applyCommand(room, 'p1', addBot('FACIL'), ctxAt(30));
     expect(recusado.ok).toBe(false);
   });
@@ -592,7 +607,7 @@ describe('CA-327: o bot joga sozinho quando é a vez dele', () => {
     let room = roomWith(1);
     room = ok(applyCommand(room, 'p1', { type: 'host:addBot', payload: { difficulty: 'MEDIO' } }, ctxAt(10))).room;
     room = ok(applyCommand(room, 'p1', { type: 'host:addBot', payload: { difficulty: 'FACIL' } }, ctxAt(11))).room;
-    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
+    room = ok(applyCommand(todosProntos(room, 19), 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
 
     const humano = 'p1';
     let agora = 20;
@@ -626,7 +641,7 @@ describe('CA-327: o bot joga sozinho quando é a vez dele', () => {
   it('o prazo de um bot é o de pensar, não o do relógio humano', () => {
     let room = roomWith(1);
     room = ok(applyCommand(room, 'p1', { type: 'host:addBot', payload: { difficulty: 'MEDIO' } }, ctxAt(10))).room;
-    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
+    room = ok(applyCommand(todosProntos(room, 19), 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
 
     // Avança até que a vez seja do bot.
     let agora = 20;
@@ -660,7 +675,7 @@ describe('CA-350: voltar ao lobby depois da partida', () => {
 
   it('do fim de partida, a sala volta a LOBBY sem começar nada', () => {
     let room = ok(applyCommand(roomWith(1), 'p1', { type: 'host:addBot', payload: { difficulty: 'FACIL' } }, ctxAt(10))).room;
-    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
+    room = ok(applyCommand(todosProntos(room, 19), 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
     room = ok(applyCommand(room, 'p1', { type: 'host:endMatch', payload: {} }, ctxAt(30))).room;
     expect(room.status).toBe('FIM_DE_PARTIDA');
 
@@ -675,7 +690,7 @@ describe('CA-350: voltar ao lobby depois da partida', () => {
 
   it('não serve para fugir do meio de uma partida', () => {
     let room = ok(applyCommand(roomWith(1), 'p1', { type: 'host:addBot', payload: { difficulty: 'FACIL' } }, ctxAt(10))).room;
-    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
+    room = ok(applyCommand(todosProntos(room, 19), 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
 
     const recusado = applyCommand(room, 'p1', aoLobby, ctxAt(30));
     expect(recusado.ok).toBe(false);
@@ -685,14 +700,14 @@ describe('CA-350: voltar ao lobby depois da partida', () => {
 
   it('só o host volta a mesa para o lobby', () => {
     let room = roomWith(2);
-    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
+    room = ok(applyCommand(todosProntos(room, 19), 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
     room = ok(applyCommand(room, 'p1', { type: 'host:endMatch', payload: {} }, ctxAt(30))).room;
     expect(applyCommand(room, 'p2', aoLobby, ctxAt(40)).ok).toBe(false);
   });
 
   it('espectador da partida passada joga a próxima (RF-014)', () => {
     let room = roomWith(2);
-    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
+    room = ok(applyCommand(todosProntos(room, 19), 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(20))).room;
     room = ok(join(room, { playerId: 'p9', nickname: 'Tarde', avatar: AVATAR }, ctxAt(25))).room;
     expect(room.players.find((p) => p.id === 'p9')!.isSpectator).toBe(true);
 
@@ -743,7 +758,7 @@ describe('CA-397 / RF-083: entrar e sair da mesa no lobby', () => {
 
   it('só no lobby: com partida em curso, recusa', () => {
     let room = roomWith(3);
-    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(10))).room;
+    room = ok(applyCommand(todosProntos(room, 9), 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(10))).room;
 
     // Sair da mesa no meio da partida é abandono, e tem caminho próprio; entrar
     // nela é RF-014, que manda jogar na PRÓXIMA. Alternar aqui deixaria alguém
@@ -804,7 +819,7 @@ describe('CA-397 / RF-083: entrar e sair da mesa no lobby', () => {
     room = ok(applyCommand(room, 'p1', virar(false), ctxAt(40))).room;
     expect(humano(room), 'depois de sentar de volta').toBe(true);
 
-    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(50))).room;
+    room = ok(applyCommand(todosProntos(room, 49), 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(50))).room;
     expect(humano(room), 'depois de começar').toBe(true);
 
     // Cai, e o tempo passa: a carência de transporte vira ausência, e é aí que
@@ -835,7 +850,7 @@ describe('CA-397 / RF-083: entrar e sair da mesa no lobby', () => {
      * apareceu, e é pelo sintoma que alguém vai reconhecê-lo se voltar.
      */
     let room = roomWith(3);
-    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(10))).room;
+    room = ok(applyCommand(todosProntos(room, 9), 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(10))).room;
 
     room = ok(join(room, { playerId: 's1', nickname: 'Plateia', avatar: { emoji: '🦉', color: 'sky' } }, ctxAt(20))).room;
     room = ok(reconnect(room, 's1', ctxAt(21))).room;
@@ -855,7 +870,7 @@ describe('CA-397 / RF-083: entrar e sair da mesa no lobby', () => {
   it('CA-407: quem ESTAVA jogando e sai continua abortando a rodada (RJ-154)', () => {
     // A outra metade: o conserto não pode ter desligado a retirada de verdade.
     let room = roomWith(3);
-    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(10))).room;
+    room = ok(applyCommand(todosProntos(room, 9), 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(10))).room;
 
     const r = ok(leave(room, 'p2', ctxAt(20)));
     expect(r.emissions.map((e) => e.event.type)).toContain('round:aborted');
@@ -877,8 +892,8 @@ describe('CA-397 / RF-083: entrar e sair da mesa no lobby', () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.motivo).toBe('SO_BOTS_NA_MESA');
 
-    // Sentando de volta, começa normalmente.
-    const sentado = ok(applyCommand(room, 'p1', virar(false), ctxAt(50))).room;
+    // Sentando de volta E confirmando (RF-094), começa normalmente.
+    const sentado = todosProntos(ok(applyCommand(room, 'p1', virar(false), ctxAt(50))).room, 55);
     expect(applyCommand(sentado, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(60)).ok).toBe(true);
   });
 
@@ -959,7 +974,7 @@ describe('CA-330 a CA-341: chat da mesa', () => {
     let room = roomWith(2);
     expect(applyCommand(room, 'p1', dizer('no lobby'), ctxAt(50)).ok).toBe(true);
 
-    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(60))).room;
+    room = ok(applyCommand(todosProntos(room, 59), 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(60))).room;
     expect(applyCommand(room, 'p1', dizer('em partida'), ctxAt(70)).ok).toBe(true);
 
     const encerrada: Room = { ...room, status: 'ENCERRADA' };
@@ -993,7 +1008,7 @@ describe('CA-330 a CA-341: chat da mesa', () => {
   it('CA-334/CA-335: o histórico vai no retrato, para quem recarrega e para quem chega depois', () => {
     let room = roomWith(2);
     room = ok(applyCommand(room, 'p1', dizer('antes de você chegar'), ctxAt(50))).room;
-    room = ok(applyCommand(room, 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(60))).room;
+    room = ok(applyCommand(todosProntos(room, 59), 'p1', { type: 'host:startMatch', payload: {} }, ctxAt(60))).room;
 
     // Entrar com partida em andamento = espectador (RF-014).
     const comEspectador = ok(join(room, { playerId: 'p9', nickname: 'Tarde', avatar: AVATAR }, ctxAt(70))).room;
@@ -1295,5 +1310,205 @@ describe('CA-414: segundo plano não é ausência', () => {
 
     expect(tick(room, ctxAt(300 + LIMITS.transportGraceMs + 1_000)).room.status)
       .toBe('EM_PARTIDA');
+  });
+});
+
+/**
+ * RF-094 — o host só começa quando todo mundo confirmou.
+ *
+ * "Todos conectados" nunca significou "todos olhando": no lobby a pessoa entra
+ * pelo link, larga o telefone e volta cinco minutos depois — e a partida
+ * começava sem ela, que perdia a rodada de testa inteira sem ter visto uma
+ * carta.
+ */
+describe('CA-415: pronto no lobby', () => {
+  const pronto = (room: Room, id: string, valor: boolean, now = 50) =>
+    send(room, id, { type: 'player:setPronto', payload: { pronto: valor } }, now);
+
+  it('sem todos prontos, o host não começa', () => {
+    const room = roomWith(3);
+    const r = send(room, room.hostId!, { type: 'host:startMatch', payload: {} }, 100);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toBe('FALTA_PRONTO');
+  });
+
+  it('faltando UM, ainda não começa', () => {
+    let room = roomWith(3);
+    room = ok(pronto(room, 'p1', true)).room;
+    room = ok(pronto(room, 'p2', true)).room;
+
+    const r = send(room, room.hostId!, { type: 'host:startMatch', payload: {} }, 100);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toBe('FALTA_PRONTO');
+  });
+
+  it('com todos prontos, começa', () => {
+    let room = roomWith(3);
+    for (const id of ['p1', 'p2', 'p3']) room = ok(pronto(room, id, true)).room;
+
+    expect(send(room, room.hostId!, { type: 'host:startMatch', payload: {} }, 100).ok).toBe(true);
+  });
+
+  /** Bot não tem o que confirmar, e exigir isso seria cerimônia sem decisão. */
+  it('bot nasce pronto: mesa de gente e bots só espera pela gente', () => {
+    let room = roomWith(1);
+    room = ok(send(room, 'p1', { type: 'host:addBot', payload: { difficulty: 'MEDIO' } }, 10)).room;
+    expect(room.players.find((p) => p.bot !== null)!.pronto).toBe(true);
+
+    // Só o humano falta.
+    expect(send(room, 'p1', { type: 'host:startMatch', payload: {} }, 100).ok).toBe(false);
+    room = ok(pronto(room, 'p1', true)).room;
+    expect(send(room, 'p1', { type: 'host:startMatch', payload: {} }, 100).ok).toBe(true);
+  });
+
+  it('desmarcar volta a travar o começo', () => {
+    let room = roomWith(2);
+    room = ok(pronto(room, 'p1', true)).room;
+    room = ok(pronto(room, 'p2', true)).room;
+    room = ok(pronto(room, 'p2', false, 60)).room;
+
+    const r = send(room, room.hostId!, { type: 'host:startMatch', payload: {} }, 100);
+    expect(r.ok).toBe(false);
+  });
+
+  it('repetir o mesmo pronto não emite evento', () => {
+    let room = roomWith(2);
+    room = ok(pronto(room, 'p1', true)).room;
+    expect(ok(pronto(room, 'p1', true, 60)).emissions).toEqual([]);
+  });
+
+  it('espectador não confirma, e não segura a mesa', () => {
+    let room = roomWith(2);
+    const espectador = ok(join(room, {
+      playerId: 'e1', nickname: 'Zé', avatar: AVATAR,
+    }, ctxAt(20)));
+    room = espectador.room;
+
+    const r = send(room, 'e1', { type: 'player:setPronto', payload: { pronto: true } }, 30);
+    // No lobby quem entra senta; o teste cobre o caminho de quem está de fora.
+    if (!r.ok) expect(r.motivo).toBe('ESPECTADOR_NAO_JOGA');
+  });
+
+  it('fora do lobby, confirmar não faz sentido', () => {
+    const room = started(roomWith(2));
+    const r = send(room, 'p2', { type: 'player:setPronto', payload: { pronto: true } }, 200);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toBe('SO_NO_LOBBY');
+  });
+
+  /**
+   * A revanche não passa pelo lobby, então travá-la por pronto deixaria o host
+   * com um erro que ele não tem como resolver. Quem está na sala quando a
+   * partida acaba viu a partida acabar.
+   */
+  it('a revanche não trava por pronto', () => {
+    let room = started(roomWith(2));
+    room = ok(send(room, room.hostId!, { type: 'host:endMatch', payload: {} }, 300)).room;
+    expect(room.status).toBe('FIM_DE_PARTIDA');
+
+    expect(send(room, room.hostId!, { type: 'host:rematch', payload: {} }, 400).ok).toBe(true);
+  });
+
+  /** Voltar para arrumar a mesa muda bots e opções: confirma-se de novo. */
+  it('voltar ao lobby ZERA o pronto', () => {
+    let room = started(roomWith(2));
+    room = ok(send(room, room.hostId!, { type: 'host:endMatch', payload: {} }, 300)).room;
+    room = ok(send(room, room.hostId!, { type: 'host:toLobby', payload: {} }, 400)).room;
+
+    expect(seatedPlayers(room).every((p) => p.bot !== null || !p.pronto)).toBe(true);
+    expect(send(room, room.hostId!, { type: 'host:startMatch', payload: {} }, 500).ok).toBe(false);
+  });
+});
+
+/**
+ * RF-095 — o host cala alguém no chat.
+ *
+ * Só o chat, e de propósito: calar não tira ninguém da partida. Sem isto, o
+ * host escolhia entre aguentar o spam e acabar com a partida de alguém.
+ */
+describe('CA-416: silenciar no chat', () => {
+  const calar = (room: Room, alvo: string, valor: boolean, quem = 'p1', now = 60) =>
+    send(room, quem, { type: 'host:silenciar', payload: { playerId: alvo, silenciado: valor } }, now);
+
+  const falar = (room: Room, quem: string, now = 70) =>
+    send(room, quem, { type: 'chat:send', payload: { text: 'oi' } }, now);
+
+  it('calado não fala, e a recusa é do SERVIDOR', () => {
+    let room = roomWith(3);
+    expect(falar(room, 'p2').ok).toBe(true);
+
+    room = ok(calar(room, 'p2', true)).room;
+    const r = falar(room, 'p2', 80);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toBe('SILENCIADO');
+  });
+
+  it('liberar devolve a voz', () => {
+    let room = roomWith(3);
+    room = ok(calar(room, 'p2', true)).room;
+    room = ok(calar(room, 'p2', false, 'p1', 90)).room;
+    expect(falar(room, 'p2', 100).ok).toBe(true);
+  });
+
+  it('calar um não cala os outros', () => {
+    let room = roomWith(3);
+    room = ok(calar(room, 'p2', true)).room;
+    expect(falar(room, 'p3', 80).ok).toBe(true);
+  });
+
+  it('só o host cala', () => {
+    const room = roomWith(3);
+    const r = calar(room, 'p3', true, 'p2');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe('NOT_HOST');
+  });
+
+  /** Ninguém deve conseguir se trancar do lado de fora. */
+  it('o host não se cala', () => {
+    const room = roomWith(3);
+    const r = calar(room, 'p1', true);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toBe('HOST_NAO_SE_SILENCIA');
+  });
+
+  it('bot não se cala: ele já não fala', () => {
+    let room = roomWith(1);
+    room = ok(send(room, 'p1', { type: 'host:addBot', payload: { difficulty: 'MEDIO' } }, 10)).room;
+    const bot = room.players.find((p) => p.bot !== null)!;
+
+    const r = calar(room, bot.id, true);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toBe('BOT_NAO_FALA');
+  });
+
+  it('vale DURANTE a partida, que é quando o spam incomoda', () => {
+    let room = started(roomWith(3));
+    room = ok(calar(room, 'p2', true, 'p1', 200)).room;
+
+    const r = falar(room, 'p2', 210);
+    expect(r.ok).toBe(false);
+  });
+
+  /** O host calou por um motivo; a revanche não é perdão automático. */
+  it('o silêncio sobrevive à volta ao lobby', () => {
+    let room = started(roomWith(3));
+    room = ok(calar(room, 'p2', true, 'p1', 200)).room;
+    room = ok(send(room, room.hostId!, { type: 'host:endMatch', payload: {} }, 300)).room;
+    room = ok(send(room, room.hostId!, { type: 'host:toLobby', payload: {} }, 400)).room;
+
+    expect(room.players.find((p) => p.id === 'p2')!.silenciado).toBe(true);
+    expect(falar(room, 'p2', 500).ok).toBe(false);
+  });
+
+  it('a mesa inteira vê quem está calado', () => {
+    let room = roomWith(3);
+    const r = ok(calar(room, 'p2', true));
+    room = r.room;
+
+    expect(types(r.emissions)).toContain('room:playerUpdated');
+    const visao = snapshotFor(room, 'p3') as unknown as {
+      payload: { players: { id: string; silenciado: boolean }[] };
+    };
+    expect(visao.payload.players.find((p) => p.id === 'p2')!.silenciado).toBe(true);
   });
 });

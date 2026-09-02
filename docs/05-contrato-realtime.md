@@ -94,6 +94,8 @@ existe caminho de código separado para "recuperar partida".
 | `room:resync` | `{}` | qualquer | Devolve `room:snapshot` |
 | `player:setProfile` | `{ nickname, avatar }` | qualquer, só em `LOBBY` | Atualiza perfil |
 | `player:background` | `{ emSegundoPlano }` | qualquer, inclusive `PAUSADA` | A aba foi para segundo plano, ou voltou (RJ-117b) |
+| `player:setPronto` | `{ pronto }` | só em `LOBBY`, e não para quem assiste | Confirma que está pronto (RF-094) |
+| `host:silenciar` | `{ playerId, silenciado }` | qualquer, **exceto** o próprio host e bots | Cala ou libera alguém no chat (RF-095) |
 | `player:leave` | `{}` | qualquer | Sai da sala |
 | `player:setSpectator` | `{ spectator }` | qualquer, **exceto bot**, só em `LOBBY` | Sai da mesa para assistir, ou senta-se (RF-083). Pedir o que já se é não emite evento |
 | `chat:send` | `{ text }` | qualquer presente, **exceto bot**, em qualquer status menos `ENCERRADA` | Publica a mensagem para a sala (RF-017) |

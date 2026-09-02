@@ -12,7 +12,7 @@ const DIFICULDADES: { valor: BotDifficulty; rotulo: string; explica: string }[] 
   { valor: 'REALISTA', rotulo: 'Realista', explica: 'Lê as apostas da mesa e mede o risco de cada carta. Ganha da maioria.' },
 ];
 
-export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRemoverBot, aoAbrirPerfil, aoAbrirRegras, aoSair, aoEnviarChat, aoAssistir }: {
+export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRemoverBot, aoAbrirPerfil, aoAbrirRegras, aoSair, aoEnviarChat, aoAssistir, aoDarPronto, aoSilenciar }: {
   retrato: Retrato;
   eu: string;
   aoIniciar: () => void;
@@ -24,6 +24,8 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
   aoSair: () => void;
   aoEnviarChat: (texto: string) => void;
   aoAssistir: (assistir: boolean) => void;
+  aoDarPronto: (pronto: boolean) => void;
+  aoSilenciar: (playerId: string, silenciado: boolean) => void;
 }) {
   const [dificuldade, setDificuldade] = useState<BotDifficulty>('MEDIO');
   const jogadores = retrato.players.filter((p) => !p.isSpectator);
@@ -39,6 +41,11 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
   // bastar quando virou possível sair da mesa sem sair da sala (RF-083): dois
   // bots sentados e o único humano assistindo passavam nas duas contagens.
   const alguemJogando = jogadores.some((p) => !p.bot);
+
+  // RF-094. Bot nasce pronto, então quem falta é sempre gente.
+  const euPronto = jogadores.find((p) => p.id === eu)?.pronto ?? false;
+  const faltamProntos = jogadores.filter((p) => !p.pronto);
+  const todosProntos = faltamProntos.length === 0;
   const convite = `${location.origin}/?sala=${retrato.code}`;
 
   return (
@@ -81,6 +88,40 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
                 ausente={false}
               />
             </div>
+            {/* Pronto de RF-094, visível para a mesa inteira.
+                Palavra e não só ícone: um ✓ verde sozinho depende de cor, e
+                metade de quem falta precisa ser identificada de relance. */}
+            {p.pronto ? (
+              <span
+                style={{ fontSize: 10, color: 'var(--nota-alta)', letterSpacing: '.04em' }}
+                aria-label={`${p.nickname} está pronto`}
+              >
+                ✓ pronto
+              </span>
+            ) : (
+              <span
+                style={{ fontSize: 10, color: 'var(--texto-apagado)', letterSpacing: '.04em' }}
+                aria-label={`${p.nickname} ainda não deu pronto`}
+              >
+                aguardando
+              </span>
+            )}
+
+            {/* RF-095: silenciar. Só para gente — bot não fala. */}
+            {souHost && p.id !== eu && !p.bot && (
+              <button
+                className="fantasma"
+                aria-pressed={p.silenciado}
+                aria-label={p.silenciado
+                  ? `Devolver a voz a ${p.nickname}`
+                  : `Silenciar ${p.nickname} no chat`}
+                onClick={() => aoSilenciar(p.id, !p.silenciado)}
+                style={{ minWidth: 44, padding: 0, opacity: p.silenciado ? 1 : 0.6 }}
+              >
+                {p.silenciado ? '🔇' : '🔈'}
+              </button>
+            )}
+
             {souHost && p.id !== eu && (
               <button
                 className="fantasma"
@@ -216,35 +257,68 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
         </button>
       </div>
 
-      <Chat mensagens={retrato.chat} eu={eu} aoEnviar={aoEnviarChat} />
+      <Chat
+        mensagens={retrato.chat}
+        eu={eu}
+        aoEnviar={aoEnviarChat}
+        souHost={souHost}
+        silenciados={new Set(retrato.players.filter((p) => p.silenciado).map((p) => p.id))}
+        estouSilenciado={retrato.players.find((p) => p.id === eu)?.silenciado ?? false}
+        aoSilenciar={aoSilenciar}
+      />
 
       {/* RF-025: toda tela tem saída explícita. Sem isto, entrar numa sala era
           um caminho de mão única — só fechando a aba, o que o servidor leria
           como queda e faria a mesa esperar por quem não vai voltar. */}
       <button className="fantasma" onClick={aoSair}>Sair da mesa</button>
 
+      {/* RF-094: o próprio pronto, para quem está sentado.
+          Fica ACIMA do botão do host, porque é o passo que vem antes — e
+          porque o host também precisa dar o dele. */}
+      {!assistindo && (
+        <button
+          className={euPronto ? 'fantasma' : undefined}
+          onClick={() => aoDarPronto(!euPronto)}
+          aria-pressed={euPronto}
+        >
+          {euPronto ? '✓ Pronto — tocar para desmarcar' : 'Estou pronto'}
+        </button>
+      )}
+
       {souHost ? (
         <div className="pilha" style={{ gap: 8 }}>
-          <button disabled={!suficiente || !alguemJogando} onClick={aoIniciar}>
+          <button
+            disabled={!suficiente || !alguemJogando || !todosProntos}
+            onClick={aoIniciar}
+          >
             Começar a partida
           </button>
           {!suficiente ? (
             <p className="fraco">
               Falta gente: são precisos {LIMITS.minPlayers} para começar.
             </p>
-          ) : !alguemJogando && (
+          ) : !alguemJogando ? (
             /* O servidor também recusa, com `SO_BOTS_NA_MESA`. Aqui é para a
                recusa não CHEGAR: um botão que aceita o toque e devolve erro
                vermelho é pior que um botão desligado que diz o que fazer. */
             <p className="fraco">
               Só há bots na mesa. Sente-se para a partida começar.
             </p>
+          ) : !todosProntos && (
+            /* Dizer QUEM falta, e não "aguardando jogadores".
+               Sem os nomes, a espera vira adivinhação e o host acaba
+               expulsando quem não devia. */
+            <p className="fraco">
+              Falta {faltamProntos.map((p) => p.nickname).join(', ')} dar pronto.
+            </p>
           )}
         </div>
       ) : (
         <div className="cartao" style={{ textAlign: 'center' }}>
           <p className="fraco">
-            Esperando {retrato.players.find((p) => p.id === retrato.hostId)?.nickname ?? 'o host'} começar.
+            {todosProntos
+              ? `Esperando ${retrato.players.find((p) => p.id === retrato.hostId)?.nickname ?? 'o host'} começar.`
+              : `Faltam ${faltamProntos.length} ${faltamProntos.length === 1 ? 'pessoa' : 'pessoas'} dar pronto.`}
           </p>
         </div>
       )}

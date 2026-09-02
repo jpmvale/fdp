@@ -13,7 +13,7 @@ import { Feltro } from '../components/Feltro';
 import { Vidas } from '../components/Vidas';
 import type { Retrato, PlayerView } from '../state/tipos';
 
-export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoApostar, aoJogar, aoAbrirRegras, aoEnviarChat, preJogada, aoPreJogar, aoAbrirPerfil }: {
+export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoApostar, aoJogar, aoAbrirRegras, aoEnviarChat, preJogada, aoPreJogar, aoAbrirPerfil, aoSilenciar }: {
   retrato: Retrato;
   eu: string;
   partida: PlayerView;
@@ -26,6 +26,7 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
   preJogada: string | null;
   aoPreJogar: (id: string | null) => void;
   aoAbrirPerfil?: ((slug: string) => void) | undefined;
+  aoSilenciar?: ((playerId: string, silenciado: boolean) => void) | undefined;
 }) {
   const nome = (id: string) => retrato.players.find((p) => p.id === id)?.nickname ?? '—';
 
@@ -114,6 +115,10 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
           eu={eu}
           aoEnviar={aoEnviarChat}
           inicialmenteAberto={larga}
+          souHost={retrato.hostId === eu}
+          silenciados={new Set(retrato.players.filter((p) => p.silenciado).map((p) => p.id))}
+          estouSilenciado={retrato.players.find((p) => p.id === eu)?.silenciado ?? false}
+          aoSilenciar={aoSilenciar}
         />
 
         <Historico partida={partida} jogadores={retrato.players} eu={eu} />
