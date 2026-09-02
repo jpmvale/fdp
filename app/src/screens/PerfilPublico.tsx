@@ -4,6 +4,7 @@ import { faixaDe } from '@fdp/rules';
 import { Avatar } from '../components/Avatar';
 import { Folha } from '../components/Folha';
 import { perfilPublico, type ContaPublica } from '../net/sessao';
+import { agruparPorDia, dataPorExtenso } from '../datas';
 import type { Avatar as AvatarProto } from '@fdp/protocol';
 
 interface PartidaNoPerfil {
@@ -70,6 +71,14 @@ export function PerfilPublico({ slug, aoFechar, meu = false }: {
     } | null
   >(null);
   const [erro, setErro] = useState<string | null>(null);
+  /**
+   * O "agora" congelado na abertura da folha.
+   *
+   * `Date.now()` no meio do render mudaria a cada quadro, e uma folha aberta na
+   * virada da meia-noite veria "hoje" virar "ontem" debaixo do dedo de quem
+   * está lendo. Um instante só, fixo enquanto a tela existe.
+   */
+  const [agora] = useState(() => Date.now());
   const [buscandoMais, setBuscandoMais] = useState(false);
 
   useEffect(() => {
@@ -164,9 +173,46 @@ export function PerfilPublico({ slug, aoFechar, meu = false }: {
                   {dados.partidas.length} de {dados.resumo.partidas}
                 </span>
               </div>
-              {dados.partidas.map((p, i) => (
+              {/* Agrupado por dia (RF-108).
+
+                  Uma coluna de data em cada linha não cabe: a linha já carrega
+                  colocação, tamanho da mesa, rodadas, acertos, elo e nota, e a
+                  tela é desenhada para 360 px. Um cabeçalho por dia não custa
+                  largura nenhuma — e junta as quatro partidas da mesma noite,
+                  que é como elas aconteceram. */}
+              {agruparPorDia(dados.partidas, (p) => p.quando, agora).map((dia, d) => (
+                /* A chave leva o índice porque o rótulo NÃO é único: o
+                   agrupamento respeita a ordem que veio do servidor, então o
+                   mesmo dia separado por outro dia rende dois grupos com o
+                   mesmo nome. Hoje o servidor ordena por data e isso não
+                   acontece — chave duplicada seria um defeito latente
+                   esperando a primeira mudança de ordenação. */
+                <div key={`${dia.rotulo}-${String(d)}`} className="pilha" style={{ gap: 6 }}>
+                  {/* Separador, e não cabeçalho.
+
+                      Com a mesma classe `.rotulo` de "últimas partidas", o dia
+                      ficava com o peso visual de uma seção irmã — "HOJE" lia
+                      como um título no mesmo nível, e não como uma divisão
+                      DENTRO da lista. O fio à direita resolve sem inventar
+                      tipografia nova: é a forma que já se reconhece como
+                      divisória, em qualquer aplicativo de conversa. */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8, marginTop: 4,
+                  }}>
+                    <span style={{ fontSize: 11, color: 'var(--texto-apagado)' }}>
+                      {dia.rotulo}
+                    </span>
+                    <span aria-hidden style={{ flex: 1, height: 1, background: 'var(--linha)' }} />
+                  </div>
+                  {dia.itens.map((p, i) => (
                 <div
                   key={i}
+                  /* A data completa fica no `title` e no rótulo acessível: o
+                     cabeçalho do dia é curto de propósito, e curto perde a
+                     hora — duas partidas do mesmo dia ficariam
+                     indistinguíveis (RNF-038). */
+                  title={dataPorExtenso(p.quando)}
+                  aria-label={`Partida de ${dataPorExtenso(p.quando)}`}
                   style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 13 }}
                 >
                   <span style={{ width: 26, color: 'var(--texto-apagado)', fontSize: 11 }}>
@@ -203,6 +249,8 @@ export function PerfilPublico({ slug, aoFechar, meu = false }: {
                   }}>
                     {p.nota === null ? '—' : p.nota.toFixed(1)}
                   </span>
+                </div>
+                  ))}
                 </div>
               ))}
 

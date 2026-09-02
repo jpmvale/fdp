@@ -201,6 +201,7 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 | RF-105 | O perfil público mostra faixa e pontos; não há listagem nem classificação global |
 | RF-106 | Qualquer pessoa **PODE** esconder as mensagens de outra **para si**, sem passar pelo servidor e sem que a outra saiba |
 | RF-107 | O convite **DEVE** ser `/{origem}/j/{código}` e chegar nas conversas como cartão: título, descrição com a contagem da mesa e imagem. O formato antigo `?sala=` continua entrando |
+| RF-108 | O histórico do perfil **DEVE** dizer **quando** cada partida aconteceu, agrupado por dia, com "hoje" e "ontem" por extenso e o ano quando não for o corrente |
 
 RF-086 abre a casca de 460 px para 900 **só na mesa**, e é a única tela onde isso
 acontece. Em qualquer outra, a coluna continua estreita mesmo num monitor de 27" —
@@ -279,6 +280,22 @@ autoridade social real — quem criou a mesa e convidou os outros. Entre estranh
 dar a um deles o botão de expulsar os outros quatro é entregar a partida a quem clicar primeiro.
 A consequência é RF-102: a decisão de pausa precisa de um host, então a ausência passa a
 resolver-se sozinha, pelo mesmo mecanismo do RF-096.
+
+**Por que a data do histórico é um separador por dia, e não uma coluna (RF-108).** A linha já
+carrega colocação, tamanho da mesa, rodadas, acertos, elo e nota, e a tela é desenhada para 360 px:
+uma coluna a mais espremeria todas as outras. Um cabeçalho a cada dia não custa largura nenhuma — e
+junta as quatro partidas da mesma noite, que é como elas aconteceram.
+
+O separador tem peso visual MENOR que o título da seção, com um fio à direita. Com a mesma classe
+`.rotulo` de "últimas partidas", "HOJE" lia como uma seção irmã em vez de uma divisão dentro da
+lista — e a hierarquia errada é pior que nenhuma.
+
+"Hoje" e "ontem" porque é assim que alguém se refere à partida de ontem; ninguém diz "joguei em 1º
+de setembro" no dia seguinte. O **ano** entra quando não é o corrente: num histórico ordenado do mais
+novo para o mais velho, "12 de janeiro" de dois anos atrás se lê como janeiro deste ano, e a
+confusão acontece justamente no fim da lista, onde ninguém está prestando atenção. A data completa,
+com hora, fica no `title` e no rótulo acessível — o rótulo curto perde a hora, e duas partidas do
+mesmo dia ficariam indistinguíveis (RNF-038).
 
 **Por que o erro de rota HTTP passa por `frase()`.** O caminho do socket já traduzia; o do HTTP
 caía no `code` e mostrava a palavra crua do protocolo. Quem batia no teto de salas por hora lia
