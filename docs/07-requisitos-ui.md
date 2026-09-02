@@ -185,6 +185,8 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 | RF-062 | SSO com e-mail **verificado pelo provedor** assume a conta de senha, apaga a senha e derruba as sessões |
 | RF-063 | Entrar com senha numa conta assumida por SSO **DEVE** dizer o que houve — *"esta conta agora entra pelo Google"* —, nunca "senha inválida" |
 | RF-070 | Avatar por imagem, só para quem tem conta, reduzido **no servidor** para 256×256 WebP, com EXIF removido. O emoji e a cor **CONTINUAM** por baixo: são o que aparece enquanto a foto carrega e se ela falhar |
+| RF-083 | O contador de cartas na mão **DEVE** desenhar o MESMO verso do baralho, em miniatura, e não uma forma genérica: dois versos diferentes no mesmo jogo fazem o pequeno ler como barra de progresso |
+| RF-084 | No desktop a mesa **DEVE** ser ampliada por `scale` sobre a largura de projeto, e não esticada. O zoom sai da ALTURA disponível, e nunca pode obrigar a rolar para ver a mesa e as próprias cartas juntas |
 
 RF-086 abre a casca de 460 px para 900 **só na mesa**, e é a única tela onde isso
 acontece. Em qualquer outra, a coluna continua estreita mesmo num monitor de 27" —
@@ -246,6 +248,18 @@ RF-085 mostra informação que **já era pública** (`handCounts`, RJ-102) e nã
 em lugar nenhum: quem quisesse saber quantas cartas restavam ao adversário tinha de
 contar as mãos já jogadas de cabeça, no meio da rodada. Viradas porque o conteúdo é
 segredo — uma carta desenhada de frente prometeria informação que não existe.
+
+**Por que o zoom é `scale` e não layout fluido (RF-084).** A geometria do feltro é medida em
+pixels — CA-362 defende a faixa onde o aviso "É A SUA VEZ!" cabe, entre as cartas jogadas e o
+assento de baixo. Esticar a largura moveria essas medidas e, pior, deixava a mesa achatada no
+monitor: os assentos se espalhavam e cada um continuava com os mesmos 104 px, com a altura presa
+em 372. `scale` sobre a largura de projeto mantém o sistema de coordenadas intacto e amplia
+tudo junto — carta, avatar e texto.
+
+E o zoom sai da **altura**, não da largura, porque foi por largura que a primeira versão errou:
+um ultrawide de 2560×1080 é largo e BAIXO, ganhava zoom 2 e passava a exigir rolagem. Notebook
+de 768 px de altura não ganha zoom nenhum, e é o correto — não cabe mais nada sem cortar as
+cartas de quem está jogando.
 
 Na tela de conta, os botões de SSO vêm **antes** do formulário de senha. Sem recuperação de
 senha (§8 do plano 01), quem entra pelo Google nunca fica sem acesso — e a ordem dos botões é a

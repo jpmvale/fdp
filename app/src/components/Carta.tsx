@@ -1,5 +1,22 @@
 import type { Card } from '@fdp/rules';
 
+/**
+ * A textura do verso, num lugar só.
+ *
+ * O contador de cartas na mão, lá no assento, desenha versos de 9 px — e
+ * desenhava um gradiente roxo liso, escolhido à parte. Ficavam dois versos
+ * diferentes no mesmo jogo: o que a pessoa segura e o que ela vê do
+ * adversário. Miniatura do mesmo desenho lê como carta; retângulo colorido lê
+ * como barra de progresso.
+ *
+ * A listra é fina de propósito — 5 px sumiriam num quadrado de 9.
+ */
+export const VERSO_DA_CARTA =
+  'repeating-linear-gradient(45deg,#2a3457,#2a3457 5px,#1f2743 5px,#1f2743 10px)';
+
+export const VERSO_DA_CARTA_MINI =
+  'repeating-linear-gradient(45deg,#2a3457,#2a3457 1.5px,#1f2743 1.5px,#1f2743 3px)';
+
 /** Naipe é ILUSTRAÇÃO (RJ-022): não decide vaza nenhuma, só colore a carta. */
 const NAIPES: Record<string, string> = {
   copas: '♥', ouros: '♦', espadas: '♠', paus: '♣',
@@ -42,9 +59,7 @@ export function Carta({ carta, tamanho = 'media', selecionada, aoClicar, rotulo 
     placeContent: 'center',
     padding: 0,
     border: 0,
-    background: carta
-      ? '#f3f5fe'
-      : 'repeating-linear-gradient(45deg,#2a3457,#2a3457 5px,#1f2743 5px,#1f2743 10px)',
+    background: carta ? '#f3f5fe' : VERSO_DA_CARTA,
     color: carta && VERMELHOS.has(carta.suit) ? '#d1263c' : '#16181f',
     transform: selecionada ? 'translateY(-8px)' : undefined,
     boxShadow: selecionada ? '0 0 0 3px var(--acento)' : undefined,

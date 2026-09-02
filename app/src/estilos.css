@@ -333,3 +333,99 @@ input:focus { border-color: var(--acento); }
     overflow-y: auto;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * O zoom da mesa no desktop.
+ *
+ * O feltro é desenhado para 360 px de largura e 372 de altura, e a geometria
+ * de dentro é MEDIDA nesses pixels (CA-362). Um layout fluido moveria as
+ * medidas e, pior, deixava a mesa achatada no monitor: os assentos se
+ * espalhavam pela largura e cada um continuava com os mesmos 104 px, com a
+ * altura presa em 372.
+ *
+ * `scale` resolve os dois: as coordenadas internas não mudam — o teste
+ * continua valendo — e a mesa cresce inteira, com carta, avatar e texto na
+ * mesma proporção. É zoom, e não esticar.
+ *
+ * O palco reserva a altura, porque `transform` não ocupa espaço no layout:
+ * sem ele, o que vem depois (o botão de jogar, as suas cartas) subiria por
+ * baixo da mesa ampliada.
+ * ------------------------------------------------------------------------- */
+:root {
+  --zoom-mesa: 1;
+}
+
+.feltro-palco {
+  height: calc(372px * var(--zoom-mesa));
+  overflow: visible;
+}
+
+.feltro-zoom {
+  width: 360px;
+  margin: 0 auto;
+  transform: scale(var(--zoom-mesa));
+  transform-origin: top center;
+}
+
+/*
+ * O zoom sai da ALTURA disponível, não da largura.
+ *
+ * A primeira versão errou por largura: um ultrawide de 2560×1080 ganhava zoom
+ * 2 e o documento passava a exigir ROLAGEM — a pessoa não via a mesa e a
+ * própria mão ao mesmo tempo, que é o ponto inteiro de ampliar. Ultrawide é
+ * largo e BAIXO, e quem decide se cabe é a altura.
+ *
+ * A segunda versão tentou `clamp(1, calc((100vh - 390px) / 372), 2)` e falhou
+ * EM SILÊNCIO: dividir comprimento por número devolve comprimento, `scale()`
+ * recusou o valor e caiu para 1. Não deu erro em lugar nenhum — a mesa
+ * simplesmente não crescia.
+ *
+ * Então são faixas de altura, com os limiares saindo da conta e não de
+ * chute. Fora do feltro, a tela gasta cerca de 390 px com cabeçalho, barra do
+ * turno, botão de jogar e as suas cartas; o zoom que cabe é (altura − 390)/372:
+ *
+ * |  altura | cabe até | usado |
+ * |---|---|---|
+ * |   900   |   1,37   |  1,3  |
+ * |  1020   |   1,69   |  1,80 |
+ * |  1200   |   2,18   |  2    |
+ *
+ * Os 390 px de folga são a conta do CELULAR, onde o chat fica empilhado
+ * embaixo. No desktop ele vai para a lateral, então sobra mais altura — medido
+ * em 1920×1080: 170 px ociosos com o zoom da conta. Daí 1,80 na faixa de 1020,
+ * acima do que a fórmula conservadora daria, e conferido nas duas fases (a de
+ * apostas é a mais alta, por causa da fileira de botões).
+ *
+ * Foi 1,85 por um momento, e o documento chegou a 1091 px numa tela de 1080 —
+ * 11 px de barra de rolagem piscando entre fases. Zoom que aparece e some é
+ * pior que zoom um pouco menor.
+ *
+ * Teto de 2 porque acima disso a mesa passa a exigir mover a cabeça para ver
+ * os dois lados, e uma carta de 136 px não fica mais legível que uma de 68.
+ */
+@media (min-width: 900px) and (min-height: 880px) {
+  :root { --zoom-mesa: 1.3; }
+}
+
+@media (min-width: 900px) and (min-height: 1020px) {
+  :root { --zoom-mesa: 1.8; }
+}
+
+@media (min-width: 1280px) and (min-height: 1200px) {
+  :root { --zoom-mesa: 2; }
+}
+
+/*
+ * A casca acompanha o zoom.
+ *
+ * 900 px cabiam 460 de mesa + 320 de chat. Com a mesa ampliada, o mesmo teto
+ * espremeria a conversa ou cortaria o feltro — e num ultrawide sobrava metade
+ * da tela vazia enquanto a mesa não cabia.
+ */
+@media (min-width: 1280px) {
+  .casca--mesa { max-width: 1080px; }
+}
+
+@media (min-width: 1700px) {
+  .casca--mesa { max-width: 1240px; }
+}

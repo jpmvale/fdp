@@ -1,5 +1,5 @@
 import { Avatar } from './Avatar';
-import { Carta } from './Carta';
+import { Carta, VERSO_DA_CARTA_MINI } from './Carta';
 import { Vaza, useRecolhimento, type JogadaNaMesa } from './Vaza';
 import { Balao, useBaloes } from './Balao';
 import type { PlayerView, PublicPlayer, Retrato } from '../state/tipos';
@@ -522,14 +522,17 @@ function CartasNaMao({ quantas, nome }: { quantas: number; nome: string }) {
 
   return (
     <div
-      style={{ display: 'flex', gap: 2, alignItems: 'center', height: 12 }}
+      // Sem `gap`: as cartas se sobrepõem, e o espaçamento é o `marginLeft`
+      // negativo de cada uma. A altura NÃO muda — o assento é medido, e crescer
+      // aqui moveria a geometria que CA-362 defende.
+      style={{ display: 'flex', alignItems: 'center', height: 12 }}
       aria-label={`${nome}: ${String(quantas)} ${quantas === 1 ? 'carta na mão' : 'cartas na mão'}`}
     >
       {desenhadas ? (
-        Array.from({ length: quantas }, (_, i) => <Verso key={i} />)
+        Array.from({ length: quantas }, (_, i) => <Verso key={i} primeira={i === 0} />)
       ) : (
         <>
-          <Verso />
+          <Verso primeira />
           <span aria-hidden style={{ fontSize: 10, color: 'var(--texto-fraco)' }}>
             ×{quantas}
           </span>
@@ -540,21 +543,38 @@ function CartasNaMao({ quantas, nome }: { quantas: number; nome: string }) {
 }
 
 /** O verso de uma carta: 8×11, a proporção de um baralho de verdade. */
-function Verso() {
+/**
+ * Uma carta virada em miniatura.
+ *
+ * Era um retângulo com gradiente roxo liso, e lia como barra de progresso, não
+ * como carta. Agora é a MESMA textura do verso grande (`VERSO_DA_CARTA_MINI`),
+ * com listra proporcionalmente mais fina para aparecer em 9 px — dois versos
+ * diferentes no mesmo jogo era a raiz do problema.
+ *
+ * As três coisas que fazem ler como carta, e nenhuma é enfeite: a textura
+ * diagonal (que é o desenho do baralho), a borda clara (que é a **margem
+ * branca** de uma carta de verdade, o detalhe que o olho usa para reconhecer
+ * uma), e a sobreposição, porque mão de cartas fica em leque e não em fileira
+ * espaçada.
+ */
+function Verso({ primeira }: { primeira: boolean }) {
   return (
     <span
       aria-hidden
       style={{
-        width: 8,
-        height: 11,
-        borderRadius: 2,
-        // O mesmo tratamento do verso grande da mão, em miniatura: sem a
-        // textura ele viraria um retângulo cinza, que se confunde com
-        // separador.
-        background: 'linear-gradient(135deg, var(--acento) 0%, #4a3f7a 100%)',
-        boxShadow: 'inset 0 0 0 0.5px rgba(255,255,255,0.25)',
+        width: 9,
+        height: 12,
+        borderRadius: 1.5,
+        background: VERSO_DA_CARTA_MINI,
+        // Margem clara por fora e sombra por baixo: é o que separa uma carta
+        // da carta atrás dela num leque, e o que impede a fileira de virar um
+        // borrão listrado.
+        boxShadow: 'inset 0 0 0 0.5px rgba(226,232,255,0.55), -1px 0 1px rgba(0,0,0,0.45)',
         display: 'block',
         flexShrink: 0,
+        // Sobrepostas como um leque. Ainda contáveis: sobram 6 px de cada
+        // carta à vista, e são no máximo cinco.
+        marginLeft: primeira ? 0 : -3,
       }}
     />
   );

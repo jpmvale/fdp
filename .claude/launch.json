@@ -4,8 +4,13 @@
     {
       "name": "fdp",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["start"],
-      "port": 3000
+      "runtimeArgs": [
+        "start"
+      ],
+      "port": 3000,
+      "env": {
+        "DATABASE_URL": "postgres://postgres:fdp@127.0.0.1:5433/fdp_dev"
+      }
     }
   ]
 }

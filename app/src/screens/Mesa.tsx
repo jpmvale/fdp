@@ -52,7 +52,23 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
 
       {partida.isForeheadRound && <FaixaTesta />}
 
-      <Feltro retrato={retrato} eu={eu} partida={partida} aoAbrirPerfil={aoAbrirPerfil} />
+      {/* O zoom do desktop (RF-08x).
+
+          O feltro é desenhado para 360 px e tem a geometria MEDIDA em pixels —
+          CA-362 defende a faixa onde o aviso "É A SUA VEZ!" cabe, contra os
+          assentos e as cartas. Esticar a largura no monitor moveria tudo isso
+          e ainda deixava a mesa achatada: os assentos espalhavam, mas cada um
+          continuava com os mesmos 104 px.
+
+          Por isso o zoom é `scale` sobre a largura de projeto, e não um layout
+          fluido. O sistema de coordenadas de dentro fica intacto — o que o
+          teste mede continua valendo, e no monitor a mesa cresce inteira, com
+          carta, avatar e texto na mesma proporção. */}
+      <div className="feltro-palco">
+        <div className="feltro-zoom">
+          <Feltro retrato={retrato} eu={eu} partida={partida} aoAbrirPerfil={aoAbrirPerfil} />
+        </div>
+      </div>
 
       {!partida.isForeheadRound && <EmpateNaVaza partida={partida} />}
 
