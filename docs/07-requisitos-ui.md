@@ -279,6 +279,17 @@ dar a um deles o botão de expulsar os outros quatro é entregar a partida a que
 A consequência é RF-102: a decisão de pausa precisa de um host, então a ausência passa a
 resolver-se sozinha, pelo mesmo mecanismo do RF-096.
 
+**Por que a punição do abandono é destruída, e não redistribuída (RF-104).** Uma mesa com abandono
+deixa de ser soma zero de propósito. Se os pontos caíssem no colo de quem ficou, a mesa passaria a
+ter motivo para torcer para alguém sair — o incentivo exato que a punição existe para não criar.
+Cada sobrevivente leva o que a colocação dele daria de qualquer jeito.
+
+**Por que o assento lembra de quem era (RF-104 e RF-096).** As duas regras se atropelaram: o assento
+perde a conta para o bot não creditar a colocação dele a uma pessoa, e sem conta no assento o
+histórico gravava a participação de quem abandonou sem dono — então a punição não achava ninguém
+para punir. A regra existia e não acontecia. O assento guarda quem saiu só para a linha do
+histórico; a conta continua fora dele, então nada do que o bot fizer depois é creditado a ninguém.
+
 **Por que o custo do abandono aparece antes (RF-104).** É a regra deste plano com mais chance de
 machucar quem não merecia. Descobrir a punição depois de tê-la levado é o desenho que faz alguém
 abandonar o jogo, e não a partida. A outra salvaguarda é de relógio: queda de internet não é

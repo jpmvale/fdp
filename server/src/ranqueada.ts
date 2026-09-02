@@ -8,7 +8,10 @@
  */
 
 import type { Dados, Partida } from '@fdp/contas';
+import type { Room } from '@fdp/room';
+import type { MatchState } from '@fdp/rules';
 import { deltasDaMesa, type JogadorRanqueado } from './elo.js';
+import { registroDaPartida } from './historico.js';
 
 /**
  * Aplica o elo de uma partida já GRAVADA.
@@ -62,4 +65,39 @@ export async function aplicarElo(dados: Dados, partida: Partida): Promise<void> 
       abandonou: entradas.find((e) => e.contaId === d.contaId)?.abandonou ?? false,
     })),
   );
+}
+
+/**
+ * A partida que acabou virando registro — e, se for ranqueada, elo.
+ *
+ * Existe como função, e não solta dentro do `main.ts`, porque é uma **emenda**:
+ * de um lado o fim da mesa, do outro duas gravações em ordem. Emenda que só
+ * existe na fiação de produção é emenda que nenhum teste alcança, e foi
+ * exatamente aí que nasceram os dois piores defeitos deste projeto — o `v: 1`
+ * fixo no hub e o `isPresent` que deixava o expulso voltar. Os dois lados
+ * estavam testados; a emenda, não.
+ *
+ * **Nunca lança.** `onFimDePartida` é chamado de dentro do `settle` do hub, e
+ * uma exceção daqui derrubaria a entrega dos eventos e a mesa junto (RF-071).
+ * Histórico é registro, não jogo: com o Postgres fora do ar, a partida termina
+ * normalmente e o que se perde é uma linha no perfil de alguém.
+ */
+export async function registrarFimDePartida(
+  dados: Dados | null,
+  room: Room,
+  estado: MatchState,
+  terminouEm: number,
+): Promise<void> {
+  if (!dados) return;
+  try {
+    const registro = registroDaPartida(room, estado, terminouEm);
+    if (!registro) return;
+
+    // O elo vem DEPOIS da partida, e só se ela foi gravada: um número no perfil
+    // de alguém sem a partida que o explica é pior que nenhum.
+    const gravada = await dados.partidas.gravar(registro);
+    if (gravada) await aplicarElo(dados, gravada);
+  } catch (erro) {
+    console.error('falha ao registrar a partida:', erro);
+  }
 }

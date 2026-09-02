@@ -116,6 +116,20 @@ delta = −K − PUNICAO_ABANDONO        // PUNICAO_ABANDONO = 25
 Ou seja: o pior resultado possível da mesa, **mais** um extra. A colocação que o bot acabar tirando
 naquele assento não conta para a pessoa — ela não jogou aquilo.
 
+**A punição é destruída, não redistribuída** — e por isso uma mesa com abandono **deixa de ser soma
+zero**. Ninguém lucra com a saída alheia: cada sobrevivente leva exatamente o que a colocação dele
+daria de qualquer jeito. Se os pontos do abandono caíssem no colo de quem ficou, a mesa passaria a
+ter motivo para torcer para alguém sair — que é o incentivo exato que a punição existe para não
+criar. O gate da F4 verifica isso sobre uma partida de verdade.
+
+**O assento lembra de quem era.** `trocarPorBot` apaga a conta do assento para o bot não creditar a
+colocação dele a uma pessoa (RF-096) — e isso, sozinho, fazia a participação de quem abandonou ser
+gravada **sem `contaId`**, então esta punição não achava ninguém para punir. A regra existia e não
+acontecia. O assento passa a guardar `quemSaiu` (apelido, avatar e conta), usado só para a linha do
+histórico; a conta continua fora do assento, então nada do que o bot fizer depois é creditado a
+ninguém. Lembrar não é herdar: o que a memória permite é o contrário — cobrar de quem saiu o preço
+de ter saído.
+
 Duas coisas que precisam ficar explícitas, porque a punição é a parte do plano com mais chance de
 machucar alguém que não merecia:
 
@@ -266,6 +280,7 @@ mudar (D-11). É barato: dois inteiros por linha que já existe.
 | CA-428 | E | RF-104 | A tela da fila ranqueada mostra o custo do abandono antes do botão de entrar |
 | CA-429 | E | RF-105 | O perfil público de uma conta ranqueada mostra faixa e pontos; o de uma conta sem ranqueada não mostra a seção |
 | CA-430 | U | RF-106 | A lista local de escondidos é por sala, sobrevive a recarregar, lê lixo como lista vazia, e um armazenamento que lança — ou que não existe — não quebra nada |
+| CA-431 | I | RF-098, RF-102, RF-103, RF-104 | O gate da F4: quatro contas entram na fila ranqueada, jogam a partida inteira com um abandono no meio, e o elo aparece nos quatro perfis — com a punição em quem saiu, sem ninguém lucrar com ela, e nada disso numa fila normal |
 
 ---
 
@@ -314,11 +329,28 @@ notifica os sockets que são seus. O que não dava era fingir que metade disso j
 
 **F4 — A ranqueada.** ✅ Exigência de conta, faixa de pareamento, punição de abandono, avisos na
 tela.
-*Gate:* CA-426, CA-428.
+*Gate:* CA-426, CA-428, e o gate de verdade — *"uma partida ranqueada completa, com um abandono, do
+socket da fila até o número mudando nos dois perfis"*. **Executado** (CA-431), depois de ter sido
+declarado cumprido sem ter sido.
 
 *Cumprido:* 12 testes de socket de verdade, incluindo o que garante que as duas filas não se
 misturam — três na normal e um na ranqueada somam quatro, e é exatamente o que não pode formar
 mesa.
+
+*O que o gate encontrou, e não teria sido encontrado de outro jeito.* As duas metades estavam
+testadas e a **emenda** não: a fila formava mesa num teste, o elo era aplicado sobre uma `Partida`
+fabricada em outro, e o caminho entre os dois nunca tinha rodado inteiro. Ele achou duas coisas:
+
+1. **A punição de abandono nunca era aplicada.** Duas decisões corretas se atropelaram — RF-096
+   apaga a conta do assento, RF-104 precisa da conta para cobrar — e o resultado era uma regra
+   escrita, documentada, testada em unidade e **inerte em produção**. Ver §4.3.
+2. **A mesa com abandono não é soma zero**, e o plano não dizia. A punição é destruída em vez de
+   redistribuída, o que é a decisão certa e precisava estar escrita: sem ela, o próximo a mexer no
+   elo "consertaria" a soma devolvendo os pontos à mesa, e criaria o incentivo a torcer pelo
+   abandono alheio.
+
+A emenda saiu do `main.ts` e virou `registrarFimDePartida`, porque emenda que só existe na fiação de
+produção é emenda que nenhum teste alcança.
 
 ---
 

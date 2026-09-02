@@ -92,6 +92,25 @@ export interface RoomPlayer {
    * do abandono é o mesmo da ausência (RJ-117).
    */
   abandonou: boolean;
+
+  /**
+   * Quem estava no assento antes de o bot assumir — **só em abandono**.
+   *
+   * Existe porque duas decisões corretas se atropelaram, e o gate da F4 pegou:
+   * `trocarPorBot` apaga a conta do assento para o bot não creditar a colocação
+   * dele a uma pessoa (RF-096), e sem conta no assento o histórico gravava a
+   * participação de quem abandonou **sem `contaId`** — então a punição de
+   * RF-104 não achava ninguém para punir. A regra existia e não acontecia.
+   *
+   * `null` em expulsão, e de propósito: quem levou o pé não escolheu sair, e a
+   * partida dele não vira registro nem custa elo.
+   */
+  quemSaiu: {
+    nickname: string;
+    avatar: Avatar;
+    conta: string | null;
+    contaId: string | null;
+  } | null;
   /**
    * Quando esta pessoa falou pela última vez. `null` = ainda não falou.
    *

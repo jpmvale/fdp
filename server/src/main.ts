@@ -14,8 +14,7 @@ import { createHub, CLOSE_CODES } from './hub.js';
 import { createHttpApp } from './http.js';
 import type { Dados } from '@fdp/contas';
 import { configuracaoDoAmbiente } from './sso.js';
-import { registroDaPartida } from './historico.js';
-import { aplicarElo } from './ranqueada.js';
+import { registrarFimDePartida } from './ranqueada.js';
 import { criarFila, PASSO_DA_FILA_MS } from './fila-viva.js';
 import { createPersistence } from './persistence.js';
 import { createSigner } from './session.js';
@@ -137,18 +136,7 @@ async function main(): Promise<void> {
      * certo. Histórico é registro, não jogo.
      */
     onFimDePartida: (room, estado) => {
-      if (!dados) return;
-      const registro = registroDaPartida(room, estado, Date.now());
-      if (!registro) return;
-
-      void dados.partidas.gravar(registro)
-        // O elo vem DEPOIS da partida, e só se ela foi gravada: um número no
-        // perfil de alguém sem a partida que o explica é pior que nenhum.
-        .then((gravada) => (gravada ? aplicarElo(dados, gravada) : undefined))
-        .catch((erro) => {
-          // Vira log, e não exceção: uma linha de perfil vale menos que a mesa.
-          console.error('falha ao gravar partida no histórico:', erro);
-        });
+      void registrarFimDePartida(dados, room, estado, Date.now());
     },
   });
 

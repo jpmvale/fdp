@@ -132,6 +132,7 @@ function newPlayer(params: JoinParams, now: number, isSpectator: boolean): RoomP
     silenciado: false,
     expulsoEm: null,
     abandonou: false,
+    quemSaiu: null,
     lastChatAt: null,
     bot: null,
     conta: params.conta ?? null,
@@ -190,6 +191,7 @@ function newBot(
     // abandonou nada.
     expulsoEm: null,
     abandonou: false,
+    quemSaiu: null,
     bot: { difficulty },
     // Bot nunca tem conta. Não é descuido: é o que impede uma mesa só de bots
     // de fazer uma partida entrar no histórico de alguém (RF-068).
@@ -957,6 +959,20 @@ export function trocarPorBot(
     // resultado que ela não jogou (RF-068).
     conta: null,
     contaId: null,
+    /**
+     * Mas o assento LEMBRA de quem era, quando foi abandono.
+     *
+     * Sem isto a punição de RF-104 não teria a quem se aplicar: o histórico
+     * gravaria a participação sem `contaId`, e o elo pularia a linha. A regra
+     * existiria e não aconteceria — foi o que o gate da F4 encontrou.
+     *
+     * Lembrar não é herdar: a conta continua fora do assento, então nada do
+     * que o bot fizer daqui em diante é creditado a ninguém. O que a memória
+     * permite é o contrário — cobrar de quem saiu o preço de ter saído.
+     */
+    quemSaiu: motivo === 'ABANDONO'
+      ? { nickname: alvo.nickname, avatar: alvo.avatar, conta: alvo.conta, contaId: alvo.contaId }
+      : null,
   };
 
   return { room: { ...room, players: replace(room.players, alvo.id, assento) }, assento };

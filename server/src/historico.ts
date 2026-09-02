@@ -43,17 +43,34 @@ export function registroDaPartida(
     const n = numeros.get(id);
     const eliminado = eliminados.get(id);
 
+    /**
+     * O assento abandonado é gravado no nome de quem SAIU, não do bot.
+     *
+     * O assento vira bot e perde a conta para o bot não creditar a colocação
+     * dele a ninguém (RF-096). Mas o assento lembra de quem era (`quemSaiu`), e
+     * é essa memória que a linha usa — sem ela, a participação sairia sem
+     * `contaId` e a punição de RF-104 não teria a quem se aplicar. A regra
+     * existia e não acontecia; o gate da F4 encontrou.
+     *
+     * Só ABANDONO tem `quemSaiu`. Expulsão não: quem levou o pé não escolheu
+     * sair, e a partida dele não vira registro nem custa elo.
+     */
+    const saiu = naSala?.quemSaiu ?? null;
+
     return {
       posicao,
       // Bot NUNCA leva conta, mesmo que a sala se confunda: é o que impede uma
       // mesa só de bots de fazer a partida entrar no histórico de alguém.
-      contaId: naSala?.bot ? null : (naSala?.contaId ?? null),
+      contaId: saiu ? saiu.contaId : (naSala?.bot ? null : (naSala?.contaId ?? null)),
       // Snapshot: quem trocar de apelido amanhã não reescreve a partida de
       // ontem, e o convidado sem conta precisa aparecer de algum jeito.
-      apelido: naSala?.nickname ?? '—',
-      avatar: naSala?.avatar ?? { emoji: '🦊', color: 'amber' },
-      bot: naSala?.bot !== null && naSala?.bot !== undefined,
-      dificuldade: naSala?.bot?.difficulty ?? null,
+      apelido: saiu?.nickname ?? naSala?.nickname ?? '—',
+      avatar: saiu?.avatar ?? naSala?.avatar ?? { emoji: '🦊', color: 'amber' },
+      // O assento abandonado NÃO é gravado como bot: quem estava ali era gente,
+      // e marcá-lo como bot esconderia o abandono atrás de uma máquina — além
+      // de fazer `aplicarElo` pular a linha, que é metade do defeito original.
+      bot: saiu ? false : (naSala?.bot !== null && naSala?.bot !== undefined),
+      dificuldade: saiu ? null : (naSala?.bot?.difficulty ?? null),
       colocacao: colocacoes.get(id) ?? estado.playerOrder.length,
       vidasFinais: estado.lives[id] ?? 0,
       eliminadoRodada: eliminado?.roundNumber ?? null,
