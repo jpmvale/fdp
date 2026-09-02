@@ -17,6 +17,9 @@ import type { PlayerId } from '@fdp/rules';
 import type { Hub } from './hub.js';
 import { createIdempotencyCache, createRateLimiter } from './limits.js';
 import type { SessionSigner } from './session.js';
+import type { FilaViva } from './fila-viva.js';
+import { atenderFila } from './fila-ws.js';
+import type { Dados } from '@fdp/contas';
 
 export interface WsOptions {
   hub: Hub;
@@ -25,6 +28,14 @@ export interface WsOptions {
   /** Origens aceitas no upgrade. Vazio = aceita qualquer uma (dev). */
   allowedOrigin?: string | undefined;
   onSuspicion?: (event: { code: string; roomCode: string; playerId: PlayerId }) => void;
+  /**
+   * A fila. **Opcional de propósito**: sem ela o socket de fila responde 404 e
+   * o jogo continua inteiro — a fila é mais um caminho, nunca o caminho (plano
+   * 03, I-1).
+   */
+  fila?: FilaViva | null;
+  /** Para saber quem está logado no `fila:entrar` da ranqueada. */
+  dados?: Dados | null;
 }
 
 /** `/api/rooms/{code}/ws` — o código na rota confina o token àquela sala. */
@@ -47,6 +58,16 @@ interface Attached {
   playerId: PlayerId;
 }
 
+/** O socket da fila: sem sala, sem jogador — ainda. */
+interface NaFila {
+  fila: true;
+}
+
+type Sessao = Attached | NaFila;
+
+/** O caminho da fila. Sem código de sala: a sala é o que ela vai produzir. */
+const FILA_PATH = '/api/fila/ws';
+
 /**
  * Só o que é de fato usado do servidor HTTP. Pedir um `http.Server` inteiro
  * obrigaria o chamador a converter o retorno do `@hono/node-server`, que é
@@ -58,6 +79,7 @@ export interface Upgradable {
 
 export function attachWebSocket(server: Upgradable, options: WsOptions): { close(): void } {
   const { hub, signer } = options;
+  const fila = options.fila ?? null;
   const now = options.now ?? Date.now;
   const wss = new WebSocketServer({ noServer: true });
   const lastSeen = new WeakMap<WebSocket, number>();
@@ -69,8 +91,9 @@ export function attachWebSocket(server: Upgradable, options: WsOptions): { close
 
   server.on('upgrade', (request: IncomingMessage, socket: Duplex, head: Buffer) => {
     const url = new URL(request.url ?? '/', 'http://localhost');
-    const match = WS_PATH.exec(url.pathname);
-    if (!match) return refuse(socket, '404 Not Found');
+    const naFila = url.pathname === FILA_PATH;
+    const match = naFila ? null : WS_PATH.exec(url.pathname);
+    if (!naFila && !match) return refuse(socket, '404 Not Found');
 
     // Origem cruzada não abre socket: o navegador não aplica CORS a WebSocket,
     // então checar aqui é a única defesa contra sala aberta por outro site.
@@ -79,7 +102,23 @@ export function attachWebSocket(server: Upgradable, options: WsOptions): { close
       return refuse(socket, '403 Forbidden');
     }
 
-    const code = (match[1] ?? '').toUpperCase();
+    /**
+     * O socket da fila não tem sala, e por isso não tem token de sala.
+     *
+     * A identidade dele chega DEPOIS, no `fila:entrar` — apelido e avatar para
+     * quem não tem conta, cookie de sessão para quem tem. Exigir token aqui
+     * seria exigir uma sala que ainda não existe: é exatamente ela que a fila
+     * está tentando criar.
+     */
+    if (naFila) {
+      if (!fila) return refuse(socket, '404 Not Found');
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request, { fila: true } satisfies NaFila);
+      });
+      return;
+    }
+
+    const code = (match![1] ?? '').toUpperCase();
     const token = url.searchParams.get('token') ?? '';
     const verified = signer.verify(token, now(), code);
 
@@ -99,7 +138,14 @@ export function attachWebSocket(server: Upgradable, options: WsOptions): { close
     });
   });
 
-  wss.on('connection', (ws: WebSocket, _request: IncomingMessage, session: Attached) => {
+  wss.on('connection', (ws: WebSocket, request: IncomingMessage, session: Sessao) => {
+    if ('fila' in session) {
+      atenderFila(ws, request, fila!, {
+        signer, dados: options.dados ?? null, now, lastSeen,
+      });
+      return;
+    }
+
     const { code, playerId } = session;
     const room = hub.get(code);
     if (!room || room.status === 'ENCERRADA') {

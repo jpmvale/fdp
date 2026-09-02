@@ -10,6 +10,8 @@ export {
   reconnect,
   seatedPlayers,
   snapshotFor,
+  startMatch,
+  trocarPorBot,
   spectators,
   absentMatchPlayers,
 } from './room.js';

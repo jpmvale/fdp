@@ -21,6 +21,7 @@ import { conferirSenha, gastarComoSeFosse, gerarHash, senhaAceitavel } from './s
 import { processarAvatar, TAMANHO_MAX } from './avatar.js';
 import type { DepositoDeAvatares } from '@fdp/avatares';
 import { createRateLimiter } from './limits.js';
+import { faixaDoElo } from './elo.js';
 import { SESSAO_CONTA_MS, type SessionSigner } from './session.js';
 
 export const COOKIE_SESSAO = 'fdp_conta';
@@ -374,9 +375,31 @@ export function montarRotasDeConta(
     const limite = Math.min(50, Math.max(1, Number(c.req.query('limite') ?? 10) || 10));
     const recentes = await dados.partidas.porConta(conta.id, { limite, pular });
 
+    /**
+     * O elo, quando existe (RF-105, D-3).
+     *
+     * `null` para quem nunca jogou ranqueada — e `null`, não 1000: mostrar o
+     * elo inicial de quem nunca entrou na fila daria a entender que a pessoa
+     * jogou e ficou exatamente no meio. A seção some da tela nesse caso, que é
+     * a resposta honesta.
+     *
+     * Sem classificação global e sem listagem: elo aqui responde "quanto eu
+     * jogo bem", não "quem é o melhor" (plano 03 §1).
+     */
+    const registro = (await dados.elos.porContas([conta.id])).get(conta.id);
+    const elo = registro && registro.partidas > 0
+      ? {
+          pontos: registro.pontos,
+          faixa: faixaDoElo(registro.pontos),
+          partidas: registro.partidas,
+          melhorPontos: registro.melhorPontos,
+        }
+      : null;
+
     return c.json({
       conta: contaPublica(conta),
       resumo,
+      elo,
       // Onde esta página começa e se ainda há mais. Sem isto o cliente teria
       // de adivinhar pelo tamanho do lote — e adivinharia errado no caso em
       // que o total é múltiplo exato do limite.
@@ -399,6 +422,11 @@ export function montarRotasDeConta(
           nota: eu?.nota ?? null,
           acertos: eu?.acertos ?? 0,
           jogadas: eu?.jogadas ?? 0,
+          // `null` fora da ranqueada. A tela usa a diferença para não escrever
+          // "±0" numa partida que nunca teve elo.
+          eloDelta: eu?.eloDelta ?? null,
+          abandonou: eu?.abandonou ?? false,
+          ranqueada: p.origem === 'RANQUEADA',
         };
       }),
     });

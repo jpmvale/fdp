@@ -97,6 +97,22 @@ existe caminho de código separado para "recuperar partida".
 | `player:setPronto` | `{ pronto }` | só em `LOBBY`, e não para quem assiste | Confirma que está pronto (RF-094) |
 | `host:silenciar` | `{ playerId, silenciado }` | qualquer, **exceto** o próprio host e bots | Cala ou libera alguém no chat (RF-095) |
 
+### O socket da fila (plano 03 §5)
+
+`/api/fila/ws` é um socket **sem sala** — é ela que a fila vai produzir. Não leva token de sala; a
+identidade chega no `fila:entrar` (apelido e avatar de quem não tem conta, cookie de sessão de quem
+tem). Mesmo envelope, vocabulário próprio.
+
+| Comando | Payload | Efeito |
+|---|---|---|
+| `fila:entrar` | `{ modo, nickname?, avatar? }` | Entra na fila. `RANQUEADA` sem conta é recusada com `RANQUEADA_EXIGE_CONTA` (RF-098) |
+| `fila:sair` | `{}` | Sai. Fechar o socket faz o mesmo — a fila **é** o socket (RF-100) |
+
+| Evento | Payload | Quando |
+|---|---|---|
+| `fila:espera` | `{ modo, naFila, desde, janelaAte }` | A cada mudança na fila daquele modo |
+| `fila:pareado` | `{ modo, roomCode, playerId, sessionToken }` | A mesa nasceu. O socket da fila fecha em seguida |
+
 `host:kick` deixou de ser só do lobby: em `EM_PARTIDA` e `PAUSADA` ele expulsa quem está sentado
 **sem tirar o assento da mesa** — o assento vira bot e a rodada segue (RF-096). Espectador sai como
 sairia do lobby. Bot é recusado com `BOT_SAI_POR_REMOVEBOT`. A mesa fica sabendo por
@@ -346,3 +362,9 @@ Redis sem ele, e é lida como "nunca falou".
 RNF-015 existe porque o histórico vive na sala e a sala vive em Redis: sem teto,
 uma sala de 4 horas com gente falante cresce sem limite dentro do valor que é
 lido e escrito a cada mudança de estado.
+
+Numa mesa de fila (`origem` diferente de `PRIVADA`), **todo** comando `host:*` é recusado com
+`MESA_DE_FILA_NAO_TEM_HOST` (RF-101). A recusa é num lugar só, antes do `switch`: comando de host
+que aparecer amanhã já nasce recusado. E a pausa por ausência resolve-se sozinha lá — passado o
+mesmo minuto em que a sala privada anunciaria a decisão ao host, o assento vira bot e a mesa volta
+a andar (RF-102), com `room:playerUpdated` e um `system:notice` de código `ABANDONO_BOT_ASSUMIU`.

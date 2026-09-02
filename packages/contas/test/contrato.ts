@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { Avatar } from '@fdp/protocol';
+import { ELO_INICIAL, type Avatar } from '@fdp/protocol';
 import type { Dados, JogadorDaPartida, Partida } from '../src/index.js';
 
 export interface DadosHarness {
@@ -25,11 +25,13 @@ const jogador = (over: Partial<JogadorDaPartida> = {}): JogadorDaPartida => ({
   posicao: 0, contaId: null, apelido: 'Convidado', avatar: AVATAR, bot: false,
   dificuldade: null, colocacao: 1, vidasFinais: 3, eliminadoRodada: null,
   mortoEmVaza: null, acertos: 4, jogadas: 6, erroMedio: 0.5, piorErro: 2, nota: 7.5,
+  eloAntes: null, eloDelta: null, abandonou: false,
   ...over,
 });
 
 const partida = (jogadores: JogadorDaPartida[], over: Partial<Partida> = {}): Omit<Partida, 'id'> => ({
   salaCodigo: 'AB12C',
+  origem: 'PRIVADA',
   comecouEm: 1_700_000_000_000,
   terminouEm: 1_700_000_600_000,
   motivoFim: 'VITORIA',
@@ -435,6 +437,96 @@ export function descreverContratoDeDados(harness: DadosHarness): void {
         // apagado — o limite é de quanto se mostra por vez.
         expect(await d.partidas.porConta(a.conta.id, { limite: 10 })).toHaveLength(10);
         expect((await d.partidas.resumoDaConta(a.conta.id)).partidas).toBe(12);
+      }));
+
+    // --- elo (plano 03 §6.1) ------------------------------------------------
+
+    const comConta = async (d: Dados, apelido: string, email: string) => {
+      const r = await d.contas.criarComSenha({ apelido, avatar: AVATAR, email, hash: 'h' });
+      if (!r.ok) throw new Error('cadastro falhou');
+      return r.conta;
+    };
+
+    it('CA-427: quem nunca jogou ranqueada lê o elo inicial, sem linha no banco', () =>
+      comDados(async (d) => {
+        const ana = await comConta(d, 'Ana', 'a@exemplo.com');
+        const elo = (await d.elos.porContas([ana.id])).get(ana.id);
+        // "Sem linha" e "elo zero" são coisas diferentes, e é a LEITURA que
+        // resolve a diferença — quem chama nunca precisa conhecê-la.
+        expect(elo).toEqual({
+          contaId: ana.id, pontos: ELO_INICIAL, partidas: 0,
+          melhorPontos: ELO_INICIAL, atualizadoEm: 0,
+        });
+      }));
+
+    it('CA-427: conta que não existe simplesmente não aparece', () =>
+      comDados(async (d) => {
+        expect((await d.elos.porContas(['00000000-0000-4000-8000-000000000000'])).size).toBe(0);
+        expect((await d.elos.porContas([])).size).toBe(0);
+      }));
+
+    it('CA-427: aplicar mexe no elo E grava na participação', () =>
+      comDados(async (d) => {
+        const ana = await comConta(d, 'Ana', 'a@exemplo.com');
+        const beto = await comConta(d, 'Beto', 'b@exemplo.com');
+
+        const gravada = await d.partidas.gravar(partida(
+          [jogador({ posicao: 0, contaId: ana.id, colocacao: 1 }),
+           jogador({ posicao: 1, contaId: beto.id, colocacao: 2 })],
+          { origem: 'RANQUEADA' },
+        ));
+        if (!gravada) throw new Error('não gravou');
+
+        await d.elos.aplicar(gravada.id, [
+          { contaId: ana.id, eloAntes: ELO_INICIAL, delta: 30, eloDepois: ELO_INICIAL + 30, abandonou: false },
+          { contaId: beto.id, eloAntes: ELO_INICIAL, delta: -30, eloDepois: ELO_INICIAL - 30, abandonou: true },
+        ]);
+
+        const elos = await d.elos.porContas([ana.id, beto.id]);
+        expect(elos.get(ana.id)!.pontos).toBe(ELO_INICIAL + 30);
+        expect(elos.get(ana.id)!.partidas).toBe(1);
+        expect(elos.get(ana.id)!.melhorPontos).toBe(ELO_INICIAL + 30);
+        expect(elos.get(beto.id)!.pontos).toBe(ELO_INICIAL - 30);
+        // O melhor NÃO desce: é o recorde, não o estado.
+        expect(elos.get(beto.id)!.melhorPontos).toBe(ELO_INICIAL);
+
+        const relida = await d.partidas.porId(gravada.id);
+        const linhaDoBeto = relida!.jogadores.find((j) => j.contaId === beto.id)!;
+        expect(linhaDoBeto.eloAntes).toBe(ELO_INICIAL);
+        expect(linhaDoBeto.eloDelta).toBe(-30);
+        expect(linhaDoBeto.abandonou).toBe(true);
+      }));
+
+    it('CA-427: o elo é SOMADO, e duas aplicações seguidas compõem', () =>
+      comDados(async (d) => {
+        const ana = await comConta(d, 'Ana', 'a@exemplo.com');
+        for (const delta of [30, -50]) {
+          const g = await d.partidas.gravar(partida(
+            [jogador({ contaId: ana.id })], { origem: 'RANQUEADA' }));
+          await d.elos.aplicar(g!.id, [
+            { contaId: ana.id, eloAntes: 0, delta, eloDepois: 0, abandonou: false }]);
+        }
+        const elo = (await d.elos.porContas([ana.id])).get(ana.id)!;
+        expect(elo.pontos).toBe(ELO_INICIAL - 20);
+        expect(elo.partidas).toBe(2);
+      }));
+
+    it('CA-427: o piso vale no banco também — elo não fica negativo', () =>
+      comDados(async (d) => {
+        const ana = await comConta(d, 'Ana', 'a@exemplo.com');
+        const g = await d.partidas.gravar(partida(
+          [jogador({ contaId: ana.id })], { origem: 'RANQUEADA' }));
+        await d.elos.aplicar(g!.id, [
+          { contaId: ana.id, eloAntes: ELO_INICIAL, delta: -99_999, eloDepois: 0, abandonou: false }]);
+        expect((await d.elos.porContas([ana.id])).get(ana.id)!.pontos).toBe(0);
+      }));
+
+    it('a origem sobrevive à ida e volta', () =>
+      comDados(async (d) => {
+        const ana = await comConta(d, 'Ana', 'a@exemplo.com');
+        const g = await d.partidas.gravar(partida(
+          [jogador({ contaId: ana.id })], { origem: 'RANQUEADA' }));
+        expect((await d.partidas.porId(g!.id))!.origem).toBe('RANQUEADA');
       }));
   });
 }

@@ -15,6 +15,8 @@ import { createHttpApp } from './http.js';
 import type { Dados } from '@fdp/contas';
 import { configuracaoDoAmbiente } from './sso.js';
 import { registroDaPartida } from './historico.js';
+import { aplicarElo } from './ranqueada.js';
+import { criarFila, PASSO_DA_FILA_MS } from './fila-viva.js';
 import { createPersistence } from './persistence.js';
 import { createSigner } from './session.js';
 import { attachWebSocket } from './ws.js';
@@ -139,10 +141,14 @@ async function main(): Promise<void> {
       const registro = registroDaPartida(room, estado, Date.now());
       if (!registro) return;
 
-      void dados.partidas.gravar(registro).catch((erro) => {
-        // Vira log, e não exceção: uma linha de perfil vale menos que a mesa.
-        console.error('falha ao gravar partida no histórico:', erro);
-      });
+      void dados.partidas.gravar(registro)
+        // O elo vem DEPOIS da partida, e só se ela foi gravada: um número no
+        // perfil de alguém sem a partida que o explica é pior que nenhum.
+        .then((gravada) => (gravada ? aplicarElo(dados, gravada) : undefined))
+        .catch((erro) => {
+          // Vira log, e não exceção: uma linha de perfil vale menos que a mesa.
+          console.error('falha ao gravar partida no histórico:', erro);
+        });
     },
   });
 
@@ -199,15 +205,27 @@ async function main(): Promise<void> {
     console.log(`FDP em http://localhost:${info.port}`);
   });
 
+  /**
+   * A fila (plano 03).
+   *
+   * Sobe sempre, com ou sem banco: a fila NORMAL não exige conta (D-1), e é a
+   * ranqueada que responde "exige conta" quando não há de onde ler elo. Um jogo
+   * que perde a fila casual porque o Postgres caiu seria o oposto de I-1.
+   */
+  const fila = criarFila({ hub, signer });
+
   const ws = attachWebSocket(server, {
     hub,
     signer,
+    fila,
+    dados,
     allowedOrigin: ALLOWED_ORIGIN,
     onSuspicion: (event) =>
       console.warn(`suspeita ${event.code} sala=${event.roomCode} jogador=${event.playerId}`),
   });
 
   const clock = setInterval(() => hub.advance(Date.now()), TICK_MS);
+  const pareador = setInterval(() => fila.avancar(Date.now()), PASSO_DA_FILA_MS);
   const writer = setInterval(() => void persistence.flush(), PERSIST_MS);
 
   /**
@@ -223,6 +241,7 @@ async function main(): Promise<void> {
     console.log(`${signal}: fechando sockets e persistindo salas`);
 
     clearInterval(clock);
+    clearInterval(pareador);
     clearInterval(writer);
     hub.closeAll(CLOSE_CODES.SERVER_RESTART);
     ws.close();

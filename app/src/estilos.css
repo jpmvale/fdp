@@ -429,3 +429,35 @@ input:focus { border-color: var(--acento); }
 @media (min-width: 1700px) {
   .casca--mesa { max-width: 1240px; }
 }
+
+/* Os pontinhos da fila (plano 03 §5). Só sinal de vida — nada depende deles. */
+.pontinho-da-fila {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--texto-apagado);
+  animation: respirar-pontinho 1.2s ease-in-out infinite;
+}
+
+@keyframes respirar-pontinho {
+  0%, 100% { opacity: 0.25; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-3px); }
+}
+
+/* Sem movimento, os pontinhos ficam parados e legíveis — e NÃO congelados no
+   meio de um quadro.
+
+   Trocar por outra animação não resolveria: a regra global marca
+   `animation-duration: 0.01ms !important`, então qualquer animação aqui
+   terminaria no primeiro instante e pararia no estado final dela, que no caso
+   era opacidade 0,25 — três bolinhas quase invisíveis. `animation-name: none`
+   com uma opacidade própria é a única forma de decidir o que se vê.
+
+   Quem depende disso não perde nada: os pontinhos são `aria-hidden`, e quem
+   diz o que está acontecendo é o texto ao lado. */
+@media (prefers-reduced-motion: reduce) {
+  .pontinho-da-fila {
+    animation-name: none;
+    opacity: 0.55;
+  }
+}

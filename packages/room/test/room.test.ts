@@ -21,6 +21,7 @@ import {
   reconnect,
   seatedPlayers,
   snapshotFor,
+  startMatch,
   spectators,
   tick,
   type Emission,
@@ -283,6 +284,114 @@ describe('CA-020 a CA-026: lobby', () => {
     it('quem não é host não expulsa ninguém', () => {
       const room = started(roomWith(3), 100);
       expect(send(room, 'p2', { type: 'host:kick', payload: { playerId: 'p3' } }, 200).ok).toBe(false);
+    });
+  });
+
+  describe('CA-424 e CA-425: mesa de fila (plano 03, D-8 e D-9)', () => {
+    /** Uma mesa de fila com N pessoas, já em partida. */
+    function mesaDeFila(count: number, at = 0): Room {
+      let room = createRoom('K7QMP', { playerId: 'p1', nickname: 'Ana', avatar: AVATAR }, ctxAt(at), 'RANQUEADA');
+      for (let i = 2; i <= count; i++) {
+        room = ok(join(room, { playerId: `p${i}`, nickname: `J${i}`, avatar: AVATAR }, ctxAt(at + i))).room;
+      }
+      // A fila começa a partida DIRETO: `host:startMatch` é recusado aqui, e a
+      // presença já foi provada pelo socket da fila.
+      return ok(startMatch(room, ctxAt(100))).room;
+    }
+
+    it('CA-424: nenhum poder de host funciona numa mesa de fila', () => {
+      const room = mesaDeFila(4);
+      const comandos: Command[] = [
+        { type: 'host:kick', payload: { playerId: 'p2' } },
+        { type: 'host:setOptions', payload: { options: room.options } },
+        { type: 'host:addBot', payload: { difficulty: 'FACIL' } },
+        { type: 'host:endMatch', payload: {} },
+        { type: 'host:startMatch', payload: {} },
+        { type: 'host:resolveAbsence', payload: { action: 'ENCERRAR' } },
+      ];
+      for (const c of comandos) {
+        const r = send(room, 'p1', c, 200);
+        expect(r.ok, c.type).toBe(false);
+        if (!r.ok) expect(r.motivo, c.type).toBe('MESA_DE_FILA_NAO_TEM_HOST');
+      }
+    });
+
+    it('a mesa de fila começa sem pronto: a fila já provou a presença', () => {
+      // Ninguém deu pronto e a partida começou — em sala privada isto seria
+      // `FALTA_PRONTO`.
+      const room = mesaDeFila(4);
+      expect(room.status).toBe('EM_PARTIDA');
+      expect(seatedPlayers(room).every((p) => p.pronto)).toBe(false);
+    });
+
+    it('CA-425: ausência vira bot sozinha, sem decisão de ninguém', () => {
+      let room = mesaDeFila(4);
+      const maoAntes = room.match!.hidden.hands['p2'];
+      room = ok(disconnect(room, 'p2', ctxAt(1000))).room;
+      room = tick(room, ctxAt(1000 + LIMITS.transportGraceMs + 1)).room;
+      expect(room.status).toBe('PAUSADA');
+
+      // Antes da carência, nada acontece: quem caiu ainda pode voltar, e o
+      // relógio do abandono é o mesmo da ausência.
+      const cedo = tick(room, ctxAt(room.pause!.decisionUnlockedAt - 1));
+      expect(cedo.room.status).toBe('PAUSADA');
+      expect(cedo.room.players.find((p) => p.id === 'p2')!.bot).toBeNull();
+
+      const t = tick(room, ctxAt(room.pause!.decisionUnlockedAt));
+      const assento = t.room.players.find((p) => p.id === 'p2')!;
+
+      expect(assento.bot).not.toBeNull();
+      expect(assento.abandonou).toBe(true);
+      expect(t.room.status).toBe('EM_PARTIDA');
+      expect(t.room.pause).toBeNull();
+      expect(t.room.phaseDeadline).not.toBeNull();
+      // A rodada NÃO é anulada: a mesa não paga pelo sumiço de um.
+      expect(types(t.emissions)).not.toContain('round:aborted');
+      expect(types(t.emissions)).toContain('match:resumed');
+      expect(t.room.match!.hidden.hands['p2']).toEqual(maoAntes);
+      expect(checkRoomInvariants(t.room)).toEqual([]);
+    });
+
+    it('a mesa privada continua esperando o host decidir', () => {
+      let room = started(roomWith(4), 100);
+      room = ok(disconnect(room, 'p2', ctxAt(1000))).room;
+      room = tick(room, ctxAt(1000 + LIMITS.transportGraceMs + 1)).room;
+
+      const t = tick(room, ctxAt(room.pause!.decisionUnlockedAt));
+      expect(t.room.status).toBe('PAUSADA');
+      expect(types(t.emissions)).toContain('match:decisionUnlocked');
+      expect(t.room.players.find((p) => p.id === 'p2')!.bot).toBeNull();
+    });
+
+    it('sair da mesa de fila é abandono, e não anula a rodada dos outros', () => {
+      const room = mesaDeFila(4);
+      const rodadaAntes = room.match!.roundNumber;
+      const { room: depois, emissions } = ok(leave(room, 'p2', ctxAt(200)));
+
+      const assento = depois.players.find((p) => p.id === 'p2')!;
+      expect(assento.bot).not.toBeNull();
+      expect(assento.abandonou).toBe(true);
+      expect(depois.match!.roundNumber).toBe(rodadaAntes);
+      expect(types(emissions)).not.toContain('round:aborted');
+      expect(depois.status).toBe('EM_PARTIDA');
+    });
+
+    it('sair da mesa PRIVADA continua sendo retirada, com a rodada refeita', () => {
+      const room = started(roomWith(4), 100);
+      const { emissions } = ok(leave(room, 'p2', ctxAt(200)));
+      expect(types(emissions)).toContain('round:aborted');
+    });
+
+    it('expulso e abandono são marcas diferentes: só uma custa elo', () => {
+      const daFila = mesaDeFila(4);
+      expect(ok(leave(daFila, 'p2', ctxAt(200))).room
+        .players.find((p) => p.id === 'p2')!.abandonou).toBe(true);
+
+      const privada = started(roomWith(4), 100);
+      const expulso = ok(send(privada, 'p1', { type: 'host:kick', payload: { playerId: 'p2' } }, 200))
+        .room.players.find((p) => p.id === 'p2')!;
+      expect(expulso.expulsoEm).not.toBeNull();
+      expect(expulso.abandonou).toBe(false);
     });
   });
 

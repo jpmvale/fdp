@@ -16,6 +16,7 @@ import type { ChatMessage } from '../state/tipos';
 export function Chat({
   mensagens, eu, aoEnviar, inicialmenteAberto = false,
   souHost = false, silenciados, estouSilenciado = false, aoSilenciar,
+  mudos, aoAlternarMudo,
 }: {
   mensagens: ChatMessage[];
   eu: string;
@@ -26,6 +27,17 @@ export function Chat({
   silenciados?: Set<string> | undefined;
   estouSilenciado?: boolean;
   aoSilenciar?: ((playerId: string, silenciado: boolean) => void) | undefined;
+  /**
+   * Silenciar para mim (plano 03 §9.1) — outra coisa do `silenciados` acima.
+   *
+   * Aquele é moderação do host: o servidor recusa a mensagem e a pessoa fica
+   * sem voz para a mesa inteira. Este é alívio de quem lê: a mensagem chega,
+   * chega a todo mundo, e só a MINHA tela deixa de mostrá-la. Existe porque
+   * numa mesa de fila não há host (plano 03, D-8), e mesmo numa sala de amigos
+   * nem todo incômodo merece uma decisão sobre a voz de alguém.
+   */
+  mudos?: Set<string> | undefined;
+  aoAlternarMudo?: ((playerId: string) => void) | undefined;
 }) {
   const [aberto, setAberto] = useState(inicialmenteAberto);
   const [texto, setTexto] = useState('');
@@ -115,6 +127,13 @@ export function Chat({
             ) : (
               mensagens.map((m) => (
                 <div key={m.id} style={{ fontSize: 13, lineHeight: 1.45 }}>
+                  {/* A mensagem silenciada não SOME: vira uma linha apagada com
+                      o nome de quem falou e um caminho de volta.
+
+                      Apagar a linha inteira faria a conversa dos outros ficar
+                      cheia de buracos — alguém responde a algo que você não vê,
+                      e a mesa parece quebrada. E deixaria você sem como
+                      desfazer, porque não haveria onde clicar. */}
                   <span style={{
                     fontWeight: 600,
                     color: m.playerId === eu ? 'var(--acento-claro)' : 'var(--texto-medio)',
@@ -127,6 +146,25 @@ export function Chat({
                   {/* RF-095. Aqui, e não numa lista de gente à parte: você
                       vê a mensagem que incomoda e cala o autor no mesmo lugar,
                       sem procurar quem é numa segunda tela. */}
+                  {/* Todo mundo pode calar para si. Não é privilégio: não
+                      decide nada sobre ninguém. */}
+                  {m.playerId !== eu && aoAlternarMudo && (
+                    <button
+                      className="fantasma"
+                      aria-pressed={mudos?.has(m.playerId) ?? false}
+                      aria-label={mudos?.has(m.playerId)
+                        ? `Voltar a ver as mensagens de ${m.nickname}`
+                        : `Não ver mais as mensagens de ${m.nickname}`}
+                      onClick={() => aoAlternarMudo(m.playerId)}
+                      style={{
+                        all: 'unset', cursor: 'pointer', marginLeft: 5,
+                        fontSize: 10, verticalAlign: 'middle',
+                        opacity: mudos?.has(m.playerId) ? 1 : 0.45,
+                      }}
+                    >
+                      {mudos?.has(m.playerId) ? '🙈' : '👁'}
+                    </button>
+                  )}
                   {souHost && m.playerId !== eu && aoSilenciar && (
                     <button
                       className="fantasma"
@@ -159,7 +197,13 @@ export function Chat({
                   )}
                   <span style={{ color: 'var(--texto-apagado)' }}> · </span>
                   {/* `text` entra como filho, nunca como HTML (CA-340). */}
-                  <span style={{ wordBreak: 'break-word' }}>{m.text}</span>
+                  {mudos?.has(m.playerId) ? (
+                    <span className="fraco" style={{ fontStyle: 'italic' }}>
+                      mensagem escondida
+                    </span>
+                  ) : (
+                    <span style={{ wordBreak: 'break-word' }}>{m.text}</span>
+                  )}
                 </div>
               ))
             )}

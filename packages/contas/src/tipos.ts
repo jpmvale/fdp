@@ -10,7 +10,7 @@
  * não sabe o que é conta e não vai saber (plano 01, invariante I-2).
  */
 
-import type { Avatar } from '@fdp/protocol';
+import type { Avatar, Origem } from '@fdp/protocol';
 import type { EndReason, MatchOptions } from '@fdp/rules';
 
 export type ContaId = string;
@@ -83,11 +83,25 @@ export interface JogadorDaPartida {
   erroMedio: number;
   piorErro: number;
   nota: number;
+  /**
+   * O elo de antes desta partida, e o que ela mexeu. `null` fora da ranqueada —
+   * e `null` e não zero, porque zero é um delta e ausência de elo não é.
+   *
+   * Gravar os dois na PARTICIPAÇÃO, e não só o total na conta, é o que torna o
+   * perfil explicável ("−12 nesta aqui, por quê?") e o que permite recalcular a
+   * série inteira se a fórmula mudar (D-11). Custa dois inteiros por linha que
+   * já existe.
+   */
+  eloAntes: number | null;
+  eloDelta: number | null;
+  /** Saiu no meio e o assento foi terminado por um bot (D-9). */
+  abandonou: boolean;
 }
 
 export interface Partida {
   id: PartidaId;
   salaCodigo: string;
+  origem: Origem;
   comecouEm: number;
   terminouEm: number;
   motivoFim: EndReason;
@@ -193,8 +207,57 @@ export interface Partidas {
   resumoDaConta(contaId: ContaId): Promise<ResumoDaConta>;
 }
 
+/**
+ * O elo de uma conta. Quem nunca jogou ranqueada NÃO tem linha no banco — a
+ * leitura devolve o inicial, e a primeira partida cria.
+ */
+export interface RegistroDeElo {
+  contaId: ContaId;
+  pontos: number;
+  /** Só ranqueadas. É este número que define o peso da próxima (§4.1). */
+  partidas: number;
+  melhorPontos: number;
+  atualizadoEm: number;
+}
+
+/** O que uma partida ranqueada fez com o elo de uma conta. */
+export interface ResultadoDeElo {
+  contaId: ContaId;
+  eloAntes: number;
+  delta: number;
+  eloDepois: number;
+  abandonou: boolean;
+}
+
+export interface Elos {
+  /**
+   * O elo de várias contas de uma vez.
+   *
+   * De uma vez porque a conta do elo é da MESA (plano 03 §4.1): buscar um por
+   * um convidaria a calcular com a mesa incompleta, e o resultado seria
+   * inflação silenciosa.
+   *
+   * Nunca devolve `null` para uma conta que existe: quem nunca jogou ranqueada
+   * lê o inicial. "Sem linha" e "elo zero" são coisas diferentes, e é a leitura
+   * que resolve a diferença, não quem chama.
+   */
+  porContas(ids: ContaId[]): Promise<Map<ContaId, RegistroDeElo>>;
+
+  /**
+   * Aplica os deltas de UMA partida: mexe no elo das contas e grava
+   * `elo_antes`/`elo_delta`/`abandonou` na participação. Tudo numa transação.
+   *
+   * O elo é somado, não substituído. Uma pessoa só está numa mesa por vez, então
+   * a corrida não deveria existir — mas escrever valor absoluto transforma
+   * qualquer engano futuro (um reprocessamento, duas instâncias) em perda
+   * silenciosa de pontos, e somar não custa nada.
+   */
+  aplicar(partidaId: PartidaId, resultados: ResultadoDeElo[]): Promise<void>;
+}
+
 export interface Dados {
   contas: Contas;
   partidas: Partidas;
+  elos: Elos;
   fechar(): Promise<void>;
 }

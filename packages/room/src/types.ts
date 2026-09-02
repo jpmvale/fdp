@@ -19,6 +19,7 @@ import type {
   PublicPlayer,
   RoomStatus,
   ServerEvent,
+  Origem,
 } from '@fdp/protocol';
 import type { MatchOptions, MatchState, PlayerId } from '@fdp/rules';
 
@@ -80,6 +81,17 @@ export interface RoomPlayer {
    * devolver o assento inteiro, agora com as cartas que o bot já viu.
    */
   expulsoEm: number | null;
+
+  /**
+   * O assento virou bot porque a pessoa sumiu, e não porque o host a expulsou
+   * (plano 03, D-9).
+   *
+   * Separado de `expulsoEm` porque as duas coisas custam preços diferentes: na
+   * ranqueada, abandonar tira elo (RF-104), e ser expulso não é abandonar. Quem
+   * caiu e voltou ANTES de o assento virar bot não marca nada aqui — o relógio
+   * do abandono é o mesmo da ausência (RJ-117).
+   */
+  abandonou: boolean;
   /**
    * Quando esta pessoa falou pela última vez. `null` = ainda não falou.
    *
@@ -130,6 +142,15 @@ export interface PauseState {
 export interface Room {
   code: string;
   status: RoomStatus;
+  /**
+   * De onde a mesa veio (plano 03, D-8).
+   *
+   * `PRIVADA` é a sala por link. Nas outras não há host com poderes: entre
+   * estranhos, a autoridade social que sustenta o host de uma sala de amigos
+   * não existe, e dar a um deles o botão de expulsar os outros quatro é
+   * entregar a partida a quem clicar primeiro.
+   */
+  origem: Origem;
   hostId: PlayerId | null;
   players: RoomPlayer[];
   options: MatchOptions;

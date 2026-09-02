@@ -9,6 +9,8 @@ import {
   AVATAR_EMOJIS,
   LIMITS,
   NICKNAME_MAX,
+  ehDeFila,
+  type Origem,
   type BotDifficulty,
   type ChatMessage,
   type Command,
@@ -92,10 +94,16 @@ const to = (playerId: PlayerId, event: Emission['event']): Emission => ({
 // Criação e entrada
 // ---------------------------------------------------------------------------
 
-export function createRoom(code: string, host: JoinParams, ctx: RoomCtx): Room {
+export function createRoom(
+  code: string,
+  host: JoinParams,
+  ctx: RoomCtx,
+  origem: Origem = 'PRIVADA',
+): Room {
   return {
     code,
     status: 'LOBBY',
+    origem,
     hostId: host.playerId,
     players: [newPlayer(host, ctx.now, false)],
     options: { ...DEFAULT_OPTIONS },
@@ -123,6 +131,7 @@ function newPlayer(params: JoinParams, now: number, isSpectator: boolean): RoomP
     pronto: false,
     silenciado: false,
     expulsoEm: null,
+    abandonou: false,
     lastChatAt: null,
     bot: null,
     conta: params.conta ?? null,
@@ -177,7 +186,10 @@ function newBot(
     // "desse pronto" por cada bot seria cerimônia sem decisão.
     pronto: true,
     silenciado: false,
+    // Bot sentado pelo host não é assento de ninguém: não foi expulso e não
+    // abandonou nada.
     expulsoEm: null,
+    abandonou: false,
     bot: { difficulty },
     // Bot nunca tem conta. Não é descuido: é o que impede uma mesa só de bots
     // de fazer uma partida entrar no histórico de alguém (RF-068).
@@ -303,6 +315,45 @@ export function leave(room: Room, playerId: PlayerId, ctx: RoomCtx): RoomResult 
   const emissions: Emission[] = [
     all({ type: 'room:playerLeft', payload: { playerId, reason: 'LEFT' } }),
   ];
+
+  /**
+   * RF-102: em mesa de fila, sair no meio NÃO anula a rodada.
+   *
+   * A retirada do RJ-154 desfaz a rodada de todo mundo, e entre amigos isso é
+   * aceitável — quem saiu avisou, e a mesa recomeça junta. Entre estranhos é o
+   * contrário: bastaria uma pessoa clicando "sair" para apagar a rodada dos
+   * outros sete, de graça, quantas vezes quisesse.
+   *
+   * O assento vira bot, herdando mão, aposta e vidas, e a partida segue. Na
+   * ranqueada isso é abandono, e abandono tem preço (RF-104) — que é o que
+   * torna o gesto uma decisão, e não um botão de sabotagem.
+   */
+  if (next.match && isActive(next.match, playerId) && ehDeFila(next.origem)) {
+    const alvo = next.players.find((p) => p.id === playerId);
+    if (alvo && alvo.bot === null) {
+      // `leave` já marcou `SAIU`; o assento precisa voltar a ser presente para
+      // o bot poder jogá-lo. É o mesmo assento, com outro dono.
+      const trocado = trocarPorBot(next, { ...alvo, connection: 'CONECTADO' }, ctx, 'ABANDONO');
+      next = trocado.room;
+      emissions.push(all({
+        type: 'room:playerUpdated',
+        payload: { player: toPublicPlayer(trocado.assento) },
+      }));
+      emissions.push(all({
+        type: 'system:notice',
+        payload: {
+          code: 'ABANDONO_BOT_ASSUMIU',
+          params: { apelido: alvo.nickname, bot: trocado.assento.nickname },
+        },
+      }));
+      next = garantirHost(next, emissions);
+      next = maybeResume(next, ctx, emissions).room;
+      if (next.status === 'EM_PARTIDA' && next.match?.round.activePlayerId === playerId) {
+        next = { ...next, phaseDeadline: deadlineFor(next, ctx.now) };
+      }
+      return commit(next, ctx, emissions);
+    }
+  }
 
   // Sair em partida equivale a retirada: cartas e vidas descartadas (RJ-154).
   if (next.match && isActive(next.match, playerId)) {
@@ -446,6 +497,23 @@ export function applyCommand(
   const isHost = room.hostId === playerId;
   const hostOnly = command.type.startsWith('host:');
   if (hostOnly && !isHost) return failWith('NOT_HOST', 'COMANDO_EXIGE_HOST');
+
+  /**
+   * RF-101: numa mesa de fila, o host não tem poderes.
+   *
+   * Nas salas de amigos o host é uma pessoa com autoridade social de verdade —
+   * quem criou a mesa e convidou os outros. Entre estranhos ela não existe, e
+   * dar a um deles o botão de expulsar, de mexer nas regras ou de encerrar a
+   * partida dos outros quatro é entregar a mesa a quem clicar primeiro.
+   *
+   * A recusa é aqui, num lugar só, e não caso a caso: comando de host que
+   * aparecer amanhã já nasce recusado. O host CONTINUA existindo na sala de
+   * fila — alguém tem de ser o dono do assento zero para o resto do código não
+   * mudar —, mas não pode nada.
+   */
+  if (hostOnly && ehDeFila(room.origem)) {
+    return failWith('NOT_HOST', 'MESA_DE_FILA_NAO_TEM_HOST');
+  }
 
   switch (command.type) {
     case 'room:resync':
@@ -843,10 +911,23 @@ const DIFICULDADE_DO_SUBSTITUTO: BotDifficulty = 'MEDIO';
  * mão, a aposta e as vidas. Trocar o id aqui seria reescrever a rodada inteira
  * para renomear uma cadeira.
  */
-function expulsarComBot(room: Room, alvo: RoomPlayer, ctx: RoomCtx): RoomResult {
-  // O nome carrega de quem era o assento. Quem entra agora, ou recarrega a
-  // página, precisa entender por que aquele bot já tem aposta e cartas na mão
-  // — e o aviso do sistema, que explica isso uma vez, some da tela.
+export type MotivoDaSubstituicao = 'EXPULSAO' | 'ABANDONO';
+
+/**
+ * Troca a PESSOA pelo bot no assento, sem tocar na partida.
+ *
+ * Devolve a sala e o assento novo. Não emite, não retoma pausa e não mexe em
+ * prazo — quem chama decide isso, porque os dois donos desta operação querem
+ * coisas diferentes: a expulsão trata de um assento por vez, e a resolução
+ * automática de ausência (D-9) pode trocar vários de uma vez e só então
+ * retomar.
+ */
+export function trocarPorBot(
+  room: Room,
+  alvo: RoomPlayer,
+  ctx: RoomCtx,
+  motivo: MotivoDaSubstituicao,
+): { room: Room; assento: RoomPlayer } {
   const cabe = `Bot (${alvo.nickname})`;
   const nickname = apelidoLivre(
     room,
@@ -859,7 +940,10 @@ function expulsarComBot(room: Room, alvo: RoomPlayer, ctx: RoomCtx): RoomResult 
     nickname,
     bot: { difficulty: DIFICULDADE_DO_SUBSTITUTO },
     expulsoEm: ctx.now,
-    // Bot está sempre conectado por construção. Sem isto, um assento expulso
+    // Expulso NÃO é abandono. Na ranqueada os dois custam preços diferentes
+    // (RF-104), e quem levou o pé não escolheu sair.
+    abandonou: motivo === 'ABANDONO',
+    // Bot está sempre conectado por construção. Sem isto, um assento trocado
     // enquanto a pessoa caía continuaria "ausente" e seguraria a mesa pausada
     // esperando alguém que já não pode voltar.
     connection: 'CONECTADO',
@@ -869,13 +953,24 @@ function expulsarComBot(room: Room, alvo: RoomPlayer, ctx: RoomCtx): RoomResult 
     // Calar um bot não quer dizer nada: ele não fala.
     silenciado: false,
     // A conta NÃO é herdada. O bot vai terminar a partida, e creditar essa
-    // colocação no histórico de quem foi expulso seria atribuir a uma pessoa
-    // um resultado que ela não jogou (RF-068).
+    // colocação no histórico de quem saiu seria atribuir a uma pessoa um
+    // resultado que ela não jogou (RF-068).
     conta: null,
     contaId: null,
   };
 
-  let next: Room = { ...room, players: replace(room.players, alvo.id, assento) };
+  return { room: { ...room, players: replace(room.players, alvo.id, assento) }, assento };
+}
+
+function expulsarComBot(room: Room, alvo: RoomPlayer, ctx: RoomCtx): RoomResult {
+  // O nome carrega de quem era o assento. Quem entra agora, ou recarrega a
+  // página, precisa entender por que aquele bot já tem aposta e cartas na mão
+  // — e o aviso do sistema, que explica isso uma vez, some da tela.
+  const trocado = trocarPorBot(room, alvo, ctx, 'EXPULSAO');
+  const assento = trocado.assento;
+  const nickname = assento.nickname;
+
+  let next: Room = trocado.room;
   const emissions: Emission[] = [
     all({ type: 'room:playerUpdated', payload: { player: toPublicPlayer(assento) } }),
     all({
@@ -909,7 +1004,14 @@ function expulsarComBot(room: Room, alvo: RoomPlayer, ctx: RoomCtx): RoomResult 
   return commit(next, ctx, emissions);
 }
 
-function startMatch(room: Room, ctx: RoomCtx): RoomResult {
+/**
+ * Começa a partida.
+ *
+ * Exportada porque a fila a chama DIRETO, e não por comando: `host:startMatch`
+ * é recusado em mesa de fila (RF-101), e com razão — quem começa a partida ali
+ * é o pareador, não um dos jogadores.
+ */
+export function startMatch(room: Room, ctx: RoomCtx): RoomResult {
   if (room.status !== 'LOBBY') return failWith('WRONG_STATUS', 'SO_NO_LOBBY');
 
   const seated = seatedPlayers(room);
@@ -947,7 +1049,12 @@ function startMatch(room: Room, ctx: RoomCtx): RoomResult {
    * quem está no lobby sem confirmar tem duas saídas para o host: esperar ou
    * expulsar — `host:kick` já existe no lobby e é o escape.
    */
-  if (seated.some((p) => !p.pronto)) return failWith('WRONG_STATUS', 'FALTA_PRONTO');
+  // Mesa de fila não passa por lobby, e por isso não pede pronto: a presença
+  // acabou de ser provada pelo socket da fila (plano 03 §5.3). Pedir de novo
+  // seria pedir duas vezes a mesma coisa e perder gente no meio.
+  if (!ehDeFila(room.origem) && seated.some((p) => !p.pronto)) {
+    return failWith('WRONG_STATUS', 'FALTA_PRONTO');
+  }
 
   const match = createMatch({
     matchId: ctx.newId(),
@@ -1287,6 +1394,10 @@ export function snapshotFor(room: Room, viewerId: PlayerId): Emission['event'] {
     payload: {
       code: room.code,
       status: room.status,
+      // A tela precisa saber de onde a mesa veio: numa mesa de fila o host não
+      // tem poderes (RF-101), e mostrar botões que o servidor vai recusar é
+      // pior do que não mostrá-los.
+      origem: room.origem,
       hostId: room.hostId,
       options: room.options,
       stateVersion: room.stateVersion,

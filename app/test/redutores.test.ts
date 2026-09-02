@@ -136,7 +136,7 @@ describe('CA-342: o estado reduzido não diverge do retrato do servidor', () => 
 
 describe('CA-343: em dúvida, o redutor pede o retrato', () => {
   const base = (): Retrato => ({
-    code: 'K7QMP', status: 'LOBBY', hostId: 'p1', options: {} as never,
+    code: 'K7QMP', status: 'LOBBY', origem: 'PRIVADA', hostId: 'p1', options: {} as never,
     stateVersion: 1, players: [], pause: null, phaseDeadline: null, chat: [], match: null,
   });
 

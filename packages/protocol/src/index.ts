@@ -212,6 +212,25 @@ export type Command =
   | { type: 'move:bet'; payload: MoveBase & { bet: number } }
   | { type: 'move:playCard'; payload: MoveBase & { cardId: CardId } };
 
+/**
+ * O que se fala no socket da FILA — que é outro socket, com outro assunto.
+ *
+ * União separada de propósito: a sala tem código, jogadores e partida, e a fila
+ * não tem nada disso. Juntar as duas faria cada validação de comando de sala
+ * carregar casos que nunca vão acontecer nela, e vice-versa.
+ */
+export type FilaCommand =
+  | {
+      type: 'fila:entrar';
+      payload: {
+        modo: ModoDeFila;
+        /** Só na fila normal sem conta: logado, a identidade vem da conta. */
+        nickname?: string;
+        avatar?: Avatar;
+      };
+    }
+  | { type: 'fila:sair'; payload: Record<string, never> };
+
 export type CommandType = Command['type'];
 
 export const HOST_ONLY_COMMANDS = [
@@ -258,7 +277,17 @@ export type ServerEvent =
   | { type: 'match:absenceChanged'; payload: { absentPlayerIds: PlayerId[] } }
   | { type: 'match:decisionUnlocked'; payload: { hostId: PlayerId } }
   | { type: 'match:resumed'; payload: { phase: RoundPhase; activePlayerId: PlayerId | null; deadline: number | null } }
-  | { type: 'round:aborted'; payload: { roundNumber: number; withdrawnPlayerIds: PlayerId[] } };
+  | { type: 'round:aborted'; payload: { roundNumber: number; withdrawnPlayerIds: PlayerId[] } }
+
+  // --- fila (plano 03 §5) --------------------------------------------------
+  | {
+      type: 'fila:espera';
+      payload: { modo: ModoDeFila; naFila: number; desde: number; janelaAte: number | null };
+    }
+  | {
+      type: 'fila:pareado';
+      payload: { modo: ModoDeFila; roomCode: string; playerId: PlayerId; sessionToken: string };
+    };
 
 export type ServerEventType = ServerEvent['type'];
 
@@ -414,6 +443,41 @@ export const LIMITS = {
   /** Quanto dura a viagem das cartas até o vencedor (`07` §3: 150–300 ms). */
   trickCollectMs: 300,
 } as const;
+
+/**
+ * As duas filas (plano 03 §5).
+ *
+ * `NORMAL` entra com apelido, como quem entra por link. `RANQUEADA` exige conta
+ * (D-1) — elo sem conta não tem onde morar.
+ */
+export const MODOS_DE_FILA = ['NORMAL', 'RANQUEADA'] as const;
+export type ModoDeFila = (typeof MODOS_DE_FILA)[number];
+
+/**
+ * De onde a mesa veio (plano 03 §6).
+ *
+ * `PRIVADA` é a sala por link, que é o que existia antes deste campo — e é o
+ * único lugar onde o host tem poderes (D-8). `FILA` e `RANQUEADA` vêm do
+ * pareamento; só `RANQUEADA` mexe em elo.
+ *
+ * Mora no protocolo porque três pacotes precisam do mesmo vocabulário: a sala
+ * decide o que permitir, o banco grava, e o cliente mostra.
+ */
+export const ORIGENS = ['PRIVADA', 'FILA', 'RANQUEADA'] as const;
+export type Origem = (typeof ORIGENS)[number];
+
+/** A mesa é de fila? Onde `PRIVADA` termina, os poderes de host terminam. */
+export const ehDeFila = (origem: Origem): boolean => origem !== 'PRIVADA';
+
+/**
+ * Onde toda conta começa na ranqueada (plano 03 §4.1).
+ *
+ * Mora aqui, e não no `elo.ts` do servidor, porque é ao mesmo tempo uma regra
+ * do elo e o valor que o banco lê quando a conta ainda não tem linha. Duas
+ * cópias de um número que precisa ser o mesmo é o desenho que garante que um
+ * dia elas discordem.
+ */
+export const ELO_INICIAL = 1000;
 
 export const NICKNAME_MIN = 2;
 export const NICKNAME_MAX = 16;

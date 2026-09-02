@@ -12,6 +12,7 @@ import {
   AVATAR_COLORS,
   AVATAR_EMOJIS,
   LIMITS,
+  MODOS_DE_FILA,
   NICKNAME_MAX,
   NICKNAME_MIN,
   PROTOCOL_VERSION,
@@ -146,6 +147,30 @@ export const commandSchema = z.discriminatedUnion('type', [
   }),
 ]);
 
+/**
+ * Os comandos da FILA. Mesmo envelope, outro vocabulário (plano 03 §5).
+ *
+ * `nickname` e `avatar` são opcionais porque logado a identidade vem da conta —
+ * mandar apelido junto com sessão de conta seria dar ao cliente a chance de
+ * entrar na fila com um nome que não é o dele.
+ */
+export const filaCommandSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('fila:entrar'),
+    payload: z.object({
+      modo: z.enum(MODOS_DE_FILA),
+      nickname: nicknameSchema.optional(),
+      avatar: avatarSchema.optional(),
+    }).strict(),
+  }),
+  z.object({
+    type: z.literal('fila:sair'),
+    payload: z.object({}).strict(),
+  }),
+]);
+
+export type ParsedFilaCommand = z.infer<typeof filaCommandSchema>;
+
 export const envelopeSchema = z.object({
   v: z.literal(PROTOCOL_VERSION),
   id: z.string().min(1).max(64),
@@ -185,6 +210,32 @@ export function parseClientMessage(raw: unknown): ParseResult<{
   }
 
   const command = commandSchema.safeParse({
+    type: envelope.data.type,
+    payload: envelope.data.payload,
+  });
+  if (!command.success) {
+    return { ok: false, code: 'VALIDATION_FAILED', issues: issuesOf(command.error) };
+  }
+
+  return { ok: true, value: { envelope: envelope.data, command: command.data } };
+}
+
+/** O mesmo de `parseClientMessage`, para o socket da fila. */
+export function parseFilaMessage(raw: unknown): ParseResult<{
+  envelope: z.infer<typeof envelopeSchema>;
+  command: ParsedFilaCommand;
+}> {
+  const envelope = envelopeSchema.safeParse(raw);
+  if (!envelope.success) {
+    const wrongVersion =
+      typeof raw === 'object' && raw !== null && 'v' in raw &&
+      (raw as { v: unknown }).v !== PROTOCOL_VERSION;
+    return wrongVersion
+      ? { ok: false, code: 'PROTOCOL_VERSION', issues: ['versão de protocolo incompatível'] }
+      : { ok: false, code: 'VALIDATION_FAILED', issues: issuesOf(envelope.error) };
+  }
+
+  const command = filaCommandSchema.safeParse({
     type: envelope.data.type,
     payload: envelope.data.payload,
   });

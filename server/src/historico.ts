@@ -63,11 +63,21 @@ export function registroDaPartida(
       erroMedio: Math.round((n?.erroMedio ?? 0) * 100) / 100,
       piorErro: n?.pior ?? 0,
       nota: nota?.nota ?? 0,
+      // O elo entra DEPOIS, quando a partida já existe no banco (plano 03
+      // §6.1): calcular aqui exigiria ler o elo de todo mundo antes de gravar,
+      // e uma gravação que falhasse depois disso deixaria o número na conta
+      // sem a partida que o explica.
+      eloAntes: null,
+      eloDelta: null,
+      // Expulso NÃO é abandono: o preço na ranqueada é diferente, e quem levou
+      // o pé não escolheu sair.
+      abandonou: naSala?.abandonou ?? false,
     };
   });
 
   return {
     salaCodigo: room.code,
+    origem: room.origem,
     // `history[0]` é a primeira rodada; se ela faltar, a partida acabou antes
     // de existir, e o fim serve de começo.
     comecouEm: room.createdAt,

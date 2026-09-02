@@ -14,7 +14,7 @@ import { Feltro } from '../components/Feltro';
 import { Vidas } from '../components/Vidas';
 import type { Retrato, PlayerView } from '../state/tipos';
 
-export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoApostar, aoJogar, aoAbrirRegras, aoEnviarChat, preJogada, aoPreJogar, aoAbrirPerfil, aoSilenciar, aoExpulsar }: {
+export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoApostar, aoJogar, aoAbrirRegras, aoEnviarChat, preJogada, aoPreJogar, aoAbrirPerfil, aoSilenciar, aoExpulsar, mudos, aoAlternarMudo }: {
   retrato: Retrato;
   eu: string;
   partida: PlayerView;
@@ -29,6 +29,9 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
   aoAbrirPerfil?: ((slug: string) => void) | undefined;
   aoSilenciar?: ((playerId: string, silenciado: boolean) => void) | undefined;
   aoExpulsar?: ((playerId: string) => void) | undefined;
+  /** Silenciar para mim (plano 03 §9.1): local, sem passar pelo servidor. */
+  mudos?: Set<string> | undefined;
+  aoAlternarMudo?: ((playerId: string) => void) | undefined;
 }) {
   const nome = (id: string) => retrato.players.find((p) => p.id === id)?.nickname ?? '—';
 
@@ -117,15 +120,22 @@ export function Mesa({ retrato, eu, partida, selecionada, aoSelecionar, aoAposta
           eu={eu}
           aoEnviar={aoEnviarChat}
           inicialmenteAberto={larga}
-          souHost={retrato.hostId === eu}
+          // Numa mesa de fila ninguém cala ninguém (RF-101): sobra o
+          // esconder-para-mim, que não precisa de autoridade nenhuma.
+          souHost={retrato.hostId === eu && retrato.origem === 'PRIVADA'}
           silenciados={new Set(retrato.players.filter((p) => p.silenciado).map((p) => p.id))}
           estouSilenciado={retrato.players.find((p) => p.id === eu)?.silenciado ?? false}
           aoSilenciar={aoSilenciar}
+          mudos={mudos}
+          aoAlternarMudo={aoAlternarMudo}
         />
 
         <Historico partida={partida} jogadores={retrato.players} eu={eu} />
 
-        {aoExpulsar && (
+        {/* Numa mesa de fila não há host com poderes (RF-101). O painel não
+            fica desabilitado: some. Botão que existe e recusa ensina que o
+            aplicativo está quebrado; botão que não existe não promete nada. */}
+        {aoExpulsar && retrato.origem === 'PRIVADA' && (
           <Anfitriao
             jogadores={retrato.players}
             eu={eu}

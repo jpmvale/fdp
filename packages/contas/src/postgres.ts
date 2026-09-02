@@ -21,9 +21,10 @@ import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import { ELO_INICIAL } from '@fdp/protocol';
 import type {
-  Conta, Contas, Credencial, Dados, JogadorDaPartida,
-  Partida, Partidas, Provedor,
+  Conta, ContaId, Contas, Credencial, Dados, Elos, JogadorDaPartida,
+  Partida, Partidas, Provedor, RegistroDeElo,
 } from './tipos.js';
 import { emailNormalizado, slugDe, slugLivre, vaiPersistir } from './regras.js';
 
@@ -42,7 +43,7 @@ export interface OpcoesPostgres {
   max?: number;
 }
 
-const MIGRACOES = ['001-contas.sql'] as const;
+const MIGRACOES = ['001-contas.sql', '002-elo.sql'] as const;
 
 async function aplicarMigracoes(pool: pg.Pool): Promise<void> {
   await pool.query(`
@@ -111,6 +112,9 @@ const paraJogador = (r: Record<string, unknown>): JogadorDaPartida => ({
   erroMedio: num(r['erro_medio']),
   piorErro: num(r['pior_erro']),
   nota: num(r['nota']),
+  eloAntes: r['elo_antes'] === null || r['elo_antes'] === undefined ? null : num(r['elo_antes']),
+  eloDelta: r['elo_delta'] === null || r['elo_delta'] === undefined ? null : num(r['elo_delta']),
+  abandonou: (r['abandonou'] as boolean | undefined) ?? false,
 });
 
 const paraPartida = (
@@ -119,6 +123,7 @@ const paraPartida = (
 ): Partida => ({
   id: r['id'] as string,
   salaCodigo: r['sala_codigo'] as string,
+  origem: r['origem'] as Partida['origem'],
   comecouEm: ms(r['comecou_em']),
   terminouEm: ms(r['terminou_em']),
   motivoFim: r['motivo_fim'] as Partida['motivoFim'],
@@ -304,10 +309,10 @@ export async function criarDadosEmPostgres(opcoes: OpcoesPostgres): Promise<Dado
         const id = randomUUID();
         await c.query(
           `INSERT INTO partidas
-             (id, sala_codigo, comecou_em, terminou_em, motivo_fim, rodadas, opcoes)
-           VALUES ($1, $2, to_timestamp($3::double precision / 1000),
-                   to_timestamp($4::double precision / 1000), $5, $6, $7)`,
-          [id, entrada.salaCodigo, entrada.comecouEm, entrada.terminouEm,
+             (id, sala_codigo, origem, comecou_em, terminou_em, motivo_fim, rodadas, opcoes)
+           VALUES ($1, $2, $3, to_timestamp($4::double precision / 1000),
+                   to_timestamp($5::double precision / 1000), $6, $7, $8)`,
+          [id, entrada.salaCodigo, entrada.origem, entrada.comecouEm, entrada.terminouEm,
            entrada.motivoFim, entrada.rodadas, JSON.stringify(entrada.opcoes)]);
 
         for (const j of entrada.jogadores) {
@@ -315,11 +320,13 @@ export async function criarDadosEmPostgres(opcoes: OpcoesPostgres): Promise<Dado
             `INSERT INTO partida_jogadores
                (partida_id, posicao, conta_id, apelido, avatar, bot, dificuldade,
                 colocacao, vidas_finais, eliminado_rodada, morto_em_vaza,
-                acertos, jogadas, erro_medio, pior_erro, nota)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+                acertos, jogadas, erro_medio, pior_erro, nota,
+                elo_antes, elo_delta, abandonou)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
             [id, j.posicao, j.contaId, j.apelido, JSON.stringify(j.avatar), j.bot,
              j.dificuldade, j.colocacao, j.vidasFinais, j.eliminadoRodada,
-             j.mortoEmVaza, j.acertos, j.jogadas, j.erroMedio, j.piorErro, j.nota]);
+             j.mortoEmVaza, j.acertos, j.jogadas, j.erroMedio, j.piorErro, j.nota,
+             j.eloAntes, j.eloDelta, j.abandonou]);
         }
 
         return { ...entrada, id, jogadores: entrada.jogadores.map((j) => ({ ...j })) };
@@ -374,9 +381,70 @@ export async function criarDadosEmPostgres(opcoes: OpcoesPostgres): Promise<Dado
     },
   };
 
+  const elosApi: Elos = {
+    async porContas(ids) {
+      if (ids.length === 0) return new Map();
+      // LEFT JOIN a partir de `contas`: a resposta precisa distinguir "conta
+      // sem elo ainda" (que lê o inicial) de "conta que não existe" (que não
+      // aparece). Consultar só `elo` devolveria as duas como ausência.
+      const { rows } = await pool.query(
+        `SELECT c.id,
+                coalesce(e.pontos, $2)        AS pontos,
+                coalesce(e.partidas, 0)       AS partidas,
+                coalesce(e.melhor_pontos, $2) AS melhor_pontos,
+                e.atualizado_em
+           FROM contas c LEFT JOIN elo e ON e.conta_id = c.id
+          WHERE c.id = ANY($1::uuid[])`,
+        [ids, ELO_INICIAL]);
+
+      const fora = new Map<ContaId, RegistroDeElo>();
+      for (const r of rows) {
+        fora.set(r.id as string, {
+          contaId: r.id as string,
+          pontos: num(r.pontos),
+          partidas: num(r.partidas),
+          melhorPontos: num(r.melhor_pontos),
+          atualizadoEm: r.atualizado_em === null ? 0 : ms(r.atualizado_em),
+        });
+      }
+      return fora;
+    },
+
+    async aplicar(partidaId, resultados) {
+      if (resultados.length === 0) return;
+      await emTransacao(async (c) => {
+        for (const r of resultados) {
+          // Somar e não substituir: escrever valor absoluto transforma qualquer
+          // engano futuro — um reprocessamento, duas instâncias — em perda
+          // silenciosa de pontos, e somar não custa nada.
+          //
+          // `ON CONFLICT` porque a linha só nasce na primeira ranqueada: criá-la
+          // no cadastro encheria a tabela de contas que talvez nunca entrem na
+          // fila, e faria o cadastro precisar saber o que é elo.
+          await c.query(
+            `INSERT INTO elo (conta_id, pontos, partidas, melhor_pontos, atualizado_em)
+             VALUES ($1, greatest(0, $2::int + $3::int), 1, greatest($2::int + $3::int, $2::int), now())
+             ON CONFLICT (conta_id) DO UPDATE SET
+               pontos        = greatest(0, elo.pontos + $3::int),
+               partidas      = elo.partidas + 1,
+               melhor_pontos = greatest(elo.melhor_pontos, greatest(0, elo.pontos + $3::int)),
+               atualizado_em = now()`,
+            [r.contaId, ELO_INICIAL, r.delta]);
+
+          await c.query(
+            `UPDATE partida_jogadores
+                SET elo_antes = $3, elo_delta = $4, abandonou = $5
+              WHERE partida_id = $1 AND conta_id = $2`,
+            [partidaId, r.contaId, r.eloAntes, r.delta, r.abandonou]);
+        }
+      });
+    },
+  };
+
   return {
     contas: contasApi,
     partidas: partidasApi,
+    elos: elosApi,
     async fechar() { await pool.end(); },
   };
 }

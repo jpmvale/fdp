@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ROOM_CODE_LENGTH } from '@fdp/protocol';
+import { ROOM_CODE_LENGTH, type ModoDeFila } from '@fdp/protocol';
 
 /**
  * Home: só a porta de entrada.
@@ -11,7 +11,7 @@ import { ROOM_CODE_LENGTH } from '@fdp/protocol';
  */
 export function Home({
   aoCriar, aoEntrar, aoAbrirRegras, codigoInicial, conta, aoAbrirConta, aoSairDaConta,
-  aoEditarPerfil, aoVerPerfil,
+  aoEditarPerfil, aoVerPerfil, aoEntrarNaFila, temConta,
 }: {
   aoCriar: () => void;
   aoEntrar: (codigo: string) => void;
@@ -25,6 +25,9 @@ export function Home({
   aoEditarPerfil: () => void;
   /** O próprio perfil, com o histórico de partidas. */
   aoVerPerfil: () => void;
+  /** As filas públicas (plano 03). Só a ranqueada exige conta (D-1). */
+  aoEntrarNaFila: (modo: ModoDeFila) => void;
+  temConta: boolean;
 }) {
   const [codigo, setCodigo] = useState(codigoInicial.toUpperCase());
   const completo = codigo.length === ROOM_CODE_LENGTH;
@@ -53,6 +56,45 @@ export function Home({
       </header>
 
       <button onClick={aoCriar} style={{ height: 52 }}>Criar sala</button>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ flex: 1, height: 1, background: 'var(--linha)' }} />
+        <span className="fraco">ou</span>
+        <span style={{ flex: 1, height: 1, background: 'var(--linha)' }} />
+      </div>
+
+      {/* As filas ficam ABAIXO de "criar sala", e não acima.
+
+          A sala por link é o caminho principal do FDP e continua sendo (plano
+          03, I-1): a fila é mais um caminho, nunca o caminho. Pôr "Jogar agora"
+          no topo transformaria um jogo que se joga com os amigos num jogo que
+          se joga com estranhos, por decisão de layout. */}
+      <div className="pilha" style={{ gap: 8 }}>
+        <span className="rotulo">jogar com quem estiver online</span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="fantasma"
+            onClick={() => aoEntrarNaFila('NORMAL')}
+            style={{ flex: 1, height: 46 }}
+          >
+            Jogar agora
+          </button>
+          <button
+            className="fantasma"
+            onClick={() => aoEntrarNaFila('RANQUEADA')}
+            style={{ flex: 1, height: 46 }}
+          >
+            Ranqueada
+          </button>
+        </div>
+        <span className="fraco" style={{ fontSize: 11 }}>
+          {/* Dizer o requisito ANTES do clique. Descobrir que precisa de conta
+              depois de já ter escolhido é o passo em que se perde gente. */}
+          {temConta
+            ? 'Mesa de 4 a 8 pessoas, começando direto.'
+            : 'A ranqueada precisa de conta — é onde o seu elo mora.'}
+        </span>
+      </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ flex: 1, height: 1, background: 'var(--linha)' }} />

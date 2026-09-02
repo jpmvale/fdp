@@ -248,7 +248,7 @@ describe('perfil público (D-4)', () => {
 
       for (let i = 0; i < quantas; i++) {
         await dados.partidas.gravar({
-          salaCodigo: 'AB12C', comecouEm: 1_000 + i, terminouEm: 2_000 + i,
+          salaCodigo: 'AB12C', origem: 'PRIVADA', comecouEm: 1_000 + i, terminouEm: 2_000 + i,
           motivoFim: 'VITORIA', rodadas: 5,
           opcoes: { vidasIniciais: 5, maxCartasPorRodada: 7, regraEmpate: 'EMPATE_ANULA_VAZA' } as never,
           jogadores: [{
@@ -256,6 +256,7 @@ describe('perfil público (D-4)', () => {
             avatar: { emoji: '🦊', color: 'amber' }, bot: false, dificuldade: null,
             colocacao: 1, vidasFinais: 3, eliminadoRodada: null, mortoEmVaza: null,
             acertos: 4, jogadas: 5, erroMedio: 0.5, piorErro: 1, nota: 8,
+            eloAntes: null, eloDelta: null, abandonou: false,
           }],
         });
       }

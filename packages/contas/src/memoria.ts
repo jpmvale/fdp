@@ -11,9 +11,10 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { ELO_INICIAL } from '@fdp/protocol';
 import type {
-  Conta, ContaId, Contas, Credencial, Dados, IdentidadeSso,
-  Partida, PartidaId, Partidas, Provedor,
+  Conta, ContaId, Contas, Credencial, Dados, Elos, IdentidadeSso,
+  Partida, PartidaId, Partidas, Provedor, RegistroDeElo,
 } from './tipos.js';
 import { emailNormalizado, slugDe, slugLivre, vaiPersistir } from './regras.js';
 
@@ -31,6 +32,7 @@ export function criarDadosEmMemoria(opcoes: OpcoesMemoria = {}): Dados {
   const credenciais = new Map<ContaId, Credencial>();
   const identidades = new Map<string, IdentidadeSso>();
   const partidas = new Map<PartidaId, Partida>();
+  const elos = new Map<ContaId, RegistroDeElo>();
 
   const chaveSso = (p: Provedor, s: string): string => `${p} ${s}`;
 
@@ -187,9 +189,53 @@ export function criarDadosEmMemoria(opcoes: OpcoesMemoria = {}): Dados {
     },
   };
 
+  const elosApi: Elos = {
+    async porContas(ids) {
+      const fora = new Map<ContaId, RegistroDeElo>();
+      for (const id of ids) {
+        // Sem linha é elo inicial, não elo zero. Quem chama nunca precisa
+        // conhecer a diferença — é a leitura que a resolve.
+        if (!contas.has(id)) continue;
+        fora.set(id, clonar(elos.get(id) ?? {
+          contaId: id, pontos: ELO_INICIAL, partidas: 0,
+          melhorPontos: ELO_INICIAL, atualizadoEm: 0,
+        }));
+      }
+      return fora;
+    },
+
+    async aplicar(partidaId, resultados) {
+      const partida = partidas.get(partidaId);
+      const t = agora();
+
+      for (const r of resultados) {
+        if (!contas.has(r.contaId)) continue;
+        const atual = elos.get(r.contaId);
+        const pontos = Math.max(0, (atual?.pontos ?? ELO_INICIAL) + r.delta);
+        elos.set(r.contaId, {
+          contaId: r.contaId,
+          pontos,
+          partidas: (atual?.partidas ?? 0) + 1,
+          melhorPontos: Math.max(atual?.melhorPontos ?? ELO_INICIAL, pontos),
+          atualizadoEm: t,
+        });
+
+        // A participação também guarda: é o que torna o perfil explicável e o
+        // que permite recalcular a série se a fórmula mudar (D-11).
+        const linha = partida?.jogadores.find((j) => j.contaId === r.contaId);
+        if (linha) {
+          linha.eloAntes = r.eloAntes;
+          linha.eloDelta = r.delta;
+          linha.abandonou = r.abandonou;
+        }
+      }
+    },
+  };
+
   return {
     contas: contasApi,
     partidas: partidasApi,
+    elos: elosApi,
     async fechar() { /* nada a fechar */ },
   };
 }

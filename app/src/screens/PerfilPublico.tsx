@@ -14,6 +14,18 @@ interface PartidaNoPerfil {
   nota: number | null;
   acertos: number;
   jogadas: number;
+  /** `null` fora da ranqueada — e `null`, não zero: zero é um delta. */
+  eloDelta: number | null;
+  abandonou: boolean;
+  ranqueada: boolean;
+}
+
+/** `null` para quem nunca jogou ranqueada. A seção some, e é a resposta certa. */
+interface EloNoPerfil {
+  pontos: number;
+  faixa: string;
+  partidas: number;
+  melhorPontos: number;
 }
 
 /** Onde a página começa, e se ainda há o que buscar. Vem do servidor. */
@@ -49,7 +61,13 @@ export function PerfilPublico({ slug, aoFechar, meu = false }: {
   meu?: boolean;
 }) {
   const [dados, setDados] = useState<
-    { conta: ContaPublica; resumo: Resumo; partidas: PartidaNoPerfil[]; pagina: Pagina } | null
+    {
+      conta: ContaPublica;
+      resumo: Resumo;
+      elo: EloNoPerfil | null;
+      partidas: PartidaNoPerfil[];
+      pagina: Pagina;
+    } | null
   >(null);
   const [erro, setErro] = useState<string | null>(null);
   const [buscandoMais, setBuscandoMais] = useState(false);
@@ -112,6 +130,24 @@ export function PerfilPublico({ slug, aoFechar, meu = false }: {
             />
           </div>
 
+          {/* O elo (RF-105).
+
+              Só aparece para quem jogou ranqueada. Mostrar "1000, Prata" para
+              quem nunca entrou na fila daria a entender que a pessoa jogou e
+              ficou exatamente no meio — e não há como desfazer essa leitura
+              com uma legenda.
+
+              Sem classificação global e sem "você é o Nº tal": elo aqui
+              responde "quanto eu jogo bem", não "quem é o melhor". */}
+          {dados.elo && (
+            <div className="cartao" style={{ display: 'flex', gap: 4 }}>
+              <Numero rotulo="elo" valor={String(dados.elo.pontos)} cor={CORES_DE_FAIXA[dados.elo.faixa]} />
+              <Numero rotulo="faixa" valor={dados.elo.faixa} cor={CORES_DE_FAIXA[dados.elo.faixa]} />
+              <Numero rotulo="ranqueadas" valor={String(dados.elo.partidas)} />
+              <Numero rotulo="recorde" valor={String(dados.elo.melhorPontos)} />
+            </div>
+          )}
+
           {dados.partidas.length === 0 ? (
             <p className="fraco" style={{ textAlign: 'center', fontSize: 13 }}>
               Nenhuma partida ainda. Só entram no histórico as que têm ao menos
@@ -144,6 +180,22 @@ export function PerfilPublico({ slug, aoFechar, meu = false }: {
                   }}>
                     {p.acertos}/{p.jogadas}
                   </span>
+                  {/* O delta de elo, só nas ranqueadas. O sinal é explícito
+                      no positivo: "+12" e "12" leem diferente numa coluna em
+                      que a metade dos números é negativa. */}
+                  {p.ranqueada && p.eloDelta !== null && (
+                    <span
+                      title={p.abandonou ? 'você saiu no meio desta' : undefined}
+                      style={{
+                        width: 40, textAlign: 'right', fontSize: 11,
+                        fontVariantNumeric: 'tabular-nums',
+                        color: p.eloDelta >= 0 ? 'var(--nota-alta)' : 'var(--vidas)',
+                      }}
+                    >
+                      {p.eloDelta >= 0 ? '+' : ''}{p.eloDelta}
+                      {p.abandonou && ' ⚑'}
+                    </span>
+                  )}
                   <span style={{
                     width: 34, textAlign: 'right', fontWeight: 600,
                     fontVariantNumeric: 'tabular-nums',
@@ -171,6 +223,22 @@ export function PerfilPublico({ slug, aoFechar, meu = false }: {
     </Folha>
   );
 }
+
+/**
+ * As faixas, em cor.
+ *
+ * Reaproveita os tokens que já existem em vez de inventar cinco cores novas: o
+ * jogo já tem uma paleta, e um segundo sistema de cor com outra lógica faria a
+ * mesma tela falar duas línguas. Cor nunca é o único canal — o nome da faixa
+ * está escrito ao lado (RNF-031).
+ */
+const CORES_DE_FAIXA: Record<string, string | undefined> = {
+  Bronze: 'var(--texto-apagado)',
+  Prata: 'var(--texto-medio)',
+  Ouro: 'var(--nota-media)',
+  Platina: 'var(--nota-alta)',
+  Diamante: 'var(--nota-otima)',
+};
 
 function Numero({ rotulo, valor, cor }: { rotulo: string; valor: string; cor?: string | undefined }) {
   return (

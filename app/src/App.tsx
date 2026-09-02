@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { LIMITS, PROTOCOL_VERSION, type Avatar as AvatarProto } from '@fdp/protocol';
+import { LIMITS, PROTOCOL_VERSION, type Avatar as AvatarProto, type ModoDeFila } from '@fdp/protocol';
 import { conectar, type Conexao } from './net/socket';
 import { createReconciler } from './net/reconcile';
 import { reduzir } from './state/redutores';
@@ -7,12 +7,14 @@ import * as sessao from './net/sessao';
 import { frase } from './net/mensagens';
 import { quemSouEu, sairDaConta, salvarPerfilDaConta } from './net/sessao';
 import { jogadaAutomatica } from './jogada';
+import { alternarMudo, gravarMudos, lerMudos, limparOutrasSalas } from './mudos';
 import { carregarPreferenciaDeSom, despertarSomNoPrimeiroGesto } from './som';
 import { useEstado, definir, ler, avisar, errar } from './state/loja';
 import type { Retrato } from './state/tipos';
 import type { Reconciler } from './net/reconcile';
 import { BloqueioConexao, FaixaConexao, bloqueia } from './components/Conexao';
 import { Home } from './screens/Home';
+import { Fila } from './screens/Fila';
 import { Perfil } from './screens/Perfil';
 import { Conta } from './screens/Conta';
 import { CriarConta } from './screens/CriarConta';
@@ -53,9 +55,51 @@ export function App() {
   // O que o Perfil vai fazer ao confirmar: criar sala, entrar numa, ou só
   // salvar (quando já se está na mesa).
   const [intencao, setIntencao] = useState<
-    { tipo: 'CRIAR' } | { tipo: 'ENTRAR'; codigo: string } | { tipo: 'SO_SALVAR' } | null
+    | { tipo: 'CRIAR' }
+    | { tipo: 'ENTRAR'; codigo: string }
+    | { tipo: 'SO_SALVAR' }
+    | { tipo: 'FILA'; modo: ModoDeFila }
+    | null
   >(null);
   const [perfilAberto, setPerfilAberto] = useState(false);
+  /**
+   * A fila aberta, ou `null`.
+   *
+   * Estado de tela e nada mais: quem sabe se você está na fila é o socket, que
+   * vive dentro da `<Fila>`. Guardar "estou na fila" aqui criaria uma segunda
+   * verdade que sobreviveria a uma queda e mentiria para a pessoa.
+   */
+  const [fila, setFila] = useState<ModoDeFila | null>(null);
+  /** Apelido e avatar de quem entra na fila sem conta. */
+  const [identidadeDaFila, setIdentidadeDaFila] = useState<
+    { nickname: string; avatar: AvatarProto } | null
+  >(null);
+
+  /**
+   * Quem eu escondi para mim (plano 03 §9.1).
+   *
+   * Nunca vai ao servidor. Mandar acrescentaria nada e traria o pior de dois
+   * mundos: uma lista de quem-não-gosta-de-quem guardada em algum lugar, e a
+   * chance de a outra pessoa descobrir que foi silenciada.
+   */
+  const [mudos, setMudos] = useState<Set<string>>(() => new Set());
+  const codigoDaSala = estado.codigo;
+
+  useEffect(() => {
+    if (!codigoDaSala) { setMudos(new Set()); return; }
+    setMudos(lerMudos(codigoDaSala));
+    // Cada mesa de fila deixaria uma chave para trás; a limpeza acontece ao
+    // entrar numa sala, que é quando já se sabe qual é a atual.
+    limparOutrasSalas(codigoDaSala);
+  }, [codigoDaSala]);
+
+  const alternarMudoLocal = (playerId: string): void => {
+    setMudos((atual) => {
+      const novo = alternarMudo(atual, playerId);
+      if (codigoDaSala) gravarMudos(codigoDaSala, novo);
+      return novo;
+    });
+  };
 
   const entrar = (s: sessao.Sessao) => {
     saindo.current = false;
@@ -268,6 +312,15 @@ export function App() {
               if (estado.conta) { juntar(codigo, estado.conta.apelido, estado.conta.avatar as AvatarProto, entrar); return; }
               setIntencao({ tipo: 'ENTRAR', codigo }); definir({ tela: 'perfil' });
             }}
+            /* A fila normal não exige conta (D-1), mas exige apelido — e quem
+               não tem conta ainda não escolheu um. Passa pelo Perfil, como
+               criar sala já passava. */
+            aoEntrarNaFila={(modo) => {
+              if (modo === 'RANQUEADA' && !estado.conta) { setConta({ tela: 'entrar' }); return; }
+              if (estado.conta) { setFila(modo); return; }
+              setIntencao({ tipo: 'FILA', modo }); definir({ tela: 'perfil' });
+            }}
+            temConta={estado.conta !== null}
           />
         )}
 
@@ -322,8 +375,45 @@ export function App() {
                   .catch(() => errar('Não deu para salvar o seu perfil.'));
                 return;
               }
+              if (intencao?.tipo === 'FILA') {
+                setIdentidadeDaFila({ nickname: apelido, avatar });
+                setFila(intencao.modo);
+                setIntencao(null);
+                definir({ tela: 'home' });
+                return;
+              }
               if (intencao?.tipo === 'ENTRAR') juntar(intencao.codigo, apelido, avatar, entrar);
               else criar(apelido, avatar, entrar);
+            }}
+          />
+        )}
+
+        {fila && (
+          <Fila
+            modo={fila}
+            identidade={estado.conta
+              ? {}
+              : {
+                  nickname: identidadeDaFila?.nickname,
+                  avatar: identidadeDaFila?.avatar,
+                }}
+            aoFechar={() => setFila(null)}
+            /* Pareou: a fila sai da tela e a mesa entra pelo mesmo caminho de
+               sempre. O token vem do servidor junto com o código, então não há
+               um segundo pedido de sessão no meio — a partida já começou. */
+            aoParear={(p) => {
+              setFila(null);
+              entrar({
+                roomCode: p.roomCode,
+                playerId: p.playerId,
+                sessionToken: p.sessionToken,
+                wsUrl: new URL(`/api/rooms/${p.roomCode}/ws`, location.href)
+                  .toString().replace(/^http/, 'ws'),
+                // Quem vem da fila SENTA. Espectador é quem chega com a
+                // partida rolando, e aqui a partida acabou de começar por
+                // causa desta pessoa.
+                role: 'PLAYER',
+              });
             }}
           />
         )}
@@ -455,6 +545,8 @@ export function App() {
             aoEnviarChat={(text) => enviar('chat:send', { text })}
             aoAbrirPerfil={(slug) => setPerfilPublico(slug)}
             aoSilenciar={(playerId, silenciado) => enviar('host:silenciar', { playerId, silenciado })}
+            mudos={mudos}
+            aoAlternarMudo={alternarMudoLocal}
             aoExpulsar={(playerId) => enviar('host:kick', { playerId })}
             preJogada={estado.cartaPreJogada?.cardId ?? null}
             aoPreJogar={(cardId) => definir({
@@ -494,6 +586,8 @@ export function App() {
           aoAssistir={(assistir) => enviar('player:setSpectator', { spectator: assistir })}
           aoDarPronto={(pronto) => enviar('player:setPronto', { pronto })}
           aoSilenciar={(playerId, silenciado) => enviar('host:silenciar', { playerId, silenciado })}
+          mudos={mudos}
+          aoAlternarMudo={alternarMudoLocal}
         />
       )}
 
@@ -692,6 +786,10 @@ function narrar(msg: { type: string; payload: unknown }) {
       if ((p['code'] as unknown as string) === 'MATCH_DECIDED_EARLY') {
         const puladas = (p['params'] as unknown as { skippedTricks: number }).skippedTricks;
         avisar(`Já está decidido — ${puladas === 1 ? 'a última mão não muda' : `as ${puladas} mãos que faltam não mudam`} nada`);
+      }
+      if ((p['code'] as unknown as string) === 'ABANDONO_BOT_ASSUMIU') {
+        const q = p['params'] as unknown as { apelido: string; bot: string };
+        avisar(`${q.apelido} sumiu — ${q.bot} assumiu a mão e a aposta`);
       }
       if ((p['code'] as unknown as string) === 'EXPULSO_BOT_ASSUMIU') {
         const q = p['params'] as unknown as { apelido: string; bot: string };

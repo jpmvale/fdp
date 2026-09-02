@@ -12,7 +12,7 @@ const DIFICULDADES: { valor: BotDifficulty; rotulo: string; explica: string }[] 
   { valor: 'REALISTA', rotulo: 'Realista', explica: 'Lê as apostas da mesa e mede o risco de cada carta. Ganha da maioria.' },
 ];
 
-export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRemoverBot, aoAbrirPerfil, aoAbrirRegras, aoSair, aoEnviarChat, aoAssistir, aoDarPronto, aoSilenciar }: {
+export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRemoverBot, aoAbrirPerfil, aoAbrirRegras, aoSair, aoEnviarChat, aoAssistir, aoDarPronto, aoSilenciar, mudos, aoAlternarMudo }: {
   retrato: Retrato;
   eu: string;
   aoIniciar: () => void;
@@ -26,6 +26,9 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
   aoAssistir: (assistir: boolean) => void;
   aoDarPronto: (pronto: boolean) => void;
   aoSilenciar: (playerId: string, silenciado: boolean) => void;
+  /** Silenciar para mim (plano 03 §9.1): local, sem passar pelo servidor. */
+  mudos?: Set<string> | undefined;
+  aoAlternarMudo?: ((playerId: string) => void) | undefined;
 }) {
   const [dificuldade, setDificuldade] = useState<BotDifficulty>('MEDIO');
   const jogadores = retrato.players.filter((p) => !p.isSpectator);
@@ -265,6 +268,8 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
         silenciados={new Set(retrato.players.filter((p) => p.silenciado).map((p) => p.id))}
         estouSilenciado={retrato.players.find((p) => p.id === eu)?.silenciado ?? false}
         aoSilenciar={aoSilenciar}
+        mudos={mudos}
+        aoAlternarMudo={aoAlternarMudo}
       />
 
       {/* RF-025: toda tela tem saída explícita. Sem isto, entrar numa sala era

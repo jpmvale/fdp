@@ -480,6 +480,18 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-416 | U | RF-095 | **Dado** alguém silenciado pelo host, **então** o chat recusa com `SILENCIADO` **no servidor**, durante a partida também; só o host cala, o host não se cala, bot não se cala, liberar devolve a voz, e o silêncio sobrevive à volta ao lobby |
 | CA-417 | U | RF-096 | **Dado** o host expulsando alguém sentado numa partida, **então** o assento vira bot com a mesma mão, aposta e vidas, sem `round:aborted`; o nome diz de quem era e cabe no limite; a conta não é herdada; a pausa por ausência dele se levanta; o prazo só é refeito se a vez era dele; espectador sai sem bot; bot é recusado |
 | CA-418 | I | RF-096 | **Dado** alguém expulso no meio da partida, **então** o socket dele é recusado com `INVALID_TOKEN` e `/session` responde 401, mesmo com o assento presente e jogando |
+| CA-419 | U | RF-103 | **Dado** uma mesa de 2 a 8, **então** o 1º leva `+K`, o último `−K`, o meio de mesa ímpar leva 0, a soma da mesa é 0, o 2º leva estritamente mais que o 3º, e a colocação é monótona |
+| CA-420 | U | RF-103 | **Dado** a experiência da conta, **então** `K` é 80 até a 10ª ranqueada, 50 até a 30ª e 30 depois; o piso segura em 0 e o delta gravado bate com a diferença dos elos |
+| CA-421 | U | RF-104 | **Dado** quem abandonou, **então** recebe `−K − 25` independente da colocação do assento; quem não abandonou não paga punição; o piso também vale |
+| CA-422 | U | RF-099 | **Dado** a fila, **então** menos de 4 espera, 4 abre janela de 60 s, 8 forma na hora, a janela vencida forma com quem estiver, encolher abaixo de 4 fecha a janela, e a ordem é sempre a de chegada |
+| CA-423 | I | RF-100 | **Dado** o socket da fila, **então** fechá-lo tira da fila, `fila:sair` tira sem fechar, a mesa formada não contém socket fechado, e `fila:entrar` repetido não fura a fila |
+| CA-424 | I/U | RF-101 | **Dado** uma mesa de fila, **então** `host:kick`, `host:setOptions`, `host:addBot`, `host:endMatch`, `host:startMatch` e `host:resolveAbsence` são recusados com `MESA_DE_FILA_NAO_TEM_HOST` |
+| CA-425 | U/I | RF-102 | **Dado** ausência numa mesa de fila, **então** passada a carência o assento vira bot marcado como abandono, a mesa retoma sozinha, a rodada não é anulada, e a mesa privada continua esperando o host decidir |
+| CA-426 | I | RF-098 | **Dado** a ranqueada, **então** sem conta é recusada e a normal não; com conta o apelido vem da CONTA; a faixa de elo alarga com a espera e some depois de 5 min; as duas filas não se misturam |
+| CA-427 | U | RF-103 | **Dado** o repositório, **então** quem nunca jogou lê o elo inicial sem linha no banco, aplicar mexe no elo E na participação, o elo é somado, o recorde não desce, e o piso vale no banco |
+| CA-428 | E | RF-104 | **Dado** a tela da fila ranqueada, **então** o custo do abandono aparece antes do botão de entrar |
+| CA-429 | E | RF-105 | **Dado** o perfil público, **então** conta com ranqueada mostra faixa e pontos, e conta sem ranqueada não mostra a seção |
+| CA-430 | U | RF-106 | **Dado** a lista local de escondidos, **então** ela é por sala, sobrevive a recarregar, lê lixo como lista vazia, e um armazenamento que lança — ou que não existe — não quebra nada |
 
 CA-356 mede o defeito que consertou: a barra normalizava pelo prazo da aposta em todos os
 casos, então a vez de jogar carta nascia em 67% e a de um bot em 2%.

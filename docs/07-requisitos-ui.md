@@ -190,6 +190,16 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 | RF-094 | O host só começa a partida quando **todos os sentados** confirmarem. Bot nasce pronto. A tela **DEVE** nomear quem falta, e não dizer "aguardando jogadores" |
 | RF-095 | O host **PODE** silenciar alguém no chat, no lobby e **durante a partida**. Silenciar não tira ninguém da mesa — expulsar é outro gesto |
 | RF-096 | O host **PODE** expulsar alguém de uma partida em andamento. O assento **NÃO** sai da mesa: um bot assume a mão, a aposta e as vidas, e a rodada **continua**. Quem foi expulso não reentra na sala |
+| RF-097 | Fila **normal**: entra com apelido, sem conta, e a mesa forma-se de 4 a 8 |
+| RF-098 | Fila **ranqueada**: exige conta, pareia por faixa de elo, e a faixa alarga com a espera |
+| RF-099 | Aos 4 na fila abre-se uma janela de 60 s para a mesa crescer; aos 8 forma-se na hora |
+| RF-100 | Sair da fila **DEVE** bastar fechar a aba, perder a conexão ou mandar a aba para segundo plano |
+| RF-101 | Mesa de fila **NÃO TEM** host com poderes: nem expulsar, nem opções, nem bot, nem encerrar |
+| RF-102 | Em mesa de fila, ausência resolve-se sozinha: o assento vira bot e a rodada continua |
+| RF-103 | Elo por colocação, soma zero na mesa, `K` decrescente com a experiência, piso em zero |
+| RF-104 | Abandonar ranqueada custa o último lugar mais punição fixa, e o custo **DEVE** estar na tela **antes** de entrar na fila |
+| RF-105 | O perfil público mostra faixa e pontos; não há listagem nem classificação global |
+| RF-106 | Qualquer pessoa **PODE** esconder as mensagens de outra **para si**, sem passar pelo servidor e sem que a outra saiba |
 
 RF-086 abre a casca de 460 px para 900 **só na mesa**, e é a única tela onde isso
 acontece. Em qualquer outra, a coluna continua estreita mesmo num monitor de 27" —
@@ -251,6 +261,44 @@ RF-085 mostra informação que **já era pública** (`handCounts`, RJ-102) e nã
 em lugar nenhum: quem quisesse saber quantas cartas restavam ao adversário tinha de
 contar as mãos já jogadas de cabeça, no meio da rodada. Viradas porque o conteúdo é
 segredo — uma carta desenhada de frente prometeria informação que não existe.
+
+**Por que a fila fica abaixo de "criar sala" (RF-097).** A sala por link é o caminho principal do
+FDP e continua sendo. Pôr "Jogar agora" acima transformaria um jogo que se joga com os amigos num
+jogo que se joga com estranhos, por decisão de layout.
+
+**Por que segundo plano tira da fila (RF-100), sendo que em partida não pausa (RJ-117b).** As duas
+regras são opostas e as duas estão certas. Em partida, a pessoa está no meio de um compromisso com
+outras quatro, e o relógio dela tem de continuar correndo. Na fila, o mesmo gesto significa outra
+coisa: quem foi para o Instagram não está esperando partida, e cair numa mesa com quatro estranhos
+que vão esperar 45 s por uma aposta que não vem é pior para todo mundo do que perder o lugar. Uma
+protege um compromisso já assumido; a outra evita assumir um que não vai ser cumprido.
+
+**Por que a mesa de fila não tem host (RF-101).** Nas salas de amigos o host é uma pessoa com
+autoridade social real — quem criou a mesa e convidou os outros. Entre estranhos ela não existe, e
+dar a um deles o botão de expulsar os outros quatro é entregar a partida a quem clicar primeiro.
+A consequência é RF-102: a decisão de pausa precisa de um host, então a ausência passa a
+resolver-se sozinha, pelo mesmo mecanismo do RF-096.
+
+**Por que o custo do abandono aparece antes (RF-104).** É a regra deste plano com mais chance de
+machucar quem não merecia. Descobrir a punição depois de tê-la levado é o desenho que faz alguém
+abandonar o jogo, e não a partida. A outra salvaguarda é de relógio: queda de internet não é
+abandono enquanto for queda — só depois de o assento virar bot.
+
+**Por que o elo some do perfil de quem nunca jogou ranqueada (RF-105).** Mostrar "1000, Prata" para
+quem nunca entrou na fila daria a entender que a pessoa jogou e ficou exatamente no meio, e não há
+legenda que desfaça essa leitura. Ausência de seção é a resposta honesta.
+
+**Por que esconder para mim é diferente de silenciar (RF-106 e RF-095).** Calar do host é
+**moderação**: o servidor recusa a mensagem, e a pessoa fica sem voz para a mesa inteira. Exige
+autoridade, e por isso não existe entre estranhos. Esconder para mim é **alívio**: a mensagem
+continua chegando e continua sendo entregue a todo mundo, e só a minha tela deixa de mostrá-la.
+Não exige autoridade nenhuma porque não decide nada sobre ninguém — e é por isso que mora inteiro
+no cliente. Mandá-lo ao servidor não acrescentaria nada e traria o pior de dois mundos: uma lista
+de quem-não-gosta-de-quem guardada em algum lugar, e a chance de a outra pessoa descobrir.
+
+A mensagem escondida não some: vira uma linha apagada com o nome de quem falou e um caminho de
+volta. Apagar a linha deixaria a conversa dos outros cheia de buracos — alguém responde a algo que
+você não vê —, e tiraria o único lugar onde desfazer.
 
 **Por que expulsar não anula a rodada (RF-096).** Sair no meio de uma partida é retirada
 (RJ-154), e retirada anula a rodada de todo mundo — quem apostou certo perde a aposta certa. Faz

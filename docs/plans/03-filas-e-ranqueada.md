@@ -1,6 +1,10 @@
 # Plano 03 — Filas de partida e ranqueada
 
-Status: **PROPOSTO** · Aberto em 02/09/2026
+Status: **ENTREGUE** · Aberto em 02/09/2026 · F1 a F4 concluídas em 02/09/2026 · D-4 corrigida
+na implementação (ver §8)
+
+O que este plano propôs está no código. Ele fica aqui como registro do porquê de cada decisão; o
+que virou norma vive em `00` §5 (P12), `05`, `07` e `10`.
 
 Cria duas filas públicas — normal e ranqueada — e um elo por colocação, no espírito do TFT.
 
@@ -52,8 +56,8 @@ Decisões que tomei por conta e ficam registradas para serem contestadas:
 
 | # | Decisão | Por quê |
 |---|---|---|
-| D-4 | **A fila vive no Redis, não no Postgres** | Fila é estado efêmero com TTL, exatamente como a sala (`11` §4). Só o **resultado** — elo, partida — é durável. Pôr fila no Postgres seria gravar em disco algo cuja vida útil é de segundos. |
-| D-5 | **Um pareador por vez, garantido por lock no Redis** | Hoje o servidor é um processo só, e por isso o lock parece inútil. Ele não é: sem lock, o dia em que subir uma segunda instância — ou o instante em que o deploy roda as duas em paralelo — duas mesas se formam com as mesmas pessoas. É barato agora e impossível de retroencaixar depois de um incidente. |
+| ~~D-4~~ | ~~**A fila vive no Redis, não no Postgres**~~ | **Corrigida implementando** — os bilhetes vivem no processo. Ver §8, F3. |
+| ~~D-5~~ | ~~**Um pareador por vez, garantido por lock no Redis**~~ | **Caiu junto com D-4**: o lock protegeria uma corrida que não é a corrida real. Ver §8, F3. |
 | D-6 | **Mesa de 4 a 8.** Mínimo 4 (pedido), teto 8 (P1) | Aos 4, abre a janela de 60 s; se chegar a 8, forma na hora e não espera o resto da janela. |
 | D-7 | **Nenhum bot em partida de fila** | Bot completa mesa é recurso do lobby privado (RF-018), onde o host escolhe. Numa fila, bot seria a casa fingindo que há gente — e, na ranqueada, elo ganho de bot. A única exceção é o bot que **assume** um assento abandonado (D-9), que não é um bot a mais na mesa: é um assento que já era de gente. |
 | D-8 | **Sala de fila não tem host com poderes** | Nas salas de amigos o host é uma pessoa com autoridade social real. Entre estranhos ela não existe, e dar a um deles o botão de expulsar os outros quatro é entregar a partida a quem clicar primeiro. Numa sala de fila não há expulsar, não há mexer nas opções, não há sentar bot, não há encerrar a partida. |
@@ -246,6 +250,7 @@ mudar (D-11). É barato: dois inteiros por linha que já existe.
 | RF-103 | Elo por colocação, soma zero na mesa, `K` decrescente, piso em zero |
 | RF-104 | Abandonar ranqueada custa o último lugar mais punição fixa, e o custo **DEVE** estar na tela **antes** de entrar na fila |
 | RF-105 | O perfil público mostra faixa e pontos; não há listagem nem classificação global |
+| RF-106 | Qualquer pessoa **PODE** esconder as mensagens de outra **para si**, sem passar pelo servidor e sem que a outra saiba (ver §9.1) |
 
 | ID | Tipo | Requisito | Critério |
 |---|---|---|---|
@@ -260,41 +265,72 @@ mudar (D-11). É barato: dois inteiros por linha que já existe.
 | CA-427 | I | RF-103 | Uma ranqueada inteira grava `elo_antes` e `elo_delta` em cada participação e atualiza `elo.pontos` uma única vez |
 | CA-428 | E | RF-104 | A tela da fila ranqueada mostra o custo do abandono antes do botão de entrar |
 | CA-429 | E | RF-105 | O perfil público de uma conta ranqueada mostra faixa e pontos; o de uma conta sem ranqueada não mostra a seção |
+| CA-430 | U | RF-106 | A lista local de escondidos é por sala, sobrevive a recarregar, lê lixo como lista vazia, e um armazenamento que lança — ou que não existe — não quebra nada |
 
 ---
 
 ## 8. Fases
 
-**F1 — O elo, sozinho.** `server/src/elo.ts` puro, migração 002, gravação na conta e na
-participação, seção no perfil.
-*Gate:* CA-419, CA-420, CA-421, CA-427, CA-429. Uma partida **privada** marcada à mão como
-ranqueada grava elo correto de ponta a ponta.
+Todas concluídas em 02/09/2026.
+
+**F1 — O elo, sozinho.** ✅ `server/src/elo.ts` puro, migração 002, `Elos` nas duas implementações,
+gravação na conta e na participação, seção no perfil.
+*Gate:* CA-419, CA-420, CA-421, CA-427, CA-429.
+
+*Cumprido:* 16 testes do elo puro — varrendo todas as colocações de todas as mesas de 2 a 8 — e 6
+de contrato, obrigatórios nas duas implementações. A soma zero é testada como propriedade do
+conjunto, que é o único jeito de vê-la.
 
 Primeiro o elo e não a fila, de propósito: o elo é a parte com matemática, é testável sem rede
 nenhuma, e é a que fica errada em silêncio. A fila sem elo é uma inconveniência; o elo errado numa
 fila que já rodou é um estrago que precisa de recálculo e de explicação pública.
 
-**F2 — Sala de fila.** `origem` na sala, poderes de host recusados, ausência automática (D-8, D-9).
-*Gate:* CA-424, CA-425. Uma sala marcada como `FILA` joga uma partida inteira com alguém sumindo no
-meio, sem ninguém decidir nada.
+*O que apareceu implementando:* o piso corta o **delta**, não só o resultado. Gravar `−30` numa
+conta que tinha 10 pontos faria a tela do perfil mentir na conta mais simples que ela faz: 10 − 30
+não é 0. O delta gravado é sempre `eloDepois − eloAntes`.
 
-**F3 — A fila normal.** Bilhetes no Redis, pareador com lock, socket, formação, tela.
-*Gate:* CA-422, CA-423. Quatro pessoas entram na fila e jogam.
+**F2 — Sala de fila.** ✅ `origem` na sala, poderes de host recusados num lugar só, ausência
+automática, e `player:leave` virando abandono em vez de retirada.
+*Gate:* CA-424, CA-425.
 
-**F4 — A ranqueada.** Exigência de conta, faixa de pareamento, punição de abandono, avisos na tela.
-*Gate:* CA-426, CA-428, e o gate de verdade: uma partida ranqueada completa, com um abandono, do
-socket da fila até o número mudando nos dois perfis.
+*O que o plano não tinha previsto:* `player:leave` numa mesa de fila. A retirada do RJ-154 anula a
+rodada de todo mundo, e entre amigos isso é aceitável — quem saiu avisou. Entre estranhos, bastaria
+uma pessoa clicando "sair" para apagar a rodada dos outros sete, de graça, quantas vezes quisesse.
+Vira abandono, pelo mesmo caminho do RF-096.
+
+**F3 — A fila normal.** ✅ Bilhetes, pareador, socket, formação, tela.
+*Gate:* CA-422, CA-423.
+
+*Correção a D-4 e D-5.* Os bilhetes **não** foram para o Redis. A razão apareceu implementando: um
+bilhete É um socket aberto (I-3), e socket é do processo que o segura. Guardar o bilhete no Redis
+daria a uma segunda instância a informação de que alguém espera, sem lhe dar meio nenhum de avisar
+essa pessoa — estado compartilhado que ninguém do outro lado consegue usar. E o lock de D-5
+protegeria uma corrida que não é a corrida real: a corrida real é entre processos que **não
+conseguem** notificar os bilhetes um do outro.
+
+O caminho para várias instâncias continua aberto e é o mesmo de sempre: `FilaViva` já é uma
+interface, a segunda implementação guarda bilhete no Redis e avisa por pub/sub, e cada processo
+notifica os sockets que são seus. O que não dava era fingir que metade disso já existia.
+
+**F4 — A ranqueada.** ✅ Exigência de conta, faixa de pareamento, punição de abandono, avisos na
+tela.
+*Gate:* CA-426, CA-428.
+
+*Cumprido:* 12 testes de socket de verdade, incluindo o que garante que as duas filas não se
+misturam — três na normal e um na ranqueada somam quatro, e é exatamente o que não pode formar
+mesa.
 
 ---
 
 ## 9. O que este plano deixa em aberto
 
-1. **Chat entre estranhos.** RF-095 deu ao host o poder de calar, e D-8 acabou de tirar o host da
-   sala de fila. Sobra uma sala onde ninguém cala ninguém. As saídas são desligar o chat na
-   ranqueada, dar a cada um um "silenciar para mim" (que não é moderação, é alívio), ou construir
-   denúncia — que é um sistema inteiro. **Recomendo o silenciar-para-mim**: é local, não precisa de
-   autoridade e resolve o caso real de quem só quer terminar a partida em paz. Não bloqueia F1 nem
-   F2; precisa de resposta antes da F4.
+1. ~~**Chat entre estranhos.**~~ **Resolvido em 02/09/2026** — RF-106, o "silenciar para mim".
+   D-8 tirou o host da mesa de fila logo depois de RF-095 lhe ter dado o poder de calar, e sobrava
+   uma sala onde ninguém cala ninguém. A resposta é local e não passa pelo servidor: a mensagem
+   continua chegando e continua sendo entregue a todo mundo, e só a minha tela deixa de mostrá-la.
+   Não exige autoridade nenhuma porque não decide nada sobre ninguém. Mandá-la ao servidor traria o
+   pior de dois mundos: uma lista de quem-não-gosta-de-quem guardada em algum lugar, e a chance de
+   a outra pessoa descobrir. Denúncia continua fora.
 2. **Smurf e farm de conta.** D-1 deixa a fila normal sem conta, e criar conta é de graça. Nada
    neste plano impede alguém de fazer contas novas para jogar contra gente pior. Mitigação barata:
    o `K` alto das dez primeiras partidas faz a conta nova subir rápido para onde ela pertence.

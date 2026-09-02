@@ -8,7 +8,7 @@
  * O servidor chama `tick` periodicamente e sempre que um prazo vence.
  */
 
-import { LIMITS, type BotDifficulty } from '@fdp/protocol';
+import { ehDeFila, LIMITS, type BotDifficulty } from '@fdp/protocol';
 import type { Move } from '@fdp/rules';
 import { advance, autoMove, applyMove, createRng, isActive, isAutomaticPhase, project } from '@fdp/rules';
 import { decidirAposta, decidirCarta } from '@fdp/bot';
@@ -19,11 +19,13 @@ import {
   sealMatchEnd,
   seatedPlayers,
   translate,
+  trocarPorBot,
 } from './room.js';
 import {
   isAbsent,
   isOnline,
   isPresent,
+  toPublicPlayer,
   type Emission,
   type Room,
   type RoomCtx,
@@ -198,6 +200,53 @@ function advancePause(room: Room, ctx: RoomCtx): { room: Room; emissions: Emissi
     };
   }
 
+  /**
+   * RF-102: numa mesa de fila, a ausência resolve-se sozinha (plano 03, D-9).
+   *
+   * A decisão de pausa (RF-011) precisa de um host, e D-8 acabou de tirar o
+   * host da mesa de fila. Sem isto a mesa ficaria refém: pausada até o teto de
+   * dez minutos, e então encerrada para todo mundo por causa de uma pessoa.
+   *
+   * O mecanismo já existe — é o mesmo do RF-096: o assento vira bot herdando
+   * mão, aposta e vidas, e a rodada NÃO é anulada. A diferença é o motivo, e
+   * ele importa: aqui a pessoa sumiu, e na ranqueada isso é abandono, que tem
+   * preço (RF-104).
+   *
+   * No MESMO instante em que a sala privada anunciaria a decisão ao host. Não é
+   * coincidência: aquele minuto é o tempo que o projeto já decidiu que vale a
+   * pena esperar por quem caiu, e antecipá-lo aqui puniria a mesma queda de
+   * internet que a carência existe para perdoar.
+   */
+  if (ehDeFila(room.origem) && ctx.now >= room.pause.decisionUnlockedAt) {
+    const sumidos = absentMatchPlayers(room);
+    let atual = room;
+    for (const id of sumidos) {
+      const alvo = atual.players.find((p) => p.id === id);
+      if (!alvo || alvo.bot !== null) continue;
+      const trocado = trocarPorBot(atual, alvo, ctx, 'ABANDONO');
+      atual = trocado.room;
+      emissions.push(all({
+        type: 'room:playerUpdated',
+        payload: { player: toPublicPlayer(trocado.assento) },
+      }));
+      emissions.push(all({
+        type: 'system:notice',
+        payload: {
+          code: 'ABANDONO_BOT_ASSUMIU',
+          params: { apelido: alvo.nickname, bot: trocado.assento.nickname },
+        },
+      }));
+    }
+
+    // Nenhum trocado: a pausa não é por ausência de jogador da partida (pode
+    // ser espectador caído). Deixa como está, e o teto de dez minutos resolve.
+    if (atual !== room) {
+      atual = garantirHost(atual, emissions);
+      const retomada = resumirDepoisDaTroca(atual, ctx, emissions);
+      return { room: retomada, emissions };
+    }
+  }
+
   if (!room.pause.decisionAnnounced && ctx.now >= room.pause.decisionUnlockedAt) {
     // Vai a todos, não só ao host: a mesa precisa entender que existe uma
     // decisão pendente e de quem ela é.
@@ -212,6 +261,36 @@ function advancePause(room: Room, ctx: RoomCtx): { room: Room; emissions: Emissi
   }
 
   return { room, emissions: [] };
+}
+
+/**
+ * A mesa volta a andar depois de os assentos sumidos virarem bot.
+ *
+ * O prazo é refeito do zero (RJ-119): ninguém volta de uma pausa já com o
+ * relógio estourado — e aqui, com um bot na vez, o prazo certo é o tempo de
+ * pensar dele, não os 45 s de aposta de gente.
+ */
+function resumirDepoisDaTroca(room: Room, ctx: RoomCtx, emissions: Emission[]): Room {
+  // Ainda tem gente ausente: outra pessoa caiu junto e ainda está na carência.
+  // A mesa continua parada, e o próximo tique resolve.
+  if (absentMatchPlayers(room).length > 0) return room;
+
+  const retomada: Room = {
+    ...room,
+    status: 'EM_PARTIDA',
+    pause: null,
+    phaseDeadline: deadlineFor({ ...room, status: 'EM_PARTIDA', pause: null }, ctx.now),
+  };
+  emissions.push(all({ type: 'room:statusChanged', payload: { status: 'EM_PARTIDA' } }));
+  emissions.push(all({
+    type: 'match:resumed',
+    payload: {
+      phase: retomada.match!.round.phase,
+      activePlayerId: retomada.match!.round.activePlayerId,
+      deadline: retomada.phaseDeadline,
+    },
+  }));
+  return retomada;
 }
 
 /**
