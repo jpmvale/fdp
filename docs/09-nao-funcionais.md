@@ -140,6 +140,11 @@ barra na frente, e a suíte inteira ficou invisível para ela por um momento —
 dizendo "sem teste" sobre critérios que já tinham um, que é a única coisa pior que não ter a
 auditoria.
 
+Vazamento de informação oculta é severidade 1 em `12`, e a defesa é em camadas: `checkNoLeak` na
+projeção, RF-035 na tela, e CA-313 varrendo o HTML que de fato chegou ao navegador de cada jogador.
+A última camada existe porque as duas primeiras olham o que o código PRETENDE mandar; só ela olha o
+que o navegador recebeu.
+
 RNF-100 é o que torna possível testar regras em milissegundos e reproduzir qualquer bug a
 partir de `(seed, jogadas[])`. Injetar tempo e aleatoriedade é o que separa um jogo testável
 de um jogo em que "só acontece às vezes".

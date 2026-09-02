@@ -85,7 +85,19 @@ export default defineConfig({
      */
     command: `npm run build:client && PORT=${String(PORTA)} LIMITE_SALAS_POR_HORA=500 npm start`,
     url: `http://127.0.0.1:${String(PORTA)}/api/health`,
-    reuseExistingServer: !process.env.CI,
+    /**
+     * **Nunca** reaproveita servidor de pé, nem no desenvolvimento.
+     *
+     * Foi o que custou uma execução inteira com dezesseis reprovações
+     * inexplicáveis: um servidor esquecido de antes de `LIMITE_SALAS_POR_HORA`
+     * existir foi reaproveitado, rodou com o teto de produção, e a suíte
+     * estourou nas primeiras salas. Nada na saída do Playwright liga uma coisa
+     * à outra — ele diz que um botão não apareceu.
+     *
+     * Reaproveitar economiza uns segundos e paga com a possibilidade de a suíte
+     * rodar contra um servidor configurado de outro jeito. Não vale.
+     */
+    reuseExistingServer: false,
     timeout: 120_000,
     stdout: 'pipe',
     stderr: 'pipe',

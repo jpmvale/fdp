@@ -323,7 +323,17 @@ describe('limite de tentativas', () => {
     }
     expect(ultima!.status).toBe(429);
     expect(Number(ultima!.headers.get('retry-after'))).toBeGreaterThan(0);
-  });
+    /**
+     * Prazo próprio: 25 conferências de senha com `scrypt` levam mais de um
+     * segundo por construção — a senha é cara de conferir DE PROPÓSITO (D-6), e
+     * é justamente o que este teste exercita.
+     *
+     * O padrão de 5 s bastava numa máquina ociosa e estourou com a suíte E2E
+     * rodando ao lado. Um teste determinístico que reprova por carga da máquina
+     * é o pior tipo de vermelho: ele não indica defeito nenhum e ensina a
+     * ignorar os que indicam. Mesma correção que CA-209 já tinha recebido.
+     */
+  }, 30_000);
 
   it('o teto é por IP: outra pessoa não paga pela força bruta alheia', async () => {
     await chamar('/api/contas', { method: 'POST', body: CADASTRO });

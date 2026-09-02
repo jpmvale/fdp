@@ -103,7 +103,10 @@ para dar a cobertura que CA-310 exige.
 - Auditoria de acessibilidade completa, incluindo os dois testes manuais de `08` §5.
 - Auditoria de segurança contra a tabela de ameaças de `09` §3.1.
 - Tela de regras dentro do produto (RF-015).
-- Roteiro manual completo de `10` §8.
+- Roteiro manual completo de `10` §8. **A parte mais cara dele já é automática**: CA-312 joga uma
+  partida inteira em quatro navegadores e confere que as quatro telas dão o mesmo vencedor e as
+  mesmas vidas; CA-313 confere que, na rodada de testa, ninguém vê a própria carta — nem no HTML que
+  chegou ao navegador.
 
 **Gate de saída — a definição de entregue:**
 - 100% dos `CA` marcados `v1` passando.

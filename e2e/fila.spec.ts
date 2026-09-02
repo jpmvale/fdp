@@ -17,6 +17,23 @@ import { fecharAbasExtras, outraPessoa } from './apoio';
 test.afterEach(fecharAbasExtras);
 
 /**
+ * Tem banco? As rotas de conta respondem 503 sem ele (plano 01, I-1).
+ *
+ * Pular é o comportamento certo, e ele estava só escrito: sem `DATABASE_URL` os
+ * dois testes de conta REPROVAVAM, com a mensagem de um botão que não apareceu
+ * — que não diz nada sobre a causa. Um teste que não pode rodar precisa dizer
+ * isso, e não fingir que encontrou defeito.
+ *
+ * A pergunta é ao servidor, e não à variável de ambiente do processo do teste:
+ * quem tem ou não banco é ele.
+ */
+let temBanco = false;
+test.beforeAll(async ({ request }) => {
+  const saude = await request.get('/api/health');
+  temBanco = ((await saude.json()) as { contas?: boolean }).contas === true;
+});
+
+/**
  * Cria uma conta e deixa a sessão pronta nesta aba.
  *
  * O e-mail carrega o instante: a suíte roda contra UM servidor, e um e-mail
@@ -50,6 +67,7 @@ async function comConta(page: Page, apelido: string): Promise<void> {
 
 test.describe('a fila', () => {
   test('CA-428: o custo do abandono aparece ANTES do botão de entrar', async ({ page }) => {
+    test.skip(!temBanco, 'sem Postgres não há conta, e a ranqueada exige conta');
     await comConta(page, 'Ana');
     await page.goto('/');
     await page.getByRole('button', { name: 'Ranqueada' }).click();
@@ -114,6 +132,7 @@ test.describe('a fila', () => {
 
 test.describe('o perfil', () => {
   test('CA-429: quem nunca jogou ranqueada não tem seção de elo', async ({ page }) => {
+    test.skip(!temBanco, 'sem Postgres não há conta, e o perfil vive nela');
     await comConta(page, 'Ana');
     await page.goto('/');
     await page.getByRole('button', { name: /meu perfil|perfil/i }).first().click();

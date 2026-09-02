@@ -253,6 +253,21 @@ Duas coisas que só se descobrem escrevendo E2E, e ficam registradas para o pró
   Com ele, a mesa ficou "estável" durante 22 s de "offline" e o teste de reconexão teria passado sem
   testar nada. O que reproduz uma queda de verdade é interceptar o socket (`routeWebSocket`) e
   fechar tanto a conexão em uso quanto as tentativas de reconexão da janela.
+- **Num teste que dirige quatro telas, o custo é a CONVERSA, não o que se testa.** A partida
+  completa levava 15 min e passou a levar 3, sem mudar nada no jogo: o laço perguntava ao navegador
+  "está visível?", "quantos botões?", uma pergunta por vez, e cada pergunta é uma viagem. Quatro
+  telas e centenas de jogadas fizeram a conversa custar quatro vezes mais que a partida inteira. Um
+  `evaluate` por tela devolve tudo de uma vez. Antes de culpar o produto pela lentidão de um E2E,
+  vale medir quem está falando.
+- **A partida completa continua sendo o teste mais caro**, e fica marcada `@lento`: roda só no push
+  para `main` (`npm run e2e` a deixa de fora, `npm run e2e:completo` a inclui). As opções de mesa não
+  têm tela — o cliente nunca manda `host:setOptions` —, então são 5 vidas e o jogo vai até sobrar um,
+  com a pausa de leitura de cada vaza. Não há atalho honesto: fazer o teste escrever direto no estado
+  seria testar outra coisa.
+- **A suíte nunca reaproveita servidor de pé.** Um servidor esquecido, de antes de a suíte precisar
+  de configuração própria, foi reaproveitado uma vez e produziu dezesseis reprovações que não diziam
+  nada sobre o produto. Economizar os segundos da subida não vale a chance de testar contra um
+  servidor diferente do que o teste pede.
 - **Uma suíte E2E estoura limites feitos para uma pessoa.** O teto de 10 salas por hora por IP é
   generoso para gente e apertado para uma suíte que cria vinte em dois minutos — e o sintoma foi
   cinco testes falhando com a tela parada, por um motivo que não era o deles. Levou duas execuções

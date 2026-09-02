@@ -41,7 +41,11 @@ export function Fim({ retrato, eu, partida, aoRevanche, aoSair, aoVoltarAoLobby 
     <div className="pilha">
       <div className="cartao pilha" style={{ gap: 8, textAlign: 'center', padding: 20 }}>
         <span className="rotulo">fim de partida</span>
-        <div style={{ fontSize: 28, fontWeight: 500 }}>
+        {/* Gancho da suíte E2E (CA-312): o vencedor precisa ser lido igual nas
+            quatro telas, e achá-lo por posição — "o segundo `div` do primeiro
+            cartão" — quebraria no dia em que alguém acrescentasse uma linha
+            acima. */}
+        <div data-vencedor style={{ fontSize: 28, fontWeight: 500 }}>
           {vencedores.length === 0
             ? 'Sem vencedor'
             : vencedores.map((id) => retrato.players.find((p) => p.id === id)?.nickname ?? '?').join(' e ')}

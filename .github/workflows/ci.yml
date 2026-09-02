@@ -179,8 +179,27 @@ jobs:
       - name: Navegador do E2E
         run: npx playwright install --with-deps chromium
 
+      # `npm run e2e` deixa de fora o que está marcado `@lento`. Hoje é um teste
+      # só — a partida completa em quatro navegadores (CA-312) —, e ele fica de
+      # fora do PR por uma razão medida, não por preguiça: 3 min, porque JOGA a
+      # partida com as pausas de leitura de cada vaza, e as opções de mesa não
+      # têm tela para encurtá-la.
+      #
+      # Um CI de PR que passa de poucos minutos deixa de ser lido, e um teste
+      # que ninguém lê não protege nada. Ele roda inteiro no push para `main`,
+      # logo abaixo.
       - name: E2E
         run: npm run e2e
+        env:
+          CI: 'true'
+          DATABASE_URL: postgres://postgres:fdp@127.0.0.1:5432/postgres
+
+      # A partida completa. Só no `main`: é o teste que mais se aproxima do
+      # roteiro manual de `10` §8, e o único lugar onde "as quatro telas
+      # concordam" é verificado de ponta a ponta.
+      - name: E2E completo (partida inteira)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: npm run e2e:completo
         env:
           CI: 'true'
           DATABASE_URL: postgres://postgres:fdp@127.0.0.1:5432/postgres
