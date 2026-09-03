@@ -496,6 +496,7 @@ propósito, gente com exatamente as mesmas vidas.
 | CA-432 | U | RF-107 | **Dado** um link no formato antigo `?sala=`, **então** ele continua preenchendo o código — link de convite já mandado não morre |
 | CA-433 | I | RF-107 | **Dado** `/j/{código}` de sala viva, **então** o HTML traz título e descrição próprios com a contagem da mesa e **nenhum apelido**; sala inexistente convida a criar a sua; e há uma só meta de cada |
 | CA-434 | U | RF-108 | **Dado** o histórico do perfil, **então** as partidas são agrupadas por dia de calendário — 23h50 e 00h10 são dias diferentes —, com "hoje" e "ontem" por extenso, o ano quando não for o corrente, a ordem do servidor preservada, e a data completa com hora disponível sem ocupar a linha |
+| CA-435 | I | RNF-076 | **Dado** a fila, **então** um mesmo endereço não passa do tamanho de uma mesa em bilhetes vivos, sair libera a vaga, e comando repetido em laço esbarra no teto do socket |
 
 CA-356 mede o defeito que consertou: a barra normalizava pelo prazo da aposta em todos os
 casos, então a vez de jogar carta nascia em 67% e a de um bot em 2%.

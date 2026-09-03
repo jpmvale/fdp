@@ -21,7 +21,7 @@
 
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
-import { PROTOCOL_VERSION } from '@fdp/protocol';
+import { LIMITS, PROTOCOL_VERSION } from '@fdp/protocol';
 import { createRoom, generateFreeCode, join, startMatch } from '@fdp/room';
 import {
   decidirFormacao,
@@ -35,9 +35,35 @@ import type { SessionSigner } from './session.js';
 /** De quanto em quanto tempo a fila é reavaliada. */
 export const PASSO_DA_FILA_MS = 2_000;
 
+/**
+ * Quantos bilhetes um mesmo endereço pode ter na fila ao mesmo tempo.
+ *
+ * A fila normal não exige conta (plano 03, D-1), então o único freio possível é
+ * o endereço. Sem teto, um script abre duzentos sockets e forma mesas de
+ * fantasmas que viram bots no primeiro minuto — os jogadores de verdade ficam
+ * sem mesa e a fila parece morta. Achado da auditoria de segurança de
+ * 03/09/2026.
+ *
+ * O número é o tamanho de uma MESA, e não um palpite de "poucos".
+ *
+ * O primeiro valor foi 3, e ele reprovou os testes da própria fila — que
+ * representam quatro pessoas entrando junto. Foi um falso positivo de
+ * laboratório mostrando o falso positivo de verdade: uma casa, uma república ou
+ * um escritório com quatro pessoas atrás do mesmo roteador é exatamente o
+ * grupo que este jogo existe para servir, e o teto os teria barrado.
+ *
+ * Oito nunca atrapalha um grupo legítimo — mais que isso não caberia numa mesa
+ * de qualquer jeito — e continua parando o ataque, que precisa de ordem de
+ * grandeza, não do dobro. Defesa que erra contra quem ela deveria proteger não
+ * é defesa mais forte, é defesa pior.
+ */
+export const BILHETES_POR_ENDERECO = LIMITS.maxPlayers;
+
+export type RecusaDeEntrada = 'JA_ESTA_NA_FILA' | 'ENDERECO_COM_BILHETES_DEMAIS';
+
 export interface FilaViva {
-  /** Põe alguém na fila. Devolve `false` se o bilhete já estava lá. */
-  entrar(bilhete: Bilhete, socket: WebSocket): boolean;
+  /** Põe alguém na fila. Devolve o motivo quando não dá. */
+  entrar(bilhete: Bilhete, socket: WebSocket, endereco: string): RecusaDeEntrada | null;
   /** Tira da fila. Idempotente: sair de onde não se está não é erro. */
   sair(id: string): void;
   /** Um passo do relógio. Separado do timer para ser testável. */
@@ -51,14 +77,20 @@ export interface OpcoesDaFila {
   hub: Hub;
   signer: SessionSigner;
   now?: () => number;
+  /** Só a suíte E2E mexe: ela sai toda do mesmo `127.0.0.1`. */
+  bilhetesPorEndereco?: number | undefined;
 }
 
 interface NaFila {
   bilhete: Bilhete;
   socket: WebSocket;
+  endereco: string;
 }
 
-export function criarFila({ hub, signer, now = Date.now }: OpcoesDaFila): FilaViva {
+export function criarFila({
+  hub, signer, now = Date.now,
+  bilhetesPorEndereco = BILHETES_POR_ENDERECO,
+}: OpcoesDaFila): FilaViva {
   const esperando = new Map<string, NaFila>();
   /** Quando a janela de cada modo vence. `null` = não há janela aberta. */
   const janelas = new Map<ModoDeFila, number | null>(MODOS.map((m) => [m, null]));
@@ -150,11 +182,16 @@ export function criarFila({ hub, signer, now = Date.now }: OpcoesDaFila): FilaVi
   });
 
   return {
-    entrar(bilhete, socket) {
-      if (esperando.has(bilhete.id)) return false;
-      esperando.set(bilhete.id, { bilhete, socket });
+    entrar(bilhete, socket, endereco) {
+      if (esperando.has(bilhete.id)) return 'JA_ESTA_NA_FILA';
+
+      const doMesmoEndereco = [...esperando.values()]
+        .filter((e) => e.endereco === endereco).length;
+      if (doMesmoEndereco >= bilhetesPorEndereco) return 'ENDERECO_COM_BILHETES_DEMAIS';
+
+      esperando.set(bilhete.id, { bilhete, socket, endereco });
       avisarEspera(bilhete.modo);
-      return true;
+      return null;
     },
 
     sair(id) {

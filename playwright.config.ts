@@ -83,7 +83,7 @@ export default defineConfig({
      * O limite continua sendo regra de produto e continua testado com o teto
      * real em `server/test/http.test.ts`.
      */
-    command: `npm run build:client && PORT=${String(PORTA)} LIMITE_SALAS_POR_HORA=500 npm start`,
+    command: `npm run build:client && PORT=${String(PORTA)} LIMITE_SALAS_POR_HORA=500 BILHETES_POR_ENDERECO=50 npm start`,
     url: `http://127.0.0.1:${String(PORTA)}/api/health`,
     /**
      * **Nunca** reaproveita servidor de pé, nem no desenvolvimento.

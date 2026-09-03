@@ -93,6 +93,18 @@ jobs:
 
       # Inclui CA-310/CA-311: 1.000 partidas simuladas sem violar invariante,
       # e a suíte de contrato do RoomStore contra Redis de verdade.
+      # RNF-079: dependência com vulnerabilidade alta ou crítica quebra o
+      # build. O requisito estava escrito desde `09` e não existia passo nenhum
+      # — a auditoria de segurança de 03/09/2026 encontrou assim: procurando o
+      # portão e não achando.
+      #
+      # `--omit=dev` de propósito: o que roda em produção é o que tem
+      # superfície de ataque. Vulnerabilidade em ferramenta de build importa
+      # menos e travaria o time por um `devDependency` transitivo que nunca
+      # chega perto de um pedido de rede.
+      - name: Auditoria de dependências
+        run: npm audit --audit-level=high --omit=dev
+
       - name: Testes
         run: npm test
         env:

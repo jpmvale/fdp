@@ -73,6 +73,71 @@ O adversário realista aqui não é um invasor: é um amigo do grupo com o DevTo
 Ocorrências de `ERR-403` **DEVEM** ser registradas com `roomCode` e `playerId` — não para
 punir, mas porque um pico delas indica ou tentativa de trapaça ou bug real de sincronização.
 
+### 3.2 Auditoria de 03/09/2026
+
+Varredura contra a tabela acima **e** contra a superfície que nasceu depois dela — contas, SSO,
+upload de imagem, Postgres, filas. O que já estava defendido não é repetido aqui; o que segue é o
+que faltava.
+
+**Corrigido.**
+
+| # | O quê | Por que passou despercebido |
+|---|---|---|
+| A-1 | **RNF-079 não existia.** O requisito manda vulnerabilidade alta ou crítica quebrar o build, e não havia passo nenhum de `npm audit` no CI | Requisito escrito e nunca implementado. Só se descobre procurando o portão e não achando — nenhum teste falha por ausência de portão |
+| A-2 | **A fila não tinha teto nenhum**: nem de comandos por socket, nem de bilhetes por endereço. A fila normal não exige conta, então um script sozinho a enchia de fantasmas e a mesa de verdade nunca se formava | Superfície nova. A tabela de ameaças é anterior às filas, e o RNF-076 lista "HTTP e WebSocket" — o socket da fila é WebSocket e nasceu sem |
+| A-3 | **`trocarMeta` usava string de substituição** no cartão do convite, e `$&`/`$1` são padrões que o `replace` interpreta | Não explorável hoje: o código de sala é alfabeto fechado sem `$`. Deixa de não ser no dia em que o cartão levar apelido de alguém |
+
+O teto da fila é o tamanho de uma **mesa**, e o número tem história: o primeiro valor foi 3 e
+reprovou os testes da própria fila, que representam quatro pessoas entrando junto. Foi um falso
+positivo de laboratório mostrando o falso positivo real — uma casa com quatro pessoas atrás do mesmo
+roteador é o grupo que este jogo existe para servir. Defesa que erra contra quem deveria proteger
+não é defesa mais forte, é defesa pior.
+
+**Aberto — decisão de produto, não de código.**
+
+| # | O quê |
+|---|---|
+| A-4 | **Um jogador pode espionar a própria partida.** Abrir uma segunda aba, entrar na mesma sala com a partida em curso e receber `allHands` — a mão de todos, inclusive a do adversário. Sem DevTools. Verificado contra o servidor. Ver §3.3 |
+
+**Verificado e sem achado:** projeção por jogador e `checkNoLeak` (RNF-071); `seed` ausente da
+projeção (RNF-073); consultas parametrizadas em todo o Postgres; upload com sessão obrigatória,
+teto por conta, recusa antecipada por `Content-Length`, formato por *magic bytes*, teto de pixels e
+EXIF descartado; `state` com comparação em tempo constante e PKCE no Google; `destinoSeguro` contra
+*open redirect*; origem conferida no upgrade de WebSocket **antes** do ramo da fila; CSP sem
+`unsafe-inline` em script; cookie `HttpOnly; Secure; SameSite=Lax`; nenhum segredo em log; login
+gastando `scrypt` mesmo para e-mail inexistente; `player:setSpectator` recusado fora do lobby.
+
+**Risco aceito e já registrado:** a existência de uma conta é descobrível pelo cadastro
+(`EMAIL_EM_USO`) e pelo login (`CONTA_MIGRADA_PARA_SSO`). Fechar os dois exige confirmação de
+e-mail — §8 do plano 01, adiada por D-10.
+
+### 3.3 A-4: espectador vê a mão de todos
+
+`RJ-159` diz que quem assiste vê a mão de todo mundo, e isso é deliberado: entre amigos, o
+espectador é o kibitzer que se debruça sobre a mesa. A consequência não estava avaliada — **a mesma
+pessoa pode estar sentada e assistindo ao mesmo tempo**, em duas abas, e o segundo socket recebe
+tudo.
+
+O adversário que `3.1` nomeia é "um amigo do grupo com o DevTools aberto". Este caminho é mais fácil
+que DevTools: são dois cliques. E `12` classifica vazamento de informação oculta como **severidade
+1**, no mesmo nível de corrupção de estado.
+
+A defesa hoje é social — a mesa mostra a contagem de quem assiste. É fraca: "1 assistindo" numa mesa
+de seis não chama atenção de ninguém.
+
+**Não há correção técnica que preserve RJ-159 como está.** Amarrar a identidade não funciona
+(convidado não tem identidade, e um segundo navegador é outra sessão); esperar a rodada seguinte não
+funciona (o espião espera). Fechar exige mudar a regra — e mudar regra de jogo é decisão de dono,
+não de auditoria. As saídas possíveis estão em `12` §Depois da v1, para decidir:
+
+1. **Espectador vê a mesa, não as mãos.** Fecha por completo, para convidado e para conta. É o
+   análogo físico: quem se debruça vê o jogo, não as cartas dos outros. Custa a experiência do
+   kibitzer que RJ-159 quis dar.
+2. **Só em mesa de fila.** Entre estranhos não há confiança social para gastar; entre amigos, há. O
+   vazamento continua possível numa sala privada — que é onde quase todo mundo joga.
+3. **Nomear quem assiste, sempre visível no feltro.** Não fecha nada; encarece socialmente. É o que
+   já existe, feito mais alto.
+
 ## 4. Privacidade
 
 | ID | Requisito |

@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { serve } from '@hono/node-server';
 import WebSocket from 'ws';
-import { PROTOCOL_VERSION } from '@fdp/protocol';
+import { LIMITS, PROTOCOL_VERSION } from '@fdp/protocol';
 import { createMemoryStore } from '@fdp/store';
 import { criarDadosEmMemoria, type Dados } from '@fdp/contas';
 import { createHub, type Hub } from '../src/hub.js';
@@ -20,7 +20,7 @@ import { createHttpApp } from '../src/http.js';
 import { createPersistence } from '../src/persistence.js';
 import { createSigner } from '../src/session.js';
 import { attachWebSocket } from '../src/ws.js';
-import { criarFila, type FilaViva } from '../src/fila-viva.js';
+import { BILHETES_POR_ENDERECO, criarFila, type FilaViva } from '../src/fila-viva.js';
 import { JANELA_MS } from '../src/fila.js';
 
 const SECRET = 'segredo-de-teste-com-32-caracteres!';
@@ -163,6 +163,44 @@ describe('CA-423: a fila é o socket', () => {
     const erro = await ana.esperar('error');
     expect(erro.payload.params).toEqual({ motivo: 'JA_ESTA_NA_FILA' });
     expect(fila.contagem().NORMAL).toBe(1);
+  });
+
+  it('CA-435: um endereço só não enche a fila', async () => {
+    /**
+     * A fila normal não exige conta (D-1), então o único freio é o endereço.
+     * Sem teto, um script abre duzentos sockets e forma mesas de fantasmas que
+     * viram bots no primeiro minuto: os jogadores de verdade ficam sem mesa e a
+     * fila parece morta. Achado da auditoria de segurança.
+     *
+     * O teto é o tamanho de uma MESA — nunca atrapalha um grupo legítimo, e o
+     * ataque precisa de ordem de grandeza.
+     */
+    const cheios = [];
+    for (let i = 0; i < BILHETES_POR_ENDERECO; i++) {
+      cheios.push(await naFila(`Bot${String(i)}`));
+    }
+    await new Promise((r) => setTimeout(r, 120));
+    expect(fila.total).toBe(BILHETES_POR_ENDERECO);
+
+    const aMais = await naFila('Excedente');
+    const erro = await aMais.esperar('error');
+    expect(erro.payload.params).toEqual({ motivo: 'ENDERECO_COM_BILHETES_DEMAIS' });
+    expect(fila.total).toBe(BILHETES_POR_ENDERECO);
+
+    // E sair libera a vaga: o teto é de bilhetes VIVOS, não de tentativas.
+    cheios[0]!.fechar();
+    await new Promise((r) => setTimeout(r, 120));
+    const agora = await naFila('Depois');
+    await agora.esperar('fila:espera');
+    expect(fila.total).toBe(BILHETES_POR_ENDERECO);
+  });
+
+  it('CA-435: comando repetido em laço esbarra no teto do socket', async () => {
+    const ana = await naFila('Ana');
+    await ana.esperar('fila:espera');
+    for (let i = 0; i < LIMITS.commandsPerWindow + 5; i++) ana.send('fila:sair', {});
+    const erro = await ana.esperar('error');
+    expect(erro.payload.code).toBe('RATE_LIMITED');
   });
 
   it('fila:sair tira sem fechar o socket', async () => {

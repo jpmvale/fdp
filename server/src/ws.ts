@@ -28,6 +28,8 @@ export interface WsOptions {
   /** Origens aceitas no upgrade. Vazio = aceita qualquer uma (dev). */
   allowedOrigin?: string | undefined;
   onSuspicion?: (event: { code: string; roomCode: string; playerId: PlayerId }) => void;
+  /** Atrás do Caddy o IP verdadeiro vem em `X-Forwarded-For`. Ver `enderecoDe`. */
+  trustProxy?: boolean | undefined;
   /**
    * A fila. **Opcional de propósito**: sem ela o socket de fila responde 404 e
    * o jogo continua inteiro — a fila é mais um caminho, nunca o caminho (plano
@@ -142,6 +144,7 @@ export function attachWebSocket(server: Upgradable, options: WsOptions): { close
     if ('fila' in session) {
       atenderFila(ws, request, fila!, {
         signer, dados: options.dados ?? null, now, lastSeen,
+        endereco: enderecoDe(request, options.trustProxy ?? false),
       });
       return;
     }
@@ -292,4 +295,21 @@ export function attachWebSocket(server: Upgradable, options: WsOptions): { close
       wss.close();
     },
   };
+}
+
+/**
+ * De onde a conexão veio, para o teto de bilhetes por endereço da fila.
+ *
+ * Mesma regra do `clientIp` do HTTP, e mesma cautela: `x-forwarded-for` é um
+ * cabeçalho que QUALQUER cliente escreve, então só vale quando há um proxy na
+ * frente que o reescreve. Confiar nele sem proxy entrega o teto de graça — quem
+ * quisesse burlá-lo bastaria mandar um endereço diferente a cada socket.
+ */
+function enderecoDe(request: IncomingMessage, confiaNoProxy: boolean): string {
+  if (confiaNoProxy) {
+    const cabecalho = request.headers['x-forwarded-for'];
+    const primeiro = (Array.isArray(cabecalho) ? cabecalho[0] : cabecalho)?.split(',')[0]?.trim();
+    if (primeiro) return primeiro;
+  }
+  return request.socket.remoteAddress ?? 'desconhecido';
 }

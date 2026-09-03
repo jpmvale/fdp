@@ -19,6 +19,7 @@ import {
   AVATAR_EMOJIS,
   CLOSE_CODES,
   ELO_INICIAL,
+  LIMITS,
   PROTOCOL_VERSION,
   type Avatar,
   type ErrorCode,
@@ -28,6 +29,7 @@ import type { Dados } from '@fdp/contas';
 import { contaDoCookie } from './contas-http.js';
 import type { FilaViva } from './fila-viva.js';
 import { novoBilhete } from './fila.js';
+import { createRateLimiter } from './limits.js';
 import type { SessionSigner } from './session.js';
 
 const PADRAO: Avatar = { emoji: AVATAR_EMOJIS[0]!, color: AVATAR_COLORS[0]! };
@@ -37,19 +39,34 @@ export interface OpcoesDoSocketDeFila {
   dados: Dados | null;
   now: () => number;
   lastSeen: WeakMap<WebSocket, number>;
+  /** De onde veio, para o teto de bilhetes por endereço. */
+  endereco: string;
 }
 
 export function atenderFila(
   ws: WebSocket,
   request: IncomingMessage,
   fila: FilaViva,
-  { signer, dados, now, lastSeen }: OpcoesDoSocketDeFila,
+  { signer, dados, now, lastSeen, endereco }: OpcoesDoSocketDeFila,
 ): void {
   // O id do bilhete é o `playerId` que a pessoa vai ter na mesa. Nasce aqui,
   // antes de existir mesa: é ele que amarra o bilhete ao assento, e por isso
   // não pode ser sorteado de novo na hora de sentar.
   const id = randomUUID();
   lastSeen.set(ws, now());
+
+  /**
+   * Teto de comandos, como no socket da sala (RNF-076).
+   *
+   * O socket da fila nasceu sem nenhum — a auditoria de 03/09/2026 encontrou.
+   * O estrago possível é pequeno (os comandos são dois e o segundo é recusado),
+   * e a razão de existir é outra: um socket sem teto é um socket que responde a
+   * um laço apertado para sempre, e o custo disso é do servidor.
+   */
+  const rate = createRateLimiter({
+    limit: LIMITS.commandsPerWindow,
+    windowMs: LIMITS.commandWindowMs,
+  });
 
   const enviar = (type: string, payload: unknown): void => {
     if (ws.readyState !== ws.OPEN) return;
@@ -75,6 +92,8 @@ export function atenderFila(
     } catch {
       return recusar('VALIDATION_FAILED', 'JSON_INVALIDO');
     }
+
+    if (!rate.check(id, now()).allowed) return recusar('RATE_LIMITED', 'RAPIDO_DEMAIS');
 
     const lida = parseFilaMessage(bruto);
     if (!lida.ok) return recusar(lida.code, lida.issues[0] ?? 'INVALIDO');
@@ -116,7 +135,7 @@ export function atenderFila(
       ? (await dados.elos.porContas([conta.id])).get(conta.id)?.pontos ?? ELO_INICIAL
       : ELO_INICIAL;
 
-    const entrou = fila.entrar(
+    const recusa = fila.entrar(
       novoBilhete({
         id,
         modo: payload.modo,
@@ -128,12 +147,17 @@ export function atenderFila(
         agora: now(),
       }),
       ws,
+      endereco,
     );
 
-    // Já estava na fila: mandar `fila:entrar` duas vezes não troca de modo pelo
+    // `JA_ESTA_NA_FILA`: mandar `fila:entrar` duas vezes não troca de modo pelo
     // meio. Trocar exigiria sair e entrar, e o lugar na fila é por ordem de
     // chegada — trocar de modo sem perder o lugar seria furar a própria fila.
-    if (!entrou) recusar('VALIDATION_FAILED', 'JA_ESTA_NA_FILA');
+    //
+    // `ENDERECO_COM_BILHETES_DEMAIS`: o teto de `fila-viva.ts`. A mensagem é
+    // honesta sobre o motivo — quem está atrás do mesmo roteador que dois
+    // amigos precisa entender por que não entrou, senão acha que quebrou.
+    if (recusa) recusar('VALIDATION_FAILED', recusa);
   };
 
   const encerrar = (): void => fila.sair(id);

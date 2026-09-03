@@ -589,5 +589,10 @@ function trocarMeta(
   atributo: 'property' | 'name' = 'property',
 ): string {
   const alvo = new RegExp(`<meta ${atributo}="${chave}" content="[^"]*">`);
-  return html.replace(alvo, `<meta ${atributo}="${chave}" content="${escapar(valor)}">`);
+  // A substituição é uma FUNÇÃO, e não uma string: numa string, `$&`, `$1` e
+  // `$\`` são padrões que o `replace` interpreta, e o valor vem de fora. Hoje o
+  // código de sala é um alfabeto fechado sem `$`, então não é explorável — e é
+  // exatamente o tipo de coisa que deixa de não ser explorável no dia em que
+  // alguém puser o apelido de alguém no cartão.
+  return html.replace(alvo, () => `<meta ${atributo}="${chave}" content="${escapar(valor)}">`);
 }

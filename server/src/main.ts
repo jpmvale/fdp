@@ -204,13 +204,21 @@ async function main(): Promise<void> {
    * ranqueada que responde "exige conta" quando não há de onde ler elo. Um jogo
    * que perde a fila casual porque o Postgres caiu seria o oposto de I-1.
    */
-  const fila = criarFila({ hub, signer });
+  const fila = criarFila({
+    hub,
+    signer,
+    // Só a suíte E2E define isto: ela abre vários sockets do mesmo endereço.
+    ...(process.env.BILHETES_POR_ENDERECO
+      ? { bilhetesPorEndereco: Number(process.env.BILHETES_POR_ENDERECO) }
+      : {}),
+  });
 
   const ws = attachWebSocket(server, {
     hub,
     signer,
     fila,
     dados,
+    trustProxy: TRUST_PROXY,
     allowedOrigin: ALLOWED_ORIGIN,
     onSuspicion: (event) =>
       console.warn(`suspeita ${event.code} sala=${event.roomCode} jogador=${event.playerId}`),
