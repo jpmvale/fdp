@@ -69,5 +69,21 @@ Vinte cartas não podem virar vinte paradas de `Tab`.
 | Cada PR | Simulação de deuteranopia e protanopia sobre a **paleta de avatares** (CA-344) — era manual, e a versão manual errou |
 | Antes da entrega | Simulação de deuteranopia e protanopia sobre **a mesa inteira**, que o teste de paleta não cobre |
 
+O `axe-core` entrou em 03/09/2026 (CA-140) e achou dois defeitos na primeira execução, os dois
+vivos desde o começo do projeto:
+
+- **`--texto-apagado` estava a 4,05:1** sobre `--superficie` — abaixo do piso de 4,5 do RNF-030 — e
+  `.rotulo` usa esse token em quase toda tela. Cinco telas reprovando pelo mesmo valor. Subiu para
+  `#878ba0` (4,62 no pior fundo), e `app/test/contraste.test.ts` passou a cobrar o piso token a
+  token, em milissegundos e sem navegador.
+- **Rótulos ARIA em elementos sem papel.** Um `<div>` ou `<span>` não tem papel implícito, e a ARIA
+  proíbe rótulo neles: o leitor de tela **descarta**. Três lugares — as cartas na mão de cada
+  assento, as vidas e o contador de mensagens novas — tinham rótulo escrito com cuidado que não
+  chegava a ninguém. `role="img"` resolve, e é o papel certo: são representações gráficas.
+
+O reflow (CA-144) é medido a **320 CSS px**, que é o número do WCAG 1.4.10 — "zoom de 200%" mistura
+esse critério com o 1.4.4 (ampliar texto), e 320 é o alvo testável. Ele encontrou três
+transbordamentos: os botões de fila da home, o "copiar convite" do lobby e a mesa inteira (RF-109).
+
 Ferramenta automatizada pega cerca de um terço dos problemas reais. Os dois testes manuais da
 tabela são obrigatórios para considerar a v1 entregue.

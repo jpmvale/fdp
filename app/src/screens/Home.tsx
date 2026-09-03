@@ -71,18 +71,27 @@ export function Home({
           se joga com estranhos, por decisão de layout. */}
       <div className="pilha" style={{ gap: 8 }}>
         <span className="rotulo">jogar com quem estiver online</span>
-        <div style={{ display: 'flex', gap: 8 }}>
+        {/* Os dois lado a lado, e empilhados quando não couberem.
+
+            `flex: 1` sozinho NÃO encolhe abaixo do conteúdo — `min-width: auto`
+            segura o item no tamanho do texto —, e a 200% de zoom "Ranqueada"
+            transbordava a tela em 19 px. Rolagem horizontal é falha de WCAG
+            1.4.10, e foi o CA-144 que a encontrou.
+
+            `flex-basis` de 120 px com `wrap` resolve sem cortar palavra nem pôr
+            reticências: acima disso ficam lado a lado, abaixo empilham. */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             className="fantasma"
             onClick={() => aoEntrarNaFila('NORMAL')}
-            style={{ flex: 1, height: 46 }}
+            style={{ flex: '1 1 120px', minWidth: 0, height: 46 }}
           >
             Jogar agora
           </button>
           <button
             className="fantasma"
             onClick={() => aoEntrarNaFila('RANQUEADA')}
-            style={{ flex: 1, height: 46 }}
+            style={{ flex: '1 1 120px', minWidth: 0, height: 46 }}
           >
             Ranqueada
           </button>

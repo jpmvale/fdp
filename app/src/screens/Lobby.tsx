@@ -59,7 +59,11 @@ export function Lobby({ retrato, eu, aoIniciar, aoExpulsar, aoAdicionarBot, aoRe
     <div className="pilha">
       <div className="cartao pilha" style={{ gap: 10 }}>
         <span className="rotulo">código da sala</span>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        {/* `wrap`: o código tem 32 px de fonte e 6 de espaçamento entre letras,
+            e a 200% de zoom ele sozinho ocupa a largura toda — o "Copiar
+            convite" era empurrado 61 px para fora da tela. Com quebra, o botão
+            desce em vez de sair (CA-144). */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* `data-codigo` é para a suíte E2E.
 
               Um atributo a mais no HTML, e é mais barato que a alternativa: o

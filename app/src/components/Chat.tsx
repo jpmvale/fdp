@@ -98,6 +98,9 @@ export function Chat({
         <span className="rotulo" style={{ flex: 1, textAlign: 'left' }}>chat da mesa</span>
         {naoLidas > 0 && (
           <span
+            // `role`: sem ele a ARIA proíbe o rótulo num `<span>`, e o leitor
+            // de tela lê só o número solto. Mesma armadilha do assento.
+            role="img"
             aria-label={`${naoLidas} ${naoLidas === 1 ? 'mensagem nova' : 'mensagens novas'}`}
             style={{
               fontSize: 11, minWidth: 20, padding: '1px 6px', borderRadius: 10,

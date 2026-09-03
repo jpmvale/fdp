@@ -202,6 +202,7 @@ não pode reintroduzir o vazamento guardando a carta "para animar depois".
 | RF-106 | Qualquer pessoa **PODE** esconder as mensagens de outra **para si**, sem passar pelo servidor e sem que a outra saiba |
 | RF-107 | O convite **DEVE** ser `/{origem}/j/{código}` e chegar nas conversas como cartão: título, descrição com a contagem da mesa e imagem. O formato antigo `?sala=` continua entrando |
 | RF-108 | O histórico do perfil **DEVE** dizer **quando** cada partida aconteceu, agrupado por dia, com "hoje" e "ontem" por extenso e o ano quando não for o corrente |
+| RF-109 | A mesa **DEVE** encolher junto abaixo de 384 px, pelo mesmo `scale` que a amplia no monitor, até o piso declarado de 264 px — nunca exigir rolagem horizontal |
 
 RF-086 abre a casca de 460 px para 900 **só na mesa**, e é a única tela onde isso
 acontece. Em qualquer outra, a coluna continua estreita mesmo num monitor de 27" —
@@ -280,6 +281,21 @@ autoridade social real — quem criou a mesa e convidou os outros. Entre estranh
 dar a um deles o botão de expulsar os outros quatro é entregar a partida a quem clicar primeiro.
 A consequência é RF-102: a decisão de pausa precisa de um host, então a ausência passa a
 resolver-se sozinha, pelo mesmo mecanismo do RF-096.
+
+**Por que a mesa encolhe, e não se remonta (RF-109).** O feltro tem 360 px de projeto e geometria
+medida em pixels — CA-362 defende essa medida. A 200% de zoom a largura efetiva cai pela metade e a
+mesa passava a exigir rolagem horizontal, que é falha de WCAG 1.4.10 (CA-144 encontrou). Remontar a
+mesa em coluna não é opção: a disposição dos assentos ao redor do feltro **é** a informação. Então é
+o mesmo `scale` de RF-092/093, agora para o outro lado — tudo encolhe junto, e o sistema de
+coordenadas de dentro fica intacto.
+
+Duas armadilhas de CSS ficaram registradas em `estilos.css` porque as duas são silenciosas:
+`calc(comprimento / número)` dá comprimento e `scale()` o recusa sem erro (o mesmo engano de
+RF-093, cometido de novo); e `margin: 0 auto` só centraliza enquanto a caixa **cabe** — mais larga
+que o espaço, a margem vira zero e o `scale` reduz em torno de um centro fora do lugar.
+
+O piso é 264 px, declarado: mais estreito que isso a carta fica menor que a unha, e um jogo que
+"cabe" e não se enxerga não é acessível — é só uma métrica verde.
 
 **Por que a data do histórico é um separador por dia, e não uma coluna (RF-108).** A linha já
 carrega colocação, tamanho da mesa, rodadas, acertos, elo e nota, e a tela é desenhada para 360 px:

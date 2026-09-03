@@ -44,7 +44,14 @@
   --vidas: #ef4d5a;
   --texto: #e9e9ed;
   --texto-fraco: #9397ab;
-  --texto-apagado: #75798c;
+  /* Subiu de #75798c em 03/09/2026: o valor antigo dava 4,05:1 sobre
+     `--superficie` e 3,61 sobre `--superficie-2`, abaixo do piso de 4,5 do
+     RNF-030 — e `.rotulo` usa este token em quase toda tela. O `axe-core`
+     apontou na primeira execução dele, em cinco telas de uma vez.
+
+     #878ba0 dá 4,62 no pior fundo. `app/test/contraste.test.ts` cobra isto
+     agora, para o piso não voltar a ser furado por um ajuste de estética. */
+  --texto-apagado: #878ba0;
   --texto-medio: #b2b6ca;
 
   /* Paleta de avatares (`07` §4). A ordem é a de AVATAR_COLORS no protocolo —
@@ -362,9 +369,23 @@ input:focus { border-color: var(--acento); }
 
 .feltro-zoom {
   width: 360px;
-  margin: 0 auto;
   transform: scale(var(--zoom-mesa));
-  transform-origin: top center;
+  /*
+   * Origem no canto, e a centralização feita à mão.
+   *
+   * `margin: 0 auto` com origem no centro parecia equivalente e não é: `auto`
+   * só centraliza enquanto a caixa CABE. Quando os 360 px de projeto são mais
+   * largos que o espaço — e é o caso a partir de 384 px de tela —, a margem
+   * vira zero, a caixa começa colada à esquerda e o `scale` reduz em torno de
+   * um centro que já está fora do lugar: a mesa encolhia e continuava
+   * transbordando pela direita.
+   *
+   * `100% - 360px * var(--zoom-mesa)` é largura menos LARGURA — comprimento
+   * vezes número dá comprimento, e essa conta o CSS aceita. É a diferença entre
+   * esta linha e a que não funcionou.
+   */
+  transform-origin: top left;
+  margin-left: calc((100% - 360px * var(--zoom-mesa)) / 2);
 }
 
 /*
@@ -410,6 +431,39 @@ input:focus { border-color: var(--acento); }
 @media (min-width: 900px) and (min-height: 1020px) {
   :root { --zoom-mesa: 1.8; }
 }
+
+/*
+ * E o zoom também ENCOLHE — que é o que faltava.
+ *
+ * O feltro tem 360 px fixos por construção: a geometria dele é medida em
+ * pixels, e CA-362 defende essa medida. Isso funcionava até alguém ampliar o
+ * texto: a 200% de zoom, a largura efetiva cai pela metade, e a mesa passava a
+ * exigir ROLAGEM HORIZONTAL — falha de WCAG 1.4.10, encontrada pelo CA-144.
+ *
+ * A saída não é reflow: reflow desmontaria a mesa, e a disposição dos assentos
+ * ao redor do feltro É a informação. É o mesmo `scale` que amplia no monitor,
+ * agora para o outro lado — a mesa inteira encolhe junta, com carta, avatar e
+ * texto na mesma proporção, e o sistema de coordenadas de dentro fica intacto.
+ *
+ * Aqui a largura MANDA, ao contrário do zoom para cima: crescer é uma escolha
+ * de conforto e depende da altura; encolher é obrigação, e quem a impõe é a
+ * borda da tela.
+ *
+ * Em degraus, e não `calc((100vw - 24px) / 360)` — que foi a minha primeira
+ * versão e não funciona: comprimento dividido por número dá COMPRIMENTO, e
+ * `scale()` recusa comprimento e cai no valor padrão, em silêncio. É o mesmo
+ * erro descrito três parágrafos acima, cometido de novo por quem o escreveu.
+ * Fica registrado aqui em vez de apagado: a lição só cola se o remendo contar
+ * por que existe.
+ *
+ * Cada degrau usa o fator que serve à largura mais ESTREITA da faixa dele —
+ * senão a borda inferior de cada faixa transborda de novo.
+ */
+@media (max-width: 383px) { :root { --zoom-mesa: 0.93; } }
+@media (max-width: 359px) { :root { --zoom-mesa: 0.86; } }
+@media (max-width: 335px) { :root { --zoom-mesa: 0.80; } }
+@media (max-width: 311px) { :root { --zoom-mesa: 0.72; } }
+@media (max-width: 287px) { :root { --zoom-mesa: 0.64; } }
 
 @media (min-width: 1280px) and (min-height: 1200px) {
   :root { --zoom-mesa: 2; }

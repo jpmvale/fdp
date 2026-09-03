@@ -458,6 +458,9 @@ function Assento({ jogador, partida, souEu, ehHost, ausente, x, y, carta, perdeu
           // teste comparar as minhas vidas antes e depois de uma queda sem
           // depender de posição na mesa — que muda com o número de jogadores.
           {...(souEu ? { 'data-minhas-vidas': true } : {})}
+          // Corações são desenho, e `role="img"` é o que permite o rótulo: sem
+          // ele o leitor de tela ouve "♥♥♥" e não "3 vidas".
+          role="img"
           style={{ color: vidas > 0 ? 'var(--vidas)' : 'var(--texto-apagado)', fontSize: 10, letterSpacing: 1 }}
           aria-label={`${vidas} ${vidas === 1 ? 'vida' : 'vidas'}`}
         >
@@ -526,6 +529,16 @@ function CartasNaMao({ quantas, nome }: { quantas: number; nome: string }) {
 
   return (
     <div
+      /**
+       * `role="img"` não é enfeite: sem ele o `aria-label` abaixo é DESCARTADO.
+       *
+       * Um `<div>` não tem papel implícito, e a ARIA proíbe rótulo em elemento
+       * sem papel — o leitor de tela ignora, e o rótulo cuidadosamente escrito
+       * não chega a ninguém. O `axe-core` chamou de `aria-prohibited-attr` na
+       * primeira execução dele. E `img` é o papel certo: isto É uma
+       * representação gráfica de "N cartas na mão".
+       */
+      role="img"
       // Sem `gap`: as cartas se sobrepõem, e o espaçamento é o `marginLeft`
       // negativo de cada uma. A altura NÃO muda — o assento é medido, e crescer
       // aqui moveria a geometria que CA-362 defende.
